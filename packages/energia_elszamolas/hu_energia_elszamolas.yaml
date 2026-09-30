@@ -1,0 +1,378 @@
+# Havi villany-elszámolás (magyar lakossági, mérőóránkénti rezsisávval).
+# A kedvezményes (rezsi) keret MÉRŐÓRÁNKÉNT jár: napi 6,91 kWh × a hónap napjai.
+# A1 tarifa (főmérő): saját sáv; sávon belül villany_ar_rezsi, felette villany_ar_piaci (hu_energia_arak.yaml).
+# H-tarifa: téli (kedvezményes, mérő 1.81) időszakban h_tarifa_ar, sáv nélkül; a nyári (normál, 1.82)
+#   fogyasztás A1 árakon, de SAJÁT, külön sávval (villany_h_rezsi_napi_hatar).
+# Havi alapdíj: A1 + H, fix havi összeg (megosztott hónapban napokra arányosítva).
+#
+# Folyó hónap: az induló óraállásokhoz (villany_honap_*_kezdo) képest, mérőcsere-biztos skálán.
+# Hónapfordulókor (1-jén 00:00:30) az automatizálás a lezárt hónapot a naplóba írja
+# (sensor.villany_havi_elszamolas_naplo + /config/energia_elszamolas/havi.csv), majd újraindítja a számlálást.
+# Számítás: custom_templates/villany_elszamolas.jinja.
+
+input_number:
+  villany_a1_alapdij:
+    name: "A1 tarifa – havi alapdíj"
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: HUF
+    icon: mdi:cash-lock
+  villany_h_alapdij:
+    name: "H-tarifa – havi alapdíj"
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: HUF
+    icon: mdi:cash-lock
+  villany_rezsi_napi_hatar:
+    name: "A1 rezsisáv – napi"
+    min: 0
+    max: 100
+    step: 0.01
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:flash-alert
+  villany_h_rezsi_napi_hatar:
+    name: "H nyári (1.82) rezsisáv – napi"
+    min: 0
+    max: 100
+    step: 0.01
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:flash-alert
+  villany_honap_a_kezdo:
+    name: "Hónap eleje – A mérő"
+    min: 0
+    max: 9999999
+    step: 0.1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:calendar-start
+  villany_honap_h_teli_kezdo:
+    name: "Hónap eleje – H téli (1.81)"
+    min: 0
+    max: 9999999
+    step: 0.1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:calendar-start
+  villany_honap_h_nyari_kezdo:
+    name: "Hónap eleje – H nyári (1.82)"
+    min: 0
+    max: 9999999
+    step: 0.1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:calendar-start
+
+# Szolgáltató: a díjtáblázatból (sensor.villany_dijtablazat) választáskor az árak átmásolódnak
+# a fenti / hu_energia_arak.yaml ármezőkbe (azok kézzel felülírhatók maradnak).
+input_select:
+  villany_szolgaltato:
+    name: "Villany szolgáltató"
+    options:
+      - "MVM Démász"
+      - "E.ON"
+      - "OPUS TITÁSZ"
+      - "ELMŰ"
+      - "ELMŰ-ÉMÁSZ"
+    icon: mdi:office-building-outline
+
+input_datetime:
+  villany_honap_kezdete:
+    name: "Elszámolási hónap kezdete"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-month
+
+shell_command:
+  villany_havi_csv: >-
+    sh /config/energia_elszamolas/havi.sh {{ honap }} {{ napok }} {{ a_kwh }} {{ h_teli_kwh }} {{ h_nyari_kwh }}
+    {{ sav_kwh }} {{ rezsi_kwh }} {{ piaci_kwh }} {{ energia_ft }} {{ h_sav_kwh }} {{ h_nyari_rezsi_kwh }}
+    {{ h_nyari_piaci_kwh }} {{ h_nyari_ft }} {{ h_teli_ft }} {{ alapdij_ft }} {{ osszesen_ft }}
+
+template:
+  - sensor:
+      # Díjtáblázat (bruttó Ft/kWh és Ft/hó, 2026. szeptemberi lakossági árak – ellenőrizd a saját számládon!).
+      # A H-tarifa normál (nyári) része mindenhol az A1 szerint. Új szolgáltató: vegyél fel egy sort ide ÉS az input_select.villany_szolgaltato listájába.
+      # Állapot = a kiválasztott szolgáltató; „tabla” = mind, „aktualis” = a kiválasztotté.
+      - name: "Villany díjtáblázat"
+        unique_id: villany_dijtablazat
+        default_entity_id: sensor.villany_dijtablazat
+        icon: mdi:table
+        state: "{{ states('input_select.villany_szolgaltato') }}"
+        attributes:
+          tabla: >-
+            {{ {
+              'MVM Démász':  {'a1_rezsi': 36.386, 'a1_piaci': 70.104, 'a1_alapdij': 153.035, 'h_kedv': 22.962, 'h_alapdij': 50.165},
+              'E.ON':        {'a1_rezsi': 35.293, 'a1_piaci': 70.104, 'a1_alapdij': 153.035, 'h_kedv': 23.520, 'h_alapdij': 50.165},
+              'OPUS TITÁSZ': {'a1_rezsi': 35.293, 'a1_piaci': 70.104, 'a1_alapdij': 153.035, 'h_kedv': 23.520, 'h_alapdij': 50.165},
+              'ELMŰ':        {'a1_rezsi': 36.208, 'a1_piaci': 70.104, 'a1_alapdij': 153.035, 'h_kedv': 23.152, 'h_alapdij': 50.165},
+              'ELMŰ-ÉMÁSZ':  {'a1_rezsi': 35.992, 'a1_piaci': 70.104, 'a1_alapdij': 153.035, 'h_kedv': 22.682, 'h_alapdij': 50.165}
+            } }}
+          aktualis: >-
+            {{ (this.attributes.tabla or {}).get(states('input_select.villany_szolgaltato')) if this.attributes.tabla is defined else none }}
+
+      # Folyó hónap: állapot = eddigi költség (Ft), részletek az „adatok” attribútumban.
+      # Számítás: custom_templates/villany_elszamolas.jinja (villany_honap makró).
+      - name: "Villany havi elszámolás"
+        unique_id: villany_havi_elszamolas
+        default_entity_id: sensor.villany_havi_elszamolas
+        unit_of_measurement: HUF
+        icon: mdi:receipt-text-clock
+        availability: >-
+          {{ states('sensor.meroora_allas') | is_number and states('sensor.energy_h_nyari') | is_number
+             and states('input_datetime.villany_honap_kezdete') not in ['unknown', 'unavailable'] }}
+        state: >-
+          {% from 'villany_elszamolas.jinja' import villany_honap %}
+          {{ (villany_honap() | from_json).eddig.osszesen_ft }}
+        attributes:
+          adatok: >-
+            {% from 'villany_elszamolas.jinja' import villany_honap %}
+            {{ villany_honap() | from_json }}
+
+  # Havi napló: minden lezárt hónap egy bejegyzés (a HA újraindításkor visszaállítja).
+  # Törlés: esemény villany_havi_elszamolas_torles, data: honap.
+  - trigger:
+      - trigger: event
+        event_type: villany_havi_elszamolas_rogzites
+        id: uj
+      - trigger: event
+        event_type: villany_havi_elszamolas_torles
+        id: torol
+    sensor:
+      - name: "Villany havi elszámolás napló"
+        unique_id: villany_havi_elszamolas_naplo
+        default_entity_id: sensor.villany_havi_elszamolas_naplo
+        icon: mdi:notebook-outline
+        state: >-
+          {% set e = (this.attributes.honapok if this.attributes.honapok is defined else []) | list %}
+          {% if trigger.id == 'uj' %}{{ e | rejectattr('honap', 'eq', trigger.event.data.bejegyzes.honap) | list | count + 1 }}
+          {% else %}{{ e | rejectattr('honap', 'eq', trigger.event.data.honap) | list | count }}{% endif %}
+        attributes:
+          honapok: >-
+            {% set e = (this.attributes.honapok if this.attributes.honapok is defined else []) | list %}
+            {% if trigger.id == 'uj' %}{{ (e | rejectattr('honap', 'eq', trigger.event.data.bejegyzes.honap) | list) + [trigger.event.data.bejegyzes] }}
+            {% else %}{{ e | rejectattr('honap', 'eq', trigger.event.data.honap) | list }}{% endif %}
+
+automation:
+  - id: villany_szolgaltato_arak_betoltese
+    alias: "Villany szolgáltató – árak betöltése a díjtáblázatból"
+    description: >-
+      Szolgáltató-váltáskor a díjtáblázat árait az ármezőkbe másolja (A1 sávon belül/felett,
+      A1 és H alapdíj, H kedvezményes). A mezők utána kézzel is átírhatók.
+      Induláskor is lefut, ha az A1 ár még 0 (első telepítés).
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: input_select.villany_szolgaltato
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ states('input_select.villany_szolgaltato') in (state_attr('sensor.villany_dijtablazat', 'tabla') or {})
+             and (trigger.platform == 'state' or states('input_number.villany_ar_rezsi') | float(0) == 0) }}
+    actions:
+      - variables:
+          t: "{{ state_attr('sensor.villany_dijtablazat', 'tabla')[states('input_select.villany_szolgaltato')] }}"
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_ar_rezsi }
+        data: { value: "{{ t.a1_rezsi }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_ar_piaci }
+        data: { value: "{{ t.a1_piaci }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_a1_alapdij }
+        data: { value: "{{ t.a1_alapdij }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.h_tarifa_ar }
+        data: { value: "{{ t.h_kedv }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_h_alapdij }
+        # H-tarifás mérő nélkül nincs H alapdíj
+        data: { value: "{{ t.h_alapdij if states('input_text.energia_forras_h') not in ['', 'unknown', 'unavailable'] else 0 }}" }
+      - action: logbook.log
+        data:
+          name: "Villany szolgáltató"
+          message: "{{ states('input_select.villany_szolgaltato') }} árai betöltve: {{ t }}"
+
+  - id: villany_havi_elszamolas_lezaras
+    alias: "Villany havi elszámolás – hónap lezárása"
+    description: >-
+      Minden hónap 1-jén 00:00:30-kor a lezárt hónap adatait a naplóba és a CSV-be írja,
+      majd az induló óraállásokat és a hónap kezdetét az újra állítja.
+    mode: single
+    triggers:
+      - trigger: time
+        at: "00:00:30"
+    conditions:
+      - condition: template
+        value_template: "{{ now().day == 1 }}"
+      - condition: template
+        value_template: "{{ states('input_datetime.villany_honap_kezdete') < now().strftime('%Y-%m-01') }}"
+    actions:
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.villany_havi_elszamolas
+      - delay: 2
+      - variables:
+          d: "{{ state_attr('sensor.villany_havi_elszamolas', 'adatok') }}"
+      # Megosztott hónapnál (A-mérő éves leolvasása a hónapban) részenként egy bejegyzés: ÉÉÉÉ-HH/1, /2.
+      - repeat:
+          for_each: "{{ d.reszek }}"
+          sequence:
+            - variables:
+                r: "{{ repeat.item }}"
+                bejegyzes:
+                  honap: "{{ d.honap if d.reszek | count == 1 else d.honap ~ '/' ~ repeat.index }}"
+                  tol: "{{ r.tol }}"
+                  ig: "{{ r.ig }}"
+                  napok: "{{ r.napok }}"
+                  a_kwh: "{{ r.a_kwh }}"
+                  h_teli_kwh: "{{ r.h_teli_kwh }}"
+                  h_nyari_kwh: "{{ r.h_nyari_kwh }}"
+                  sav_kwh: "{{ r.sav_kwh }}"
+                  rezsi_kwh: "{{ r.rezsi_kwh }}"
+                  piaci_kwh: "{{ r.piaci_kwh }}"
+                  energia_ft: "{{ r.energia_ft }}"
+                  h_sav_kwh: "{{ r.h_sav_kwh }}"
+                  h_nyari_rezsi_kwh: "{{ r.h_nyari_rezsi_kwh }}"
+                  h_nyari_piaci_kwh: "{{ r.h_nyari_piaci_kwh }}"
+                  h_nyari_ft: "{{ r.h_nyari_ft }}"
+                  h_teli_ft: "{{ r.h_teli_ft }}"
+                  alapdij_ft: "{{ r.alapdij_ft }}"
+                  osszesen_ft: "{{ r.osszesen_ft }}"
+                  megosztva: "{{ d.reszek | count > 1 }}"
+                  arak: "{{ dict(d.arak, alapdij=(d.arak.alapdij * r.alapdij_arany) | round(3)) }}"
+                  szolgaltato: "{{ states('input_select.villany_szolgaltato') }}"
+                  rogzitve: "{{ now().strftime('%Y-%m-%d %H:%M') }}"
+            - event: villany_havi_elszamolas_rogzites
+              event_data:
+                bejegyzes: "{{ bejegyzes }}"
+            - action: shell_command.villany_havi_csv
+              continue_on_error: true
+              data: "{{ bejegyzes }}"
+            - delay: 1
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.villany_honap_a_kezdo
+        data:
+          value: >-
+            {{ (states('sensor.meroora_allas') | float - states('input_number.villany_a_csere_ossz') | float(0)) | round(1) }}
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.villany_honap_h_teli_kezdo
+        data:
+          value: "{{ states('sensor.energy_h_teli') | float | round(1) }}"
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.villany_honap_h_nyari_kezdo
+        data:
+          value: "{{ states('sensor.energy_h_nyari') | float | round(1) }}"
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.villany_honap_kezdete
+        data:
+          date: "{{ now().strftime('%Y-%m-01') }}"
+
+script:
+  energia_elszamolas_elso_beallitas:
+    alias: "Energia-elszámolás – első beállítás"
+    icon: mdi:rocket-launch-outline
+    description: >-
+      Telepítés után EGYSZER futtasd (a források megadása után). A mostani óraállásokat veszi a
+      folyó hónap kezdetének, elindítja a H-tarifa téli/nyári bontását (0-ról), beállítja a napi
+      rezsisávot (6,91 kWh) és betölti a kiválasztott szolgáltató árait.
+      A régebbi adatok (előző hónapok) így nem számolódnak; a hónap első bejegyzése részleges lesz.
+    mode: single
+    sequence:
+      # Új számsegéd a minimumán jön létre: a még érintetlen (minimumon álló) eltolás-, csere- és
+      # korrekciós mezőket 0-ra állítja. A már beállított értékekhez nem nyúl (újrafuttatható).
+      - if: "{{ states('input_number.energia_forras_a_szorzo') | float(0) <= 0.5 }}"
+        then:
+          - action: input_number.set_value
+            target: { entity_id: input_number.energia_forras_a_szorzo }
+            data: { value: 1 }
+      - repeat:
+          for_each:
+            - input_number.villany_a_eltolas
+            - input_number.villany_h_eltolas
+            - input_number.gaz_eltolas
+            - input_number.villany_a_csere_ossz
+            - input_number.villany_h_csere_ossz
+            - input_number.gaz_csere_ossz
+            - input_number.villany_a_korrekcio
+            - input_number.villany_h_korrekcio
+            - input_number.gaz_korrekcio
+          sequence:
+            - if: "{{ states(repeat.item) | float(0) <= state_attr(repeat.item, 'min') | float(0) }}"
+              then:
+                - action: input_number.set_value
+                  target: { entity_id: "{{ repeat.item }}" }
+                  data: { value: 0 }
+      - delay: 2
+      - action: homeassistant.update_entity
+        target: { entity_id: [sensor.villany_a_forras_kwh, sensor.meroora_allas, sensor.meroora_allas_h] }
+      - delay: 1
+      - condition: template
+        value_template: "{{ states('sensor.meroora_allas') | is_number }}"
+      - action: input_number.set_value
+        target: { entity_id: [input_number.villany_rezsi_napi_hatar, input_number.villany_h_rezsi_napi_hatar] }
+        data: { value: 6.91 }
+      - variables:
+          h_total: >-
+            {{ (states('sensor.meroora_allas_h') | float(0) - states('input_number.villany_h_csere_ossz') | float(0)) | round(1) }}
+      - action: input_text.set_value
+        target: { entity_id: input_text.h_tarifa_szakasz }
+        data:
+          value: >-
+            {{ {'teli': 0, 'nyari': 0, 'sz': h_total, 'szak': 'teli' if is_state('binary_sensor.h_tariff_season', 'on') else 'nyari'} | to_json }}
+      - delay: 2
+      - action: homeassistant.update_entity
+        target: { entity_id: [sensor.energy_h_teli, sensor.energy_h_nyari] }
+      - delay: 1
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_honap_a_kezdo }
+        data:
+          value: >-
+            {{ (states('sensor.meroora_allas') | float - states('input_number.villany_a_csere_ossz') | float(0)) | round(1) }}
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_honap_h_teli_kezdo }
+        data: { value: "{{ states('sensor.energy_h_teli') | float(0) | round(1) }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_honap_h_nyari_kezdo }
+        data: { value: "{{ states('sensor.energy_h_nyari') | float(0) | round(1) }}" }
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.villany_honap_kezdete }
+        data: { date: "{{ now().strftime('%Y-%m-01') }}" }
+      # A kiválasztott szolgáltató árai (ugyanaz, mint az árbetöltő automatizálás)
+      - variables:
+          t: "{{ state_attr('sensor.villany_dijtablazat', 'tabla')[states('input_select.villany_szolgaltato')] }}"
+          van_h: "{{ states('input_text.energia_forras_h') not in ['', 'unknown', 'unavailable'] }}"
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_ar_rezsi }
+        data: { value: "{{ t.a1_rezsi }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_ar_piaci }
+        data: { value: "{{ t.a1_piaci }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_a1_alapdij }
+        data: { value: "{{ t.a1_alapdij }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.h_tarifa_ar }
+        data: { value: "{{ t.h_kedv }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.villany_h_alapdij }
+        data: { value: "{{ t.h_alapdij if van_h else 0 }}" }
+      - action: persistent_notification.create
+        data:
+          title: "Energia-elszámolás"
+          message: >-
+            Első beállítás kész: a folyó hónap {{ now().strftime('%Y-%m-01') }}-től számol
+            (A1 kezdőállás: {{ states('input_number.villany_honap_a_kezdo') }} kWh),
+            szolgáltató: {{ states('input_select.villany_szolgaltato') }}.
+            Az éves elszámolás a „Mérőóra leolvasás” kártyán az első éves leolvasás rögzítésével indul.

@@ -1,0 +1,493 @@
+# Energia-elszámolás nézet (sections).
+# Beillesztés: Irányítópult → ⋮ → Szerkesztés → ⋮ → Nyers konfigurációszerkesztő.
+#  - Új, üres irányítópultnál: cseréld le a teljes tartalmat erre a fájlra.
+#  - Meglévőnél: a views: alatti „- title: Energia-elszámolás” blokkot másold a saját views: listádba.
+# Szükséges: HACS → html-template-card, és a hu-szam-sor.js erőforrás (lásd README).
+views:
+- title: Energia-elszámolás
+  path: energia-elszamolas
+  icon: mdi:receipt-text-clock
+  type: sections
+  max_columns: 3
+  sections:
+  - type: grid
+    cards:
+    - type: heading
+      heading: Havi villany-elszámolás
+      icon: mdi:receipt-text-clock
+    - type: custom:html-template-card
+      ignore_line_breaks: true
+      content: |-
+        <style>
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{text-align:left;color:var(--secondary-text-color);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--divider-color)}
+        td{padding:5px 6px;border-bottom:1px solid var(--divider-color);vertical-align:top}
+        td.n,th.n{text-align:right;white-space:nowrap}
+        tr.tot td{font-weight:700;border-bottom:none}
+        .s{color:var(--secondary-text-color);font-size:11px}
+        .warn{color:var(--warning-color)}
+        tr.sel td{background:rgba(255,152,0,.14);font-weight:700}
+        .bar{height:6px;border-radius:3px;background:var(--divider-color);margin:6px 6px 2px;overflow:hidden}
+        .bar i{display:block;height:100%}
+        </style>
+        {%- set d = state_attr('sensor.villany_havi_elszamolas', 'adatok') -%}
+        {%- if d is not mapping -%}<div class="s" style="padding:8px">Nincs adat.</div>{%- else -%}
+        {%- set e = d.eddig -%}{%- set v = d.varhato -%}
+        {%- set ft = '{:,.0f}' -%}
+        {%- macro k(x) -%}{{ ('%.1f' | format(x)).replace('.', ',') }}{%- endmacro -%}
+        {%- macro p(x) -%}{{ ('%.3f' | format(x)).rstrip('0').rstrip('.').replace('.', ',') }}{%- endmacro -%}
+        {%- macro csik(nev, kwh, sav) -%}
+        {%- set pct = (100 * kwh / sav) if sav > 0 else 0 -%}
+        <div style="padding:4px 6px 0;font-size:12px">{{ nev }}: {{ k(kwh) }} / {{ k(sav) }} kWh
+        <span class="s"> · {{ ('sáv felett ' ~ k(kwh - sav) ~ ' kWh') if kwh > sav else ('még ' ~ k(sav - kwh) ~ ' kWh a sávban') }}</span></div>
+        <div class="bar"><i style="width:{{ [pct, 100] | min }}%;background:{{ 'var(--warning-color)' if pct >= 100 else 'var(--success-color)' }}"></i></div>
+        {%- endmacro -%}
+        {%- macro sor(nev, ar, kwh, eddig, varhato, warn=false) -%}
+        <tr><td class="{{ 'warn' if warn else '' }}">{{ nev }}{% if ar %}<div class="s">{{ p(ar) }} Ft/kWh</div>{% endif %}</td><td class="n">{{ k(kwh) if kwh is number else kwh }}</td><td class="n">{{ ft.format(eddig).replace(',', ' ') }}</td><td class="n">{{ ft.format(varhato).replace(',', ' ') }}</td></tr>
+        {%- endmacro -%}
+        <div style="padding:4px 6px 2px;font-size:13px"><b>{{ d.honap }}</b> · {{ d.eltelt_nap | round(0, 'ceil') | int }}. nap / {{ d.napok }}
+        <span class="s"> · a rezsikeret mérőóránként külön jár</span></div>
+        {{ csik('A1 főmérő', d.a_kwh, d.sav_kwh) }}
+        {%- if d.h_nyari_kwh > 0 or d.h_teli_kwh == 0 %}{{ csik('H nyári (1.82)', d.h_nyari_kwh, d.h_sav_kwh) }}{% endif %}
+        <table>
+        <tr><th>Tétel</th><th class="n">kWh</th><th class="n">Eddig</th><th class="n">Várható</th></tr>
+        {{ sor('A1 sávon belül', d.arak.rezsi, e.rezsi_kwh, e.rezsi_kwh * d.arak.rezsi, v.rezsi_kwh * d.arak.rezsi) }}
+        {{ sor('A1 sáv felett', d.arak.piaci, e.piaci_kwh, e.piaci_kwh * d.arak.piaci, v.piaci_kwh * d.arak.piaci, e.piaci_kwh > 0) }}
+        {%- if d.h_nyari_kwh > 0 or d.h_teli_kwh == 0 %}
+        {{ sor('H nyári sávon belül', d.arak.rezsi, e.h_nyari_rezsi_kwh, e.h_nyari_rezsi_kwh * d.arak.rezsi, v.h_nyari_rezsi_kwh * d.arak.rezsi) }}
+        {{ sor('H nyári sáv felett', d.arak.piaci, e.h_nyari_piaci_kwh, e.h_nyari_piaci_kwh * d.arak.piaci, v.h_nyari_piaci_kwh * d.arak.piaci, e.h_nyari_piaci_kwh > 0) }}
+        {%- endif %}
+        {%- if d.h_teli_kwh > 0 or d.h_nyari_kwh == 0 %}
+        {{ sor('H téli (1.81)', d.arak.h_teli, d.h_teli_kwh, e.h_teli_ft, v.h_teli_ft) }}
+        {%- endif %}
+        {{ sor('Alapdíj (A1 + H), fix', none, p(d.arak.alapdij) ~ ' Ft/hó', e.alapdij_ft, v.alapdij_ft) }}
+        <tr class="tot"><td>Összesen</td><td></td><td class="n">{{ ft.format(e.osszesen_ft).replace(',', ' ') }} Ft</td><td class="n">{{ ft.format(v.osszesen_ft).replace(',', ' ') }} Ft</td></tr>
+        </table>
+        {%- if d.megosztva %}
+        <div style="padding:6px;font-size:12px;border-left:3px solid var(--info-color,#039be5);margin:6px">A hónap a {{ d.reszek[1].tol }}-i éves leolvasással két részre oszlik (sáv és alapdíj napokra arányosan):
+        {%- for r in d.reszek %}<br>{{ r.tol[8:] }}–{{ r.ig[8:] }}. ({{ r.napok }} nap{{ ', lezárt évhez' if loop.first else ', új év' }}): A1 {{ k(r.a_kwh) }} kWh (sáv {{ k(r.sav_kwh) }}), H nyári {{ k(r.h_nyari_kwh) }}, H téli {{ k(r.h_teli_kwh) }} kWh · <b>{{ ft.format(r.osszesen_ft).replace(',', ' ') }} Ft</b>{%- endfor %}</div>
+        {%- endif %}
+        <div class="s" style="padding:6px">Várható = eddigi + az utolsó 7 nap napi átlaga × hátralévő {{ k(d.hatralevo_nap) }} nap (A1 {{ p(d.napi_atlag_a_kwh) }} kWh/nap, H {{ p(d.napi_atlag_h_kwh) }} kWh/nap). Az alapdíj fix havi összeg.<br><b>Tájékoztató számítás, nem helyettesíti a szolgáltatói számlát.</b> Naptári hónapokkal számol; ha a szolgáltató elszámolási időszaka nem 1-jén kezdődik, eltérés lehet.</div>
+        {%- endif -%}
+    - type: entities
+      title: Szolgáltató és tarifák
+      entities:
+      - entity: input_select.villany_szolgaltato
+        name: Szolgáltató
+    - type: custom:html-template-card
+      ignore_line_breaks: true
+      content: |-
+        <style>
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{text-align:left;color:var(--secondary-text-color);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--divider-color)}
+        td{padding:5px 6px;border-bottom:1px solid var(--divider-color);vertical-align:top}
+        td.n,th.n{text-align:right;white-space:nowrap}
+        tr.tot td{font-weight:700;border-bottom:none}
+        .s{color:var(--secondary-text-color);font-size:11px}
+        .warn{color:var(--warning-color)}
+        tr.sel td{background:rgba(255,152,0,.14);font-weight:700}
+        .bar{height:6px;border-radius:3px;background:var(--divider-color);margin:6px 6px 2px;overflow:hidden}
+        .bar i{display:block;height:100%}
+        </style>
+        {%- set t = state_attr('sensor.villany_dijtablazat', 'tabla') or {} -%}
+        {%- set v = states('input_select.villany_szolgaltato') -%}
+        {%- macro f(x) -%}{{ ('%.3f' | format(x)).replace('.', ',') }}{%- endmacro -%}
+        {%- set elteres = t.get(v) and (
+              (t[v].a1_rezsi - states('input_number.villany_ar_rezsi') | float(0)) | abs > 0.0005 or
+              (t[v].a1_piaci - states('input_number.villany_ar_piaci') | float(0)) | abs > 0.0005 or
+              (t[v].a1_alapdij - states('input_number.villany_a1_alapdij') | float(0)) | abs > 0.0005 or
+              (t[v].h_kedv - states('input_number.h_tarifa_ar') | float(0)) | abs > 0.0005 or
+              (t[v].h_alapdij - states('input_number.villany_h_alapdij') | float(0)) | abs > 0.0005) -%}
+        <table>
+        <tr><th>Szolgáltató</th><th class="n">A1 sávon<br>belül</th><th class="n">A1 sáv<br>felett</th><th class="n">A1 alap-<br>díj/hó</th><th class="n">H kedv.<br>(1.81)</th><th class="n">H alap-<br>díj/hó</th></tr>
+        {%- for nev, a in t.items() -%}
+        <tr class="{{ 'sel' if nev == v else '' }}"><td>{{ '▶ ' if nev == v else '' }}{{ nev }}</td><td class="n">{{ f(a.a1_rezsi) }}</td><td class="n">{{ f(a.a1_piaci) }}</td><td class="n">{{ f(a.a1_alapdij) }}</td><td class="n">{{ f(a.h_kedv) }}</td><td class="n">{{ f(a.h_alapdij) }}</td></tr>
+        {%- endfor -%}
+        </table>
+        <div class="s" style="padding:6px">Bruttó Ft/kWh, illetve Ft/hó. A H-tarifa nyári (normál, 1.82) része mindenhol az A1 árai szerint megy, saját rezsisávval.
+        {%- if elteres %} <span class="warn">A lenti számolt árak kézzel eltérnek a táblázattól.</span>{% endif %}</div>
+    - type: entities
+      state_color: false
+      entities:
+      - type: section
+        label: Számolt árak (a választáskor betöltődnek, kézzel átírhatók)
+      - entity: input_number.villany_ar_rezsi
+        name: A1 sávon belül
+        type: custom:hu-szam-sor
+      - entity: input_number.villany_ar_piaci
+        name: A1 sáv felett
+        type: custom:hu-szam-sor
+      - entity: input_number.villany_a1_alapdij
+        name: A1 havi alapdíj
+        type: custom:hu-szam-sor
+      - entity: input_number.h_tarifa_ar
+        name: H kedvezményes (1.81)
+        type: custom:hu-szam-sor
+      - entity: input_number.villany_h_alapdij
+        name: H havi alapdíj
+        type: custom:hu-szam-sor
+      - type: section
+        label: Rezsisáv (mérőóránként)
+      - entity: input_number.villany_rezsi_napi_hatar
+        name: A1 naponta
+        type: custom:hu-szam-sor
+      - entity: input_number.villany_h_rezsi_napi_hatar
+        name: H nyári (1.82) naponta
+        type: custom:hu-szam-sor
+    - type: heading
+      heading: Lezárt hónapok
+      heading_style: subtitle
+      icon: mdi:notebook-outline
+    - type: custom:html-template-card
+      ignore_line_breaks: true
+      content: |-
+        <style>
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{text-align:left;color:var(--secondary-text-color);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--divider-color)}
+        td{padding:5px 6px;border-bottom:1px solid var(--divider-color);vertical-align:top}
+        td.n,th.n{text-align:right;white-space:nowrap}
+        tr.tot td{font-weight:700;border-bottom:none}
+        .s{color:var(--secondary-text-color);font-size:11px}
+        .warn{color:var(--warning-color)}
+        tr.sel td{background:rgba(255,152,0,.14);font-weight:700}
+        .bar{height:6px;border-radius:3px;background:var(--divider-color);margin:6px 6px 2px;overflow:hidden}
+        .bar i{display:block;height:100%}
+        tr.ev td{background:rgba(3,169,244,.16);font-weight:700;border-top:2px solid var(--info-color,#039be5)}tr.ev td.l{color:var(--info-color,#039be5)}tr.evh td{border-bottom:none;padding-bottom:0}tr.evh .s{font-weight:500}tr.evs td{border-top:none}tr.folyo td{font-style:italic;opacity:.8}</style>
+        {%- set log = state_attr('sensor.villany_havi_elszamolas_naplo', 'honapok') or [] -%}
+        {%- set d = state_attr('sensor.villany_havi_elszamolas', 'adatok') -%}
+        {#- a folyó hónap (részei) is bekerül, dőlten, hogy az éves összesítő már most teljes legyen -#}
+        {%- set fns = namespace(l=log) -%}
+        {%- if d is mapping -%}{%- for r in d.reszek -%}
+          {%- set key = d.honap if d.reszek | count == 1 else d.honap ~ '/' ~ loop.index -%}
+          {%- if log | selectattr('honap', 'eq', key) | list | count == 0 -%}
+            {%- set fns.l = fns.l + [dict(r, honap=key, folyo=true)] -%}
+          {%- endif -%}
+        {%- endfor -%}{%- endif -%}
+        {%- set e = fns.l | sort(attribute='honap', reverse=true) -%}
+        {%- set ft = '{:,.0f}' -%}
+        {%- macro k(x) -%}{{ ('%.1f' | format(x)).replace('.', ',') }}{%- endmacro -%}
+        {%- macro tol(b) -%}{{ b.tol if b.tol is defined else b.honap[:7] ~ '-01' }}{%- endmacro -%}
+        {#- éves időszakok az A-mérő éves leolvasásaiból -#}
+        {%- set lo = (state_attr('sensor.meroora_leolvasasi_naplo', 'bejegyzesek') or []) | selectattr('mero', 'eq', 'A') | selectattr('tipus', 'eq', 'Éves leolvasás') | sort(attribute='datum') | list -%}
+        {%- set pns = namespace(p=[]) -%}
+        {%- for r in lo -%}{%- set pns.p = pns.p + [{'kezd': lo[loop.index0 - 1].datum if loop.index0 > 0 else none, 'veg': r.datum}] -%}{%- endfor -%}
+        {%- set periodusok = pns.p | reverse | list -%}
+        {%- macro evsor(pp) -%}
+          {%- set sns = namespace(a=0, hn=0, ht=0, pa=0, ph=0, ft=0, n=0, becs=false, elso=none, folyo=false) -%}
+          {%- for b in e -%}{%- set t = tol(b) -%}
+            {%- if t < pp.veg and (pp.kezd is none or t >= pp.kezd) -%}
+              {%- set sns.a = sns.a + b.a_kwh -%}{%- set sns.hn = sns.hn + b.h_nyari_kwh -%}{%- set sns.ht = sns.ht + b.h_teli_kwh -%}
+              {%- set sns.pa = sns.pa + b.piaci_kwh -%}{%- set sns.ph = sns.ph + (b.h_nyari_piaci_kwh if b.h_nyari_piaci_kwh is defined else 0) -%}
+              {%- set sns.ft = sns.ft + b.osszesen_ft -%}{%- set sns.n = sns.n + 1 -%}
+              {%- if b.becsult is defined and b.becsult -%}{%- set sns.becs = true -%}{%- endif -%}
+              {%- if b.folyo is defined -%}{%- set sns.folyo = true -%}{%- endif -%}
+              {%- set sns.elso = t if sns.elso is none or t < sns.elso else sns.elso -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if sns.n > 0 -%}
+          <tr class="ev evh"><td class="l" colspan="6">Éves elszámolás <span class="s">· {{ pp.kezd or sns.elso }} – {{ (as_datetime(pp.veg ~ 'T00:00:00') - timedelta(days=1)).strftime('%Y-%m-%d') }}{{ ' · részleges adat' if pp.kezd is none else '' }}{{ ' · becsült tételekkel' if sns.becs else '' }}{{ ' · a folyó hónappal' if sns.folyo else '' }}</span></td></tr>
+          <tr class="ev evs"><td class="l">Összesen</td>
+          <td class="n">{{ k(sns.a) }}</td><td class="n">{{ k(sns.hn) }}</td><td class="n">{{ k(sns.ht) }}</td>
+          <td class="n">{{ k(sns.pa) }} / {{ k(sns.ph) }}</td><td class="n">{{ ft.format(sns.ft).replace(',', ' ') }} Ft</td></tr>
+          {%- endif -%}
+        {%- endmacro -%}
+        {%- if e | count == 0 -%}<div class="s" style="padding:8px">Még nincs lezárt hónap.</div>
+        {%- else -%}
+        <table><tr><th>Hónap</th><th class="n">A1</th><th class="n">H nyári</th><th class="n">H téli</th><th class="n">Felett<div class="s">A1 / H</div></th><th class="n">Összesen</th></tr>
+        {%- set kns = namespace(kesz=[]) -%}
+        {%- for b in e -%}
+          {%- for pp in periodusok -%}
+            {%- if pp.veg not in kns.kesz and tol(b) < pp.veg -%}{{ evsor(pp) }}{%- set kns.kesz = kns.kesz + [pp.veg] -%}{%- endif -%}
+          {%- endfor -%}
+          {%- set hp = b.h_nyari_piaci_kwh if b.h_nyari_piaci_kwh is defined else 0 -%}
+          <tr class="{{ 'folyo' if b.folyo is defined else '' }}"><td>{{ b.honap[:7] }}{{ '*' if b.becsult is defined and b.becsult else '' }}{% if '/' in b.honap %}<div class="s">{{ b.tol[8:] }}–{{ b.ig[8:] }}.{{ ' (folyó)' if b.folyo is defined else '' }}</div>{% elif b.folyo is defined %}<div class="s">folyó</div>{% endif %}</td>
+          <td class="n">{{ k(b.a_kwh) }}</td><td class="n">{{ k(b.h_nyari_kwh) }}</td><td class="n">{{ k(b.h_teli_kwh) }}</td>
+          <td class="n {{ 'warn' if b.piaci_kwh > 0 or hp > 0 else '' }}">{{ k(b.piaci_kwh) }} / {{ k(hp) }}</td><td class="n"><b>{{ ft.format(b.osszesen_ft).replace(',', ' ') }} Ft</b></td></tr>
+        {%- endfor -%}
+        </table>
+        {%- set megj = e | selectattr('megjegyzes', 'defined') | selectattr('megjegyzes') | list -%}
+        <div class="s" style="padding:6px">
+        {%- for b in megj -%}{{ b.honap }}{{ '*' if b.becsult else '' }}: {{ b.megjegyzes }}<br>{%- endfor -%}
+        Kék sor: a lezárt éves elszámolás összesítése (az A-mérő éves leolvasásai között) – a szolgáltató által elszámolt éves áramdíj. Az éves leolvasás hónapja a leolvasás napjával két részre oszlik (sáv és alapdíj napokra arányosan). {{ 'Visszatöltött hónapok: a hosszú távú statisztikából, a mostani árakkal.' if e | selectattr('visszatoltve', 'defined') | list else '' }}</div>
+        {%- endif -%}
+  - type: grid
+    cards:
+    - type: heading
+      heading: Mérőóra leolvasás
+      icon: mdi:counter
+    - type: glance
+      columns: 3
+      show_icon: false
+      state_color: false
+      entities:
+      - entity: sensor.meroora_allas
+        name: A óra
+      - entity: sensor.meroora_allas_h
+        name: H óra
+      - entity: sensor.gaz_meroora_allas
+        name: Gázóra
+      - entity: sensor.meroora_allas_eves
+        name: A éves
+      - entity: sensor.meroora_allas_h_eves
+        name: H éves
+      - entity: sensor.gaz_meroora_allas_eves
+        name: Gáz éves
+    - type: entities
+      state_color: false
+      entities:
+      - entity: input_select.villany_leolvasas_tipus
+        name: Típus
+      - type: section
+      - entity: input_boolean.meroora_rogzit_a
+        name: A – főmérő
+        icon: mdi:checkbox-marked-circle-outline
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_a
+          state: 'on'
+        row:
+          entity: input_datetime.villany_a_leolvasas_datum
+          name: Dátum
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_a
+          state: 'on'
+        - entity: input_select.villany_leolvasas_tipus
+          state: Mérőcsere
+        row:
+          type: section
+          label: Óraállás = a leszerelt óra végállása
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_a
+          state: 'on'
+        row:
+          entity: input_number.villany_a_leolvasas_allas
+          name: Óraállás
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_a
+          state: 'on'
+        - entity: input_select.villany_leolvasas_tipus
+          state: Mérőcsere
+        row:
+          entity: input_number.villany_a_uj_ora_kezdo
+          name: Új óra
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_a
+          state: 'on'
+        row:
+          entity: input_number.villany_a_korrekcio
+          name: Korrekció
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_a
+          state: 'on'
+        row:
+          entity: sensor.a_mero_elteres_a_leolvasastol
+          name: Eltérés HA-tól (most)
+      - type: section
+      - entity: input_boolean.meroora_rogzit_h
+        name: H – H-tarifa
+        icon: mdi:checkbox-marked-circle-outline
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_h
+          state: 'on'
+        row:
+          entity: input_datetime.villany_h_leolvasas_datum
+          name: Dátum
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_h
+          state: 'on'
+        - entity: input_select.villany_leolvasas_tipus
+          state: Mérőcsere
+        row:
+          type: section
+          label: Óraállás = a leszerelt óra végállása
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_h
+          state: 'on'
+        row:
+          entity: input_number.villany_h_leolvasas_allas
+          name: Óraállás
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_h
+          state: 'on'
+        - entity: input_select.villany_leolvasas_tipus
+          state: Mérőcsere
+        row:
+          entity: input_number.villany_h_uj_ora_kezdo
+          name: Új óra
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_h
+          state: 'on'
+        row:
+          entity: input_number.villany_h_korrekcio
+          name: Korrekció
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_h
+          state: 'on'
+        row:
+          entity: sensor.h_mero_elteres_a_leolvasastol
+          name: Eltérés HA-tól (most)
+      - type: section
+      - entity: input_boolean.meroora_rogzit_g
+        name: Gáz
+        icon: mdi:checkbox-marked-circle-outline
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_g
+          state: 'on'
+        row:
+          entity: input_datetime.gaz_leolvasas_datum
+          name: Dátum
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_g
+          state: 'on'
+        - entity: input_select.villany_leolvasas_tipus
+          state: Mérőcsere
+        row:
+          type: section
+          label: Óraállás = a leszerelt óra végállása
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_g
+          state: 'on'
+        row:
+          entity: input_number.gaz_leolvasas_allas
+          name: Óraállás
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_g
+          state: 'on'
+        - entity: input_select.villany_leolvasas_tipus
+          state: Mérőcsere
+        row:
+          entity: input_number.gaz_uj_ora_kezdo
+          name: Új óra
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_g
+          state: 'on'
+        row:
+          entity: input_number.gaz_korrekcio
+          name: Korrekció
+          type: custom:hu-szam-sor
+      - type: conditional
+        conditions:
+        - entity: input_boolean.meroora_rogzit_g
+          state: 'on'
+        row:
+          entity: sensor.gaz_mero_elteres_a_leolvasastol
+          name: Eltérés HA-tól (most)
+      - type: section
+      - type: button
+        name: Adatok rögzítése
+        icon: mdi:check-circle-outline
+        action_name: Mehet
+        tap_action:
+          action: perform-action
+          perform_action: script.meroora_leolvasas_mehet
+          confirmation:
+            text: Rögzíted a beírt adatokat? Csak a bejelölt mérők kerülnek be.
+    - type: heading
+      heading: Leolvasási napló
+      heading_style: subtitle
+      icon: mdi:notebook-outline
+    - type: entities
+      entities:
+      - entity: input_select.villany_naplo_szuro
+        name: Szűrő
+    - type: custom:html-template-card
+      ignore_line_breaks: true
+      content: |-
+        {%- set sz = states('input_select.villany_naplo_szuro') -%}
+        {%- set e = state_attr('sensor.meroora_leolvasasi_naplo', 'bejegyzesek') or [] -%}
+        {%- set osszes = e -%}
+        {%- macro szam(x) -%}{{ ('%.3f' | format(x | float)).rstrip('0').rstrip('.').replace('.', ',') }}{%- endmacro -%}
+        {%- if sz in ['A mérő', 'H mérő', 'Gáz mérő'] -%}{%- set e = e | selectattr('mero', 'eq', 'G' if sz == 'Gáz mérő' else sz[0]) | list -%}
+        {%- elif sz in ['Éves leolvasás', 'Mérőcsere'] -%}{%- set e = e | selectattr('tipus', 'eq', sz) | list -%}{%- endif -%}
+        {%- set e = e | sort(attribute='datum', reverse=true) -%}
+        <style>
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{text-align:left;color:var(--secondary-text-color);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--divider-color)}
+        td{padding:5px 6px;border-bottom:1px solid var(--divider-color);vertical-align:top}
+        td.n{text-align:right;white-space:nowrap}
+        td .s{white-space:normal}
+        table{table-layout:auto}
+        .cs{color:var(--warning-color)}
+        .s{color:var(--secondary-text-color);font-size:11px}
+        </style>
+        {%- if e | count == 0 -%}<div class="s" style="padding:8px">Nincs bejegyzés.</div>
+        {%- else -%}
+        <table><tr><th>Dátum</th><th>Mérő</th><th>Típus</th><th style="text-align:right">Óraállás</th><th style="text-align:right">Fogyasztás</th></tr>
+        {%- for b in e -%}
+        <tr><td>{{ b.datum }}</td><td>{{ 'Gáz' if b.mero == 'G' else b.mero }}</td>
+        <td class="{{ 'cs' if b.tipus == 'Mérőcsere' else '' }}">{{ b.tipus }}{% if b.megjegyzes is defined and b.megjegyzes %}<div class="s">{{ b.megjegyzes }}</div>{% endif %}{% if b.korrekcio %}<div class="s">korr. {{ '+' if b.korrekcio > 0 else '' }}{{ szam(b.korrekcio) }} {{ 'm³' if b.mero == 'G' else 'kWh' }}</div>{% endif %}</td>
+        <td class="n">{% if b.tipus == 'Mérőcsere' %}{{ szam(b.allas) }} → {{ szam(b.uj_kezdo) }}<div class="s">régi → új</div>{% else %}{{ szam(b.allas) if b.allas is not none else '–' }}{% endif %}</td>
+        {#- Fogyasztás: az előző éves leolvasás óta, vagy ha nincs, az első (felszerelési) mérőcsere induló állásától;
+            a köztes mérőcseréket figyelembe véve, mindig a naplóból számolva -#}
+        {%- set ns = namespace(fogy=none, kezd=none, alap=none) -%}
+        {%- if b.tipus == 'Éves leolvasás' and b.allas is number -%}
+        {%- set elozok = osszes | selectattr('mero', 'eq', b.mero) | selectattr('tipus', 'eq', 'Éves leolvasás') | selectattr('datum', 'lt', b.datum) | sort(attribute='datum') | list -%}
+        {%- set cserek = osszes | selectattr('mero', 'eq', b.mero) | selectattr('tipus', 'eq', 'Mérőcsere') | selectattr('datum', 'lt', b.datum) | sort(attribute='datum') | list -%}
+        {%- if elozok -%}{%- set ns.fogy = b.allas - elozok[-1].allas -%}{%- set ns.kezd = elozok[-1].datum -%}{%- set ns.alap = elozok[-1].datum -%}
+        {%- elif cserek -%}{%- set ns.fogy = b.allas - cserek[0].uj_kezdo -%}{%- set ns.kezd = cserek[0].datum -%}{%- set ns.alap = cserek[0].datum ~ '~' -%}{%- endif -%}
+        {%- if ns.fogy is not none -%}{%- for c in cserek -%}
+        {%- if (c.datum >= ns.alap if ns.alap[-1] != '~' else c.datum > ns.kezd) -%}{%- set ns.fogy = ns.fogy + c.allas - c.uj_kezdo -%}{%- endif -%}
+        {%- endfor -%}{%- endif -%}{%- endif -%}
+        <td class="n">{% if ns.fogy is not none %}{{ szam(ns.fogy) }} {{ 'm³' if b.mero == 'G' else 'kWh' }}<div class="s">{{ ns.kezd }} óta</div>{% else %}–{% endif %}</td></tr>
+        {%- endfor -%}</table>
+        {%- endif -%}
+  - type: grid
+    cards:
+    - type: heading
+      heading: Beállítás
+      icon: mdi:cog-outline
+    - type: entities
+      title: Források
+      entities:
+      - entity: input_text.energia_forras_a
+        name: A1 főmérő (entitás)
+      - type: custom:hu-szam-sor
+        entity: input_number.energia_forras_a_szorzo
+        name: A1 szorzó
+      - entity: input_text.energia_forras_h
+        name: H-tarifa mérő (üres = nincs)
+      - entity: input_text.energia_forras_gaz
+        name: Gáz (üres = nincs)
+      - type: section
+        label: Ellenőrzés
+      - entity: sensor.villany_a_forras_kwh
+        name: A1 forrás (× szorzó)
+      - entity: sensor.villany_h_forras_kwh
+        name: H forrás
+      - entity: binary_sensor.h_tariff_season
+        name: H-tarifa téli időszak
+      - type: section
+        label: Telepítés után egyszer
+      - type: button
+        name: Első beállítás
+        icon: mdi:rocket-launch-outline
+        action_name: Indítás
+        tap_action:
+          action: perform-action
+          perform_action: script.energia_elszamolas_elso_beallitas
+          confirmation:
+            text: A mostani óraállásokkal indítja a folyó hónapot és a H-tarifa bontást. Folytatod?

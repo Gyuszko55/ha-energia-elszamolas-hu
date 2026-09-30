@@ -1,0 +1,118 @@
+{#- Havi villany-elszámolás számítása (packages/energia_elszamolas/hu_energia_elszamolas.yaml). JSON-t ad vissza.
+    A kedvezményes (rezsi) keret MÉRŐÓRÁNKÉNT jár: az A1 (főmérő) és a H-tarifa nyári (normál, 1.82,
+    A1 árakon) fogyasztása külön-külön sávval számol. A H téli (1.81) kedvezményes, sávja nincs.
+    Az alapdíj fix havi összeg (fogyasztástól független).
+    Ha a hónapban van A-mérő éves leolvasás (nem 1-jén), a hónap a leolvasás napjával két RÉSZRE oszlik:
+    mindkét rész a saját napjaival arányos sávot és alapdíjat kap (a leolvasás napja már a 2. rész).
+    Várható = eddigi + az utolsó 7 nap napi átlaga × a hátralévő napok (mérőnként; a H-nál a
+    hátralévő napok évszak szerint a téli / nyári regiszterhez kerülnek). -#}
+{%- macro _szamol(a, ht, hn, alapdij, sav_a, sav_h, rezsi_ar, piaci_ar, h_ar) -%}
+  {%- set rezsi = [a, sav_a] | min -%}
+  {%- set piaci = [a - sav_a, 0] | max -%}
+  {%- set h_rezsi = [hn, sav_h] | min -%}
+  {%- set h_piaci = [hn - sav_h, 0] | max -%}
+  {%- set a_ft = rezsi * rezsi_ar + piaci * piaci_ar -%}
+  {%- set hn_ft = h_rezsi * rezsi_ar + h_piaci * piaci_ar -%}
+  {{- {'rezsi_kwh': rezsi | round(1), 'piaci_kwh': piaci | round(1),
+       'h_nyari_rezsi_kwh': h_rezsi | round(1), 'h_nyari_piaci_kwh': h_piaci | round(1),
+       'energia_ft': a_ft | round(0) | int, 'h_nyari_ft': hn_ft | round(0) | int,
+       'h_teli_ft': (ht * h_ar) | round(0) | int, 'alapdij_ft': alapdij | round(0) | int,
+       'osszesen_ft': (a_ft + hn_ft + ht * h_ar + alapdij) | round(0) | int} | to_json -}}
+{%- endmacro -%}
+
+{%- macro _osszead(x, y) -%}
+  {{- dict(x, **{'rezsi_kwh': (x.rezsi_kwh + y.rezsi_kwh) | round(1), 'piaci_kwh': (x.piaci_kwh + y.piaci_kwh) | round(1),
+       'h_nyari_rezsi_kwh': (x.h_nyari_rezsi_kwh + y.h_nyari_rezsi_kwh) | round(1),
+       'h_nyari_piaci_kwh': (x.h_nyari_piaci_kwh + y.h_nyari_piaci_kwh) | round(1),
+       'energia_ft': x.energia_ft + y.energia_ft, 'h_nyari_ft': x.h_nyari_ft + y.h_nyari_ft,
+       'h_teli_ft': x.h_teli_ft + y.h_teli_ft, 'alapdij_ft': x.alapdij_ft + y.alapdij_ft,
+       'osszesen_ft': x.osszesen_ft + y.osszesen_ft}) | to_json -}}
+{%- endmacro -%}
+
+{%- macro villany_honap() -%}
+  {%- set k = as_datetime(states('input_datetime.villany_honap_kezdete') ~ 'T00:00:00') | as_local -%}
+  {%- set kov = (k.replace(day=28) + timedelta(days=4)).replace(day=1) -%}
+  {%- set napok = (kov - k).days -%}
+  {%- set eltelt = [[(now() - k).total_seconds() / 86400, 0.01] | max, napok] | min -%}
+  {%- set a_cs = states('input_number.villany_a_csere_ossz') | float(0) -%}
+  {%- set h_cs = states('input_number.villany_h_csere_ossz') | float(0) -%}
+  {%- set a0 = states('input_number.villany_honap_a_kezdo') | float(0) -%}
+  {%- set ht0 = states('input_number.villany_honap_h_teli_kezdo') | float(0) -%}
+  {%- set hn0 = states('input_number.villany_honap_h_nyari_kezdo') | float(0) -%}
+  {%- set a = states('sensor.meroora_allas') | float(0) - a_cs - a0 -%}
+  {%- set ht = states('sensor.energy_h_teli') | float(0) - ht0 -%}
+  {%- set hn = states('sensor.energy_h_nyari') | float(0) - hn0 -%}
+  {%- set rezsi_ar = states('input_number.villany_ar_rezsi') | float(0) -%}
+  {%- set piaci_ar = states('input_number.villany_ar_piaci') | float(0) -%}
+  {%- set h_ar = states('input_number.h_tarifa_ar') | float(0) -%}
+  {%- set napi_sav_a = states('input_number.villany_rezsi_napi_hatar') | float(0) -%}
+  {%- set napi_sav_h = states('input_number.villany_h_rezsi_napi_hatar') | float(0) -%}
+  {%- set alap = states('input_number.villany_a1_alapdij') | float(0) + states('input_number.villany_h_alapdij') | float(0) -%}
+  {%- set napi_a = states('sensor.villany_a_7napos_valtozas') | float(0) / 7 -%}
+  {%- set napi_h = states('sensor.villany_h_7napos_valtozas') | float(0) / 7 -%}
+  {#- hátralévő napok, évszak szerint (téli: okt. 15. – ápr. 14.) -#}
+  {%- set ns = namespace(teli=0, nyari=0) -%}
+  {%- set ma = now().date() -%}
+  {%- for i in range(0, 32) -%}
+    {%- set nap = ma + timedelta(days=i) -%}
+    {%- if nap < kov.date() -%}
+      {%- set w = (1 - (now() - today_at()).total_seconds() / 86400) if i == 0 else 1 -%}
+      {%- if (nap.month, nap.day) >= (10, 15) or (nap.month, nap.day) < (4, 15) -%}{%- set ns.teli = ns.teli + w -%}
+      {%- else -%}{%- set ns.nyari = ns.nyari + w -%}{%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- set hatra = ns.teli + ns.nyari -%}
+  {#- Megosztás: A-mérő éves leolvasása a hónapban (2. naptól) -#}
+  {%- set naplo = state_attr('sensor.meroora_leolvasasi_naplo', 'bejegyzesek') or [] -%}
+  {%- set eleje = k.strftime('%Y-%m-%d') -%}
+  {%- set vege = kov.strftime('%Y-%m-%d') -%}
+  {%- set ev = naplo | selectattr('mero', 'eq', 'A') | selectattr('tipus', 'eq', 'Éves leolvasás')
+               | selectattr('datum', 'gt', eleje) | selectattr('datum', 'lt', vege) | sort(attribute='datum') | list -%}
+  {%- if ev -%}
+    {%- set sd = ev[-1].datum -%}
+    {%- set n1 = (as_datetime(sd ~ 'T00:00:00') | as_local - k).days -%}
+    {%- set a1 = [[ev[-1].allas - a_cs - a0, 0] | max, a] | min -%}
+    {#- H a megosztás napján: a H-óra ugyanazon napi leolvasásából, különben napokra arányosan -#}
+    {%- set hev = naplo | selectattr('mero', 'eq', 'H') | selectattr('tipus', 'eq', 'Éves leolvasás') | selectattr('datum', 'eq', sd) | list -%}
+    {%- set js = states('input_text.h_tarifa_szakasz') -%}
+    {%- if hev and js.startswith('{') -%}
+      {%- set j = js | from_json -%}
+      {%- set hsp = hev[-1].allas - h_cs -%}
+      {%- set t_at = j.teli + ((hsp - j.sz) if j.szak == 'teli' else 0) -%}
+      {%- set n_at = j.nyari + ((hsp - j.sz) if j.szak == 'nyari' else 0) -%}
+      {%- set ht1 = [[t_at - ht0, 0] | max, ht] | min -%}
+      {%- set hn1 = [[n_at - hn0, 0] | max, hn] | min -%}
+    {%- else -%}
+      {%- set f1 = [n1 / eltelt, 1] | min -%}
+      {%- set ht1 = ht * f1 -%}{%- set hn1 = hn * f1 -%}
+    {%- endif -%}
+    {%- set reszek_def = [
+         {'tol': eleje, 'ig': (as_datetime(sd ~ 'T00:00:00') - timedelta(days=1)).strftime('%Y-%m-%d'), 'napok': n1,
+          'a': a1, 'ht': ht1, 'hn': hn1, 'lezart': true},
+         {'tol': sd, 'ig': (kov - timedelta(days=1)).strftime('%Y-%m-%d'), 'napok': napok - n1,
+          'a': a - a1, 'ht': ht - ht1, 'hn': hn - hn1, 'lezart': false}] -%}
+  {%- else -%}
+    {%- set reszek_def = [{'tol': eleje, 'ig': (kov - timedelta(days=1)).strftime('%Y-%m-%d'), 'napok': napok,
+                           'a': a, 'ht': ht, 'hn': hn, 'lezart': false}] -%}
+  {%- endif -%}
+  {%- set rs = namespace(lista=[], eddig=none, varhato=none) -%}
+  {%- for r in reszek_def -%}
+    {%- set arany = r.napok / napok -%}
+    {%- set m = _szamol(r.a, r.ht, r.hn, alap * arany, napi_sav_a * r.napok, napi_sav_h * r.napok, rezsi_ar, piaci_ar, h_ar) | from_json -%}
+    {%- if r.lezart -%}{%- set v = m -%}
+    {%- else -%}{%- set v = _szamol(r.a + napi_a * hatra, r.ht + napi_h * ns.teli, r.hn + napi_h * ns.nyari, alap * arany,
+                                   napi_sav_a * r.napok, napi_sav_h * r.napok, rezsi_ar, piaci_ar, h_ar) | from_json -%}{%- endif -%}
+    {%- set rs.lista = rs.lista + [dict(m, tol=r.tol, ig=r.ig, napok=r.napok, a_kwh=r.a | round(1), h_teli_kwh=r.ht | round(1),
+                                        h_nyari_kwh=r.hn | round(1), sav_kwh=(napi_sav_a * r.napok) | round(1),
+                                        h_sav_kwh=(napi_sav_h * r.napok) | round(1), alapdij_arany=arany | round(4))] -%}
+    {%- set rs.eddig = m if rs.eddig is none else (_osszead(rs.eddig, m) | from_json) -%}
+    {%- set rs.varhato = v if rs.varhato is none else (_osszead(rs.varhato, v) | from_json) -%}
+  {%- endfor -%}
+  {{- {'honap': k.strftime('%Y-%m'), 'napok': napok, 'eltelt_nap': eltelt | round(2),
+       'a_kwh': a | round(1), 'h_teli_kwh': ht | round(1), 'h_nyari_kwh': hn | round(1),
+       'sav_kwh': (napi_sav_a * napok) | round(1), 'h_sav_kwh': (napi_sav_h * napok) | round(1),
+       'hatralevo_nap': hatra | round(2), 'napi_atlag_a_kwh': napi_a | round(2), 'napi_atlag_h_kwh': napi_h | round(2),
+       'reszek': rs.lista, 'megosztva': rs.lista | count > 1,
+       'eddig': rs.eddig, 'varhato': rs.varhato,
+       'arak': {'rezsi': rezsi_ar, 'piaci': piaci_ar, 'h_teli': h_ar, 'alapdij': alap}} | to_json -}}
+{%- endmacro -%}

@@ -1,0 +1,97 @@
+# Energiaárak (bruttó energiadíj) és az aktuális, sávtól függő ár-szenzorok.
+# Az árakat a díjtáblázatból a szolgáltató kiválasztása tölti be (hu_energia_elszamolas.yaml), kézzel átírhatók.
+# Az aktuális ár-szenzorok (sensor.villany_aktualis_ar, h_tarifa_aktualis_ar, gaz_aktualis_ar) a HA
+# Energia irányítópultjához adhatók meg „ár-entitásként”.
+# Az input_number-eknek szándékosan nincs "initial" értéke: újraindítás után is megmarad a kézi érték.
+
+input_number:
+  villany_ar_rezsi:
+    name: A1 tarifa – rezsicsökkentett
+    unit_of_measurement: HUF/kWh
+    min: 0
+    max: 300
+    step: 0.01
+    mode: box
+    icon: mdi:cash
+  villany_ar_piaci:
+    name: A1 tarifa – sáv felett
+    unit_of_measurement: HUF/kWh
+    min: 0
+    max: 300
+    step: 0.01
+    mode: box
+    icon: mdi:cash-plus
+  h_tarifa_ar:
+    name: H-tarifa – kedvezményes (1.81)
+    unit_of_measurement: HUF/kWh
+    min: 0
+    max: 300
+    step: 0.01
+    mode: box
+    icon: mdi:cash
+  gaz_ar_rezsi:
+    name: Gáz ár – rezsicsökkentett
+    unit_of_measurement: HUF/m³
+    min: 0
+    max: 2000
+    step: 0.01
+    mode: box
+    icon: mdi:cash
+  gaz_ar_piaci:
+    name: Gáz ár – sáv felett
+    unit_of_measurement: HUF/m³
+    min: 0
+    max: 2000
+    step: 0.01
+    mode: box
+    icon: mdi:cash-plus
+  gaz_rezsi_hatar:
+    name: Gáz rezsisáv éves határa
+    unit_of_measurement: m³
+    min: 0
+    max: 20000
+    step: 1
+    mode: box
+    icon: mdi:fire-alert
+
+template:
+  - sensor:
+      - name: Villany aktuális ár
+        unique_id: villany_aktualis_ar
+        unit_of_measurement: HUF/kWh
+        icon: mdi:cash-clock
+        # Havi sáv (csak a főmérő): a hónap A-fogyasztása < napi határ × a hónap napjai.
+        state: >-
+          {% set d = state_attr('sensor.villany_havi_elszamolas', 'adatok') %}
+          {% set piaci = d is mapping and d.a_kwh >= d.sav_kwh %}
+          {{ (states('input_number.villany_ar_piaci') if piaci else states('input_number.villany_ar_rezsi')) | float(0) }}
+        attributes:
+          sav: >-
+            {% set d = state_attr('sensor.villany_havi_elszamolas', 'adatok') %}
+            {{ 'piaci' if d is mapping and d.a_kwh >= d.sav_kwh else 'rezsicsökkentett' }}
+          havi_fogyasztas_kwh: "{{ (state_attr('sensor.villany_havi_elszamolas', 'adatok') or {}).get('a_kwh') }}"
+          havi_sav_kwh: "{{ (state_attr('sensor.villany_havi_elszamolas', 'adatok') or {}).get('sav_kwh') }}"
+      - name: H-tarifa aktuális ár
+        unique_id: h_tarifa_aktualis_ar
+        unit_of_measurement: HUF/kWh
+        icon: mdi:cash-clock
+        # Téli (kedvezményes) időszakban a H-tarifa ára; nyáron A1 árak a H nyári SAJÁT havi sávjával.
+        state: >-
+          {% set d = state_attr('sensor.villany_havi_elszamolas', 'adatok') %}
+          {% if is_state('binary_sensor.h_tariff_season', 'on') %}{{ states('input_number.h_tarifa_ar') | float(0) }}
+          {% elif d is mapping and d.h_nyari_kwh >= d.h_sav_kwh %}{{ states('input_number.villany_ar_piaci') | float(0) }}
+          {% else %}{{ states('input_number.villany_ar_rezsi') | float(0) }}{% endif %}
+      - name: Gáz aktuális ár
+        unique_id: gaz_aktualis_ar
+        unit_of_measurement: HUF/m³
+        icon: mdi:cash-clock
+        state: >-
+          {% set eves = states('sensor.gaz_meroora_allas_eves') | float(0) %}
+          {% set hatar = states('input_number.gaz_rezsi_hatar') | float(1729) %}
+          {{ (states('input_number.gaz_ar_piaci') if eves >= hatar
+              else states('input_number.gaz_ar_rezsi')) | float(0) }}
+        attributes:
+          sav: >-
+            {{ 'piaci' if states('sensor.gaz_meroora_allas_eves') | float(0)
+               >= states('input_number.gaz_rezsi_hatar') | float(1729) else 'rezsicsökkentett' }}
+          eves_fogyasztas_m3: "{{ states('sensor.gaz_meroora_allas_eves') }}"

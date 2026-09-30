@@ -1,0 +1,190 @@
+# Energia-elszámolás – FORRÁSOK és óraállások.
+# A saját mérő-szenzoraidat a felületen adod meg (Beállítások → Eszközök és szolgáltatások → Segédek):
+#   „Forrás – A1 főmérő”   → pl. sensor.shelly_em_total_active_energy   (kötelező, kWh, folyamatosan növekvő)
+#   „Forrás – H-tarifa”    → a H-tarifás kör mérője (kWh)                (üresen hagyható, ha nincs H-tarifa)
+#   „Forrás – Gáz”         → gáz fogyasztás összesen (m³, soha nem nullázódó) (üresen hagyható)
+#   „Szorzó – A1 főmérő”   → ha a saját mérőd rendszeresen kevesebbet/többet mér, mint a szolgáltatói óra
+#                            (pl. 1,04 = 4%-kal többet mutat a hivatalos óra). Alapból 1.
+#
+# Új telepítéskor a számmezők a minimumukon (−9 999 999) indulnak: amíg az „Első beállítás” szkript
+# ki nem nullázza őket, az óraállás-szenzorok nem elérhetők.
+#
+# Az óraállás = forrás (× szorzó) + képlet-eltolás; az eltolást a „Mérőóra leolvasás” kártya „Mehet” gombja
+# állítja (korrekció / mérőcsere), így a HA a valódi órát mutatja.
+
+input_text:
+  energia_forras_a:
+    name: "Forrás – A1 főmérő (entitás)"
+    max: 255
+    icon: mdi:meter-electric
+  energia_forras_h:
+    name: "Forrás – H-tarifa mérő (entitás, üres = nincs)"
+    max: 255
+    icon: mdi:heat-pump-outline
+  energia_forras_gaz:
+    name: "Forrás – Gáz (entitás, üres = nincs)"
+    max: 255
+    icon: mdi:meter-gas
+
+input_number:
+  energia_forras_a_szorzo:
+    name: "Szorzó – A1 főmérő"
+    min: 0.5
+    max: 1.5
+    step: 0.0001
+    mode: box
+    icon: mdi:multiplication
+
+template:
+  - sensor:
+      # A források (a szorzóval, eltolás nélkül) – a 7 napos átlaghoz ezek a folytonos, „tiszta” értékek.
+      - name: "Villany A forrás"
+        unique_id: villany_a_forras_kwh
+        default_entity_id: sensor.villany_a_forras_kwh
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        # A szorzó a minimumán (0,5) = még nincs beállítva (az „Első beállítás” 1-re állítja).
+        availability: >-
+          {{ states(states('input_text.energia_forras_a')) | is_number
+             and states('input_number.energia_forras_a_szorzo') | float(0) > 0.5 }}
+        state: >-
+          {{ (states(states('input_text.energia_forras_a')) | float
+              * states('input_number.energia_forras_a_szorzo') | float(1)) | round(3) }}
+      - name: "Villany H forrás"
+        unique_id: villany_h_forras_kwh
+        default_entity_id: sensor.villany_h_forras_kwh
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        # Ha nincs H-tarifás mérő, 0 (így az elszámolás H része üres marad).
+        state: >-
+          {% set f = states('input_text.energia_forras_h') %}
+          {{ (states(f) | float(0) if f not in ['', 'unknown', 'unavailable'] else 0) | round(3) }}
+
+      - name: "Mérőóra állás"
+        unique_id: meroora_allas
+        default_entity_id: sensor.meroora_allas
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: >-
+          {{ states('input_number.villany_a_eltolas') | float(-9999999) > -9999999 and states('sensor.villany_a_forras_kwh') | is_number }}
+        state: >-
+          {{ (states('sensor.villany_a_forras_kwh') | float + states('input_number.villany_a_eltolas') | float) | round(0) }}
+
+      - name: "Mérőóra állás H"
+        unique_id: meroora_allas_h
+        default_entity_id: sensor.meroora_allas_h
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: >-
+          {{ states('input_number.villany_h_eltolas') | float(-9999999) > -9999999 and states('sensor.villany_h_forras_kwh') | is_number }}
+        state: >-
+          {{ (states('sensor.villany_h_forras_kwh') | float + states('input_number.villany_h_eltolas') | float) | round(0) }}
+
+      - name: "Gáz mérőóra állás"
+        unique_id: gaz_meroora_allas
+        default_entity_id: sensor.gaz_meroora_allas
+        unit_of_measurement: "m³"
+        device_class: gas
+        state_class: total_increasing
+        availability: >-
+          {{ states('input_number.gaz_eltolas') | float(-9999999) > -9999999 and states(states('input_text.energia_forras_gaz')) | is_number }}
+        state: >-
+          {{ (states(states('input_text.energia_forras_gaz')) | float + states('input_number.gaz_eltolas') | float) | round(1) }}
+
+      # H-tarifa téli (1.81) / nyári (1.82) regiszter. Állapot: input_text.h_tarifa_szakasz (JSON, tartós;
+      # a szakaszváltást a „H-tarifa – téli/nyári szakaszváltás” automatizálás írja).
+      # Aktív regiszter = alap + (folytonos számláló − sz); folytonos számláló = óraállás − mérőcserék.
+      # Ha az adat épp nem érvényes (újratöltés), marad az előző érték – különben hamis „nullázódás” a statisztikában.
+      - name: "H-tarifa téli (1.81)"
+        unique_id: energy_h_teli
+        default_entity_id: sensor.energy_h_teli
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: >-
+          {% set js = states('input_text.h_tarifa_szakasz') %}
+          {% if not (states('sensor.meroora_allas_h') | is_number and js.startswith('{')) %}
+            {{ this.state }}
+          {% else %}
+            {% set j = js | from_json %}
+            {% set total = states('sensor.meroora_allas_h') | float - states('input_number.villany_h_csere_ossz') | float(0) %}
+            {{ (j.teli + ((total - j.sz) if j.szak == 'teli' else 0)) | round(1) }}
+          {% endif %}
+      - name: "H-tarifa nyári (1.82)"
+        unique_id: energy_h_nyari
+        default_entity_id: sensor.energy_h_nyari
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: >-
+          {% set js = states('input_text.h_tarifa_szakasz') %}
+          {% if not (states('sensor.meroora_allas_h') | is_number and js.startswith('{')) %}
+            {{ this.state }}
+          {% else %}
+            {% set j = js | from_json %}
+            {% set total = states('sensor.meroora_allas_h') | float - states('input_number.villany_h_csere_ossz') | float(0) %}
+            {{ (j.nyari + ((total - j.sz) if j.szak == 'nyari' else 0)) | round(1) }}
+          {% endif %}
+
+      - name: "A mérő éves fogyasztás"
+        unique_id: meroora_allas_eves
+        default_entity_id: sensor.meroora_allas_eves
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        # Éves elszámolás óta: óraállás − mérőcserék − éves alap (a „Mehet” állítja éves leolvasáskor).
+        availability: >-
+          {{ states('input_number.villany_a_eves_bazis') | float(0) > 0 and states('sensor.meroora_allas') | is_number }}
+        state: >-
+          {{ (states('sensor.meroora_allas') | float
+              - states('input_number.villany_a_csere_ossz') | float(0)
+              - states('input_number.villany_a_eves_bazis') | float) | round(0) }}
+        attributes:
+          elszamolas_kezdete: "{{ states('input_datetime.villany_a_eves_bazis_datum') }}"
+      - name: "Gáz éves fogyasztás"
+        unique_id: gaz_meroora_allas_eves
+        default_entity_id: sensor.gaz_meroora_allas_eves
+        unit_of_measurement: "m³"
+        device_class: gas
+        state_class: total_increasing
+        availability: >-
+          {{ states('input_number.gaz_eves_bazis') | float(0) > 0 and states('sensor.gaz_meroora_allas') | is_number }}
+        state: >-
+          {{ (states('sensor.gaz_meroora_allas') | float
+              - states('input_number.gaz_csere_ossz') | float(0)
+              - states('input_number.gaz_eves_bazis') | float) | round(1) }}
+        attributes:
+          elszamolas_kezdete: "{{ states('input_datetime.gaz_eves_bazis_datum') }}"
+
+  - binary_sensor:
+      # H-tarifa kedvezményes (téli) időszak: okt. 15. – ápr. 15.
+      - name: "H-tarifa téli időszak"
+        unique_id: h_tariff_season
+        default_entity_id: binary_sensor.h_tariff_season
+        state: >-
+          {% set n = now() %}
+          {% set md = (n.month, n.day) %}
+          {{ md >= (10, 15) or md < (4, 15) }}
+
+# 7 napos fogyasztás a „Várható” becsléshez (hónap végére).
+sensor:
+  - platform: statistics
+    name: "Villany A 7napos változás"
+    unique_id: villany_a_7napos_valtozas
+    entity_id: sensor.villany_a_forras_kwh
+    state_characteristic: change
+    max_age:
+      days: 7
+    sampling_size: 100000
+  - platform: statistics
+    name: "Villany H 7napos változás"
+    unique_id: villany_h_7napos_valtozas
+    entity_id: sensor.villany_h_forras_kwh
+    state_characteristic: change
+    max_age:
+      days: 7
+    sampling_size: 100000

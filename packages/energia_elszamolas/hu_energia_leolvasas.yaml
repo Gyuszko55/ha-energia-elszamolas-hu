@@ -1,0 +1,568 @@
+# Mérőóra-leolvasás, mérőcsere és napló (A1 főmérő, H-tarifa mérő, gázmérő).
+# Óraállások: sensor.meroora_allas (A), sensor.meroora_allas_h (H), sensor.gaz_meroora_allas (G) – hu_energia_forrasok.yaml.
+#
+# Beviteli mezők (mérőnként): leolvasás dátuma, leolvasott óraállás, korrekció (±),
+# mérőcserénél az új óra kezdőállása. Közös: a bejegyzés típusa (Éves leolvasás / Mérőcsere).
+#
+# A „Mehet” (script.meroora_leolvasas_mehet), mérőnként:
+#   - korrekció → hozzáadja a képlet-eltoláshoz (a HA a valódi órát mutassa), majd 0;
+#   - Éves leolvasás → a leolvasott állás lesz az új éves elszámolás alapja, a lezárt
+#     időszak fogyasztása a naplóba kerül;
+#   - Mérőcsere → a leolvasott állás a LESZERELT óra végállása. A különbség
+#     (új kezdőállás − régi végállás) bekerül a képlet-eltolásba (az óraállás az új
+#     órát mutatja), ÉS a „csere összesen” számlálóba, amit az éves fogyasztás és a
+#     H-tarifás téli/nyári bontás kivon — így a csere a fogyasztást nem változtatja;
+#   - minden bejegyzés a naplóba (sensor.meroora_leolvasasi_naplo) és a
+#     /config/energia_elszamolas/naplo.csv fájlba kerül, a beviteli mezők kiürülnek.
+#   - Ha a dátum régebbi a mostani éves alapnál, a bejegyzés csak a naplóba kerül (utólagos felvitel).
+
+# Mérőnkénti jelölés: a „Mehet” csak a bejelölt mérőt dolgozza fel, utána a jelölést törli.
+input_boolean:
+  meroora_rogzit_a:
+    name: "Rögzítés – A főmérő"
+    icon: mdi:checkbox-marked-circle-outline
+  meroora_rogzit_h:
+    name: "Rögzítés – H-tarifa"
+    icon: mdi:checkbox-marked-circle-outline
+  meroora_rogzit_g:
+    name: "Rögzítés – Gázmérő"
+    icon: mdi:checkbox-marked-circle-outline
+
+# H-tarifa téli/nyári bontás tartós állapota (hu_energia_forrasok.yaml: energy_h_teli / energy_h_nyari).
+# Kezdőértékét az „Energia-elszámolás – első beállítás” szkript adja.
+# JSON: {"teli": a téli regiszter a szakasz elején, "nyari": a nyári a szakasz elején,
+#        "sz": a folytonos H-számláló (óraállás − cserék) a szakasz elején, "szak": "teli"/"nyari"}.
+# Az aktív regiszter = alapja + (számláló − sz), a másik áll. Egyetlen mezőben, hogy a váltás
+# egy lépésben (ugrás nélkül) történjen, és újraindítás/újratöltés után se vesszen el.
+input_text:
+  h_tarifa_szakasz:
+    name: "H-tarifa téli/nyári szakasz-állapot"
+    max: 255
+    icon: mdi:swap-vertical
+
+automation:
+  - id: h_tarifa_szakaszvaltas
+    alias: "H-tarifa – téli/nyári szakaszváltás"
+    description: >-
+      Amikor a binary_sensor.h_tariff_season vált (okt. 15. / ápr. 15.), a lezárt szakasz
+      regiszterét rögzíti és a másikat indítja (input_text.h_tarifa_szakasz). Induláskor és
+      óránként is ellenőriz, ha a váltás a HA leállása alatt történt.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.h_tariff_season
+        to: ["on", "off"]
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        minutes: 7
+    conditions:
+      - condition: template
+        value_template: >-
+          {% set j = states('input_text.h_tarifa_szakasz') %}
+          {{ j.startswith('{') and states('sensor.meroora_allas_h') | is_number
+             and states('binary_sensor.h_tariff_season') in ['on', 'off']
+             and is_state('binary_sensor.h_tariff_season', 'on') != ((j | from_json).szak == 'teli') }}
+    actions:
+      - variables:
+          j: "{{ states('input_text.h_tarifa_szakasz') | from_json }}"
+          total: >-
+            {{ states('sensor.meroora_allas_h') | float - states('input_number.villany_h_csere_ossz') | float(0) }}
+          aktiv: "{{ total - j.sz | float }}"
+          uj: >-
+            {% if j.szak == 'nyari' %}
+              {{ {'teli': j.teli, 'nyari': (j.nyari + aktiv) | round(1), 'sz': total | round(1), 'szak': 'teli'} | to_json }}
+            {% else %}
+              {{ {'teli': (j.teli + aktiv) | round(1), 'nyari': j.nyari, 'sz': total | round(1), 'szak': 'nyari'} | to_json }}
+            {% endif %}
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.h_tarifa_szakasz
+        data:
+          # a változó dict-ként jön vissza; JSON-ként kell a mezőbe
+          value: "{{ (uj if uj is mapping else uj | from_json) | to_json }}"
+      - action: logbook.log
+        data:
+          name: "H-tarifa"
+          message: "Szakaszváltás: {{ (uj if uj is mapping else uj | from_json) | to_json }}"
+
+input_select:
+  villany_leolvasas_tipus:
+    name: "Leolvasás típusa"
+    options:
+      - "Éves leolvasás"
+      - "Mérőcsere"
+    icon: mdi:form-select
+  villany_naplo_szuro:
+    name: "Napló szűrő"
+    options:
+      - "Mind"
+      - "A mérő"
+      - "H mérő"
+      - "Gáz mérő"
+      - "Éves leolvasás"
+      - "Mérőcsere"
+    icon: mdi:filter-variant
+
+input_datetime:
+  villany_a_leolvasas_datum:
+    name: "A mérő – leolvasás dátuma"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-check
+  villany_h_leolvasas_datum:
+    name: "H mérő – leolvasás dátuma"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-check
+  gaz_leolvasas_datum:
+    name: "Gázmérő – leolvasás dátuma"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-check
+  gaz_eves_bazis_datum:
+    name: "Gázmérő – éves elszámolás kezdete"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-start
+  villany_a_eves_bazis_datum:
+    name: "A mérő – éves elszámolás kezdete"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-start
+  villany_h_eves_bazis_datum:
+    name: "H mérő – éves elszámolás kezdete"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-start
+
+input_number:
+  villany_a_leolvasas_allas:
+    name: "A mérő – leolvasott óraállás"
+    min: 0
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:counter
+  villany_h_leolvasas_allas:
+    name: "H mérő – leolvasott óraállás"
+    min: 0
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:counter
+  villany_a_uj_ora_kezdo:
+    name: "A mérő – új óra kezdőállása"
+    min: 0
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:counter
+  villany_h_uj_ora_kezdo:
+    name: "H mérő – új óra kezdőállása"
+    min: 0
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:counter
+  villany_a_korrekcio:
+    name: "A mérő – korrekció"
+    min: -9999
+    max: 9999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:plus-minus-variant
+  villany_h_korrekcio:
+    name: "H mérő – korrekció"
+    min: -9999
+    max: 9999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:plus-minus-variant
+  villany_a_eltolas:
+    name: "A mérő – képlet eltolás"
+    min: -9999999
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:tune-variant
+  villany_h_eltolas:
+    name: "H mérő – képlet eltolás"
+    min: -9999999
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:tune-variant
+  villany_a_csere_ossz:
+    name: "A mérő – mérőcserék összesen"
+    min: -9999999
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:swap-horizontal
+  villany_h_csere_ossz:
+    name: "H mérő – mérőcserék összesen"
+    min: -9999999
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:swap-horizontal
+  gaz_leolvasas_allas:
+    name: "Gázmérő – leolvasott óraállás"
+    min: 0
+    max: 9999999
+    step: 0.001
+    mode: box
+    unit_of_measurement: m³
+    icon: mdi:counter
+  gaz_uj_ora_kezdo:
+    name: "Gázmérő – új óra kezdőállása"
+    min: 0
+    max: 9999999
+    step: 0.001
+    mode: box
+    unit_of_measurement: m³
+    icon: mdi:counter
+  gaz_korrekcio:
+    name: "Gázmérő – korrekció"
+    min: -9999
+    max: 9999
+    step: 0.001
+    mode: box
+    unit_of_measurement: m³
+    icon: mdi:plus-minus-variant
+  gaz_eltolas:
+    name: "Gázmérő – képlet eltolás"
+    min: -9999999
+    max: 9999999
+    step: 0.001
+    mode: box
+    unit_of_measurement: m³
+    icon: mdi:tune-variant
+  gaz_csere_ossz:
+    name: "Gázmérő – mérőcserék összesen"
+    min: -9999999
+    max: 9999999
+    step: 0.001
+    mode: box
+    unit_of_measurement: m³
+    icon: mdi:swap-horizontal
+  gaz_eves_bazis:
+    name: "Gázmérő – éves elszámolás alapja"
+    min: 0
+    max: 9999999
+    step: 0.001
+    mode: box
+    unit_of_measurement: m³
+    icon: mdi:flag-checkered
+  villany_a_eves_bazis:
+    name: "A mérő – éves elszámolás alapja"
+    min: 0
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:flag-checkered
+  villany_h_eves_bazis:
+    name: "H mérő – éves elszámolás alapja"
+    min: 0
+    max: 9999999
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:flag-checkered
+  # A H téli (1.81) / nyári (1.82) regiszter az utolsó éves leolvasáskor (a „Mehet” állítja).
+  villany_h_eves_teli_bazis:
+    name: "H mérő – éves alap, téli regiszter"
+    min: 0
+    max: 9999999
+    step: 0.1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:snowflake
+  villany_h_eves_nyari_bazis:
+    name: "H mérő – éves alap, nyári regiszter"
+    min: 0
+    max: 9999999
+    step: 0.1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:white-balance-sunny
+
+shell_command:
+  meroora_naplo_csv: >-
+    sh /config/energia_elszamolas/naplo.sh {{ datum }} {{ mero }} {{ tipus }} {{ allas }}
+    {{ uj_kezdo }} {{ korrekcio }} {{ ha_elotte }} {{ lezart }}
+
+template:
+  - sensor:
+      # H-tarifa éves fogyasztás szezononként (az utolsó éves leolvasás óta).
+      - name: "H mérő éves téli fogyasztás"
+        unique_id: meroora_allas_h_eves_teli
+        default_entity_id: sensor.meroora_allas_h_eves_teli
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:snowflake
+        availability: >-
+          {{ states('sensor.energy_h_teli') | is_number and states('input_number.villany_h_eves_teli_bazis') | is_number
+             and states('input_number.villany_h_eves_bazis') | float(0) > 0 }}
+        state: >-
+          {{ [(states('sensor.energy_h_teli') | float - states('input_number.villany_h_eves_teli_bazis') | float), 0] | max | round(1) }}
+        attributes:
+          elszamolas_kezdete: "{{ states('input_datetime.villany_h_eves_bazis_datum') }}"
+          regiszter_1_81: "{{ states('sensor.energy_h_teli') }}"
+
+      - name: "H mérő éves nyári fogyasztás"
+        unique_id: meroora_allas_h_eves_nyari
+        default_entity_id: sensor.meroora_allas_h_eves_nyari
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:white-balance-sunny
+        availability: >-
+          {{ states('sensor.energy_h_nyari') | is_number and states('input_number.villany_h_eves_nyari_bazis') | is_number
+             and states('input_number.villany_h_eves_bazis') | float(0) > 0 }}
+        state: >-
+          {{ [(states('sensor.energy_h_nyari') | float - states('input_number.villany_h_eves_nyari_bazis') | float), 0] | max | round(1) }}
+        attributes:
+          elszamolas_kezdete: "{{ states('input_datetime.villany_h_eves_bazis_datum') }}"
+          regiszter_1_82: "{{ states('sensor.energy_h_nyari') }}"
+
+      - name: "H mérő éves fogyasztás"
+        unique_id: meroora_allas_h_eves
+        default_entity_id: sensor.meroora_allas_h_eves
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:heat-pump-outline
+        availability: >-
+          {{ states('input_number.villany_h_eves_bazis') | float(0) > 0
+             and states('sensor.meroora_allas_h') | is_number }}
+        state: >-
+          {{ (states('sensor.meroora_allas_h') | float
+              - states('input_number.villany_h_csere_ossz') | float(0)
+              - states('input_number.villany_h_eves_bazis') | float) | round(0) }}
+        attributes:
+          elszamolas_kezdete: "{{ states('input_datetime.villany_h_eves_bazis_datum') }}"
+          alap_oraallas: >-
+            {% set e = state_attr('sensor.meroora_leolvasasi_naplo', 'bejegyzesek') or [] %}
+            {% set ev = e | selectattr('mero', 'eq', 'H') | selectattr('tipus', 'eq', 'Éves leolvasás') | sort(attribute='datum') | list %}
+            {{ ev[-1].allas if ev else none }}
+          elozo_idoszak_fogyasztas: >-
+            {% set e = state_attr('sensor.meroora_leolvasasi_naplo', 'bejegyzesek') or [] %}
+            {% set ev = e | selectattr('mero', 'eq', 'H') | selectattr('tipus', 'eq', 'Éves leolvasás') | sort(attribute='datum') | list %}
+            {{ ev[-1].lezart_fogyasztas if ev else none }}
+
+      - name: "A mérő eltérés a leolvasástól"
+        unique_id: villany_a_elteres
+        default_entity_id: sensor.a_mero_elteres_a_leolvasastol
+        unit_of_measurement: kWh
+        icon: mdi:compare-horizontal
+        availability: "{{ states('input_number.villany_a_leolvasas_allas') | float(0) > 0 and states('sensor.meroora_allas') | is_number }}"
+        state: "{{ (states('input_number.villany_a_leolvasas_allas') | float - states('sensor.meroora_allas') | float) | round(0) }}"
+
+      - name: "H mérő eltérés a leolvasástól"
+        unique_id: villany_h_elteres
+        default_entity_id: sensor.h_mero_elteres_a_leolvasastol
+        unit_of_measurement: kWh
+        icon: mdi:compare-horizontal
+        availability: "{{ states('input_number.villany_h_leolvasas_allas') | float(0) > 0 and states('sensor.meroora_allas_h') | is_number }}"
+        state: "{{ (states('input_number.villany_h_leolvasas_allas') | float - states('sensor.meroora_allas_h') | float) | round(0) }}"
+
+      - name: "Gázmérő eltérés a leolvasástól"
+        unique_id: gaz_elteres
+        default_entity_id: sensor.gaz_mero_elteres_a_leolvasastol
+        unit_of_measurement: m³
+        icon: mdi:compare-horizontal
+        availability: "{{ states('input_number.gaz_leolvasas_allas') | float(0) > 0 and states('sensor.gaz_meroora_allas') | is_number }}"
+        state: "{{ (states('input_number.gaz_leolvasas_allas') | float - states('sensor.gaz_meroora_allas') | float) | round(1) }}"
+
+  # Napló: minden „Mehet”-bejegyzés egy listában (a HA újraindításkor visszaállítja).
+  # Állapot = bejegyzések száma. Törlés: esemény meroora_leolvasas_torles, data: rogzitve.
+  - trigger:
+      - trigger: event
+        event_type: meroora_leolvasas_rogzites
+        id: uj
+      - trigger: event
+        event_type: meroora_leolvasas_torles
+        id: torol
+    sensor:
+      - name: "Mérőleolvasási napló"
+        unique_id: meroora_leolvasasi_naplo
+        default_entity_id: sensor.meroora_leolvasasi_naplo
+        icon: mdi:notebook-outline
+        state: >-
+          {% set e = (this.attributes.bejegyzesek if this.attributes.bejegyzesek is defined else []) | list %}
+          {% if trigger.id == 'uj' %}{{ e | count + 1 }}
+          {% else %}{{ e | rejectattr('rogzitve', 'eq', trigger.event.data.rogzitve) | list | count }}{% endif %}
+        attributes:
+          bejegyzesek: >-
+            {% set e = (this.attributes.bejegyzesek if this.attributes.bejegyzesek is defined else []) | list %}
+            {% if trigger.id == 'uj' %}{{ e + [trigger.event.data.bejegyzes] }}
+            {% else %}{{ e | rejectattr('rogzitve', 'eq', trigger.event.data.rogzitve) | list }}{% endif %}
+
+script:
+  meroora_leolvasas_mehet:
+    alias: "Mérőleolvasás – Mehet"
+    icon: mdi:check-circle-outline
+    description: >-
+      A két villanyóra és a gázóra beírt adatait alkalmazza (éves leolvasás vagy mérőcsere, korrekció),
+      naplózza, majd kiüríti a beviteli mezőket és frissíti a szenzorokat.
+    mode: single
+    sequence:
+      - variables:
+          tipus_valasztott: "{{ states('input_select.villany_leolvasas_tipus') }}"
+      - repeat:
+          for_each:
+            - { m: "a", p: "villany_a", szenzor: "sensor.meroora_allas", d: 0 }
+            - { m: "h", p: "villany_h", szenzor: "sensor.meroora_allas_h", d: 0 }
+            - { m: "g", p: "gaz", szenzor: "sensor.gaz_meroora_allas", d: 3 }
+          sequence:
+            - variables:
+                m: "{{ repeat.item.m }}"
+                p: "{{ repeat.item.p }}"
+                d: "{{ repeat.item.d }}"
+                szenzor: "{{ repeat.item.szenzor }}"
+                korr: "{{ states('input_number.' ~ p ~ '_korrekcio') | float(0) | round(d) }}"
+                allas: "{{ states('input_number.' ~ p ~ '_leolvasas_allas') | float(0) | round(d) }}"
+                uj: "{{ states('input_number.' ~ p ~ '_uj_ora_kezdo') | float(0) | round(d) }}"
+                datum: "{{ states('input_datetime.' ~ p ~ '_leolvasas_datum') }}"
+                eltolas: "{{ states('input_number.' ~ p ~ '_eltolas') | float(0) }}"
+                cs: "{{ states('input_number.' ~ p ~ '_csere_ossz') | float(0) }}"
+                bazis: "{{ states('input_number.' ~ p ~ '_eves_bazis') | float(0) }}"
+                bazis_datum: "{{ states('input_datetime.' ~ p ~ '_eves_bazis_datum') }}"
+                ha_elotte: "{{ states(szenzor) | float(0) | round(d) }}"
+                tipus: >-
+                  {# Csak a bejelölt mérővel foglalkozunk (a csere/leolvasás mérőóránként külön érvényes). #}
+                  {{ 'nincs' if not is_state('input_boolean.meroora_rogzit_' ~ m, 'on')
+                     else (tipus_valasztott if allas > 0 else ('Korrekció' if korr != 0 else 'nincs')) }}
+                # Utólagos (visszamenőleges) bejegyzés: a dátum régebbi a mostani éves alapnál →
+                # csak naplóba kerül, az alapot/eltolást/cserét nem módosítja (a korrekciót igen).
+                utolagos: >-
+                  {{ tipus in ['Éves leolvasás', 'Mérőcsere'] and bazis > 0
+                     and bazis_datum not in ['unknown', 'unavailable', ''] and datum < bazis_datum }}
+                elozo: >-
+                  {% set e = state_attr('sensor.meroora_leolvasasi_naplo', 'bejegyzesek') or [] %}
+                  {% set ev = e | selectattr('mero', 'eq', m | upper) | selectattr('tipus', 'eq', 'Éves leolvasás')
+                     | selectattr('datum', 'lt', datum) | sort(attribute='datum') | list %}
+                  {{ ev[-1] if ev else none }}
+                csere_delta: "{{ (uj - allas) if tipus == 'Mérőcsere' and not utolagos else 0 }}"
+                lezart: >-
+                  {% if tipus != 'Éves leolvasás' %}{{ none }}
+                  {% elif utolagos %}{{ (allas - elozo.allas) | round(d) if elozo is mapping and elozo.allas is number else none }}
+                  {% else %}{{ ((allas - cs) - bazis) | round(d) if bazis > 0 else none }}{% endif %}
+            - if: "{{ tipus != 'nincs' }}"
+              then:
+                - if: "{{ korr != 0 or csere_delta != 0 }}"
+                  then:
+                    - action: input_number.set_value
+                      target:
+                        entity_id: "input_number.{{ p }}_eltolas"
+                      data:
+                        value: "{{ (eltolas + korr + csere_delta) | round(3) }}"
+                - if: "{{ csere_delta != 0 }}"
+                  then:
+                    - action: input_number.set_value
+                      target:
+                        entity_id: "input_number.{{ p }}_csere_ossz"
+                      data:
+                        value: "{{ (cs + csere_delta) | round(3) }}"
+                - if: "{{ tipus == 'Éves leolvasás' and not utolagos }}"
+                  then:
+                    - action: input_number.set_value
+                      target:
+                        entity_id: "input_number.{{ p }}_eves_bazis"
+                      data:
+                        value: "{{ allas - cs }}"
+                    - if: "{{ datum not in ['unknown', 'unavailable', ''] }}"
+                      then:
+                        - action: input_datetime.set_datetime
+                          target:
+                            entity_id: "input_datetime.{{ p }}_eves_bazis_datum"
+                          data:
+                            date: "{{ datum }}"
+                    # H: a téli/nyári regiszter a leolvasás pillanatában (a szezononkénti éves értékhez)
+                    - if: "{{ m == 'h' and states('input_text.h_tarifa_szakasz').startswith('{') }}"
+                      then:
+                        - variables:
+                            j: "{{ states('input_text.h_tarifa_szakasz') | from_json }}"
+                            hsp: "{{ allas - cs }}"
+                        - action: input_number.set_value
+                          target:
+                            entity_id: input_number.villany_h_eves_teli_bazis
+                          data:
+                            value: "{{ (j.teli + ((hsp - j.sz) if j.szak == 'teli' else 0)) | round(1) }}"
+                        - action: input_number.set_value
+                          target:
+                            entity_id: input_number.villany_h_eves_nyari_bazis
+                          data:
+                            value: "{{ (j.nyari + ((hsp - j.sz) if j.szak == 'nyari' else 0)) | round(1) }}"
+                - variables:
+                    bejegyzes:
+                      rogzitve: "{{ now().strftime('%Y-%m-%d %H:%M:%S') ~ '-' ~ m }}"
+                      datum: "{{ datum }}"
+                      mero: "{{ m | upper }}"
+                      tipus: "{{ tipus }}"
+                      allas: "{{ (allas if d else allas | int) if allas > 0 else none }}"
+                      uj_kezdo: "{{ (uj if d else uj | int) if tipus == 'Mérőcsere' else none }}"
+                      korrekcio: "{{ korr if d else korr | int }}"
+                      ha_elotte: "{{ ha_elotte if d else ha_elotte | int }}"
+                      lezart_fogyasztas: "{{ (lezart if d else lezart | int) if lezart is number else none }}"
+                      idoszak_kezdete: >-
+                        {{ (elozo.datum if elozo is mapping else none) if utolagos
+                           else (bazis_datum if lezart is number else none) }}
+                      utolag: "{{ utolagos }}"
+                - event: meroora_leolvasas_rogzites
+                  event_data:
+                    bejegyzes: "{{ bejegyzes }}"
+                - action: shell_command.meroora_naplo_csv
+                  continue_on_error: true
+                  data:
+                    datum: "{{ datum }}"
+                    mero: "{{ m | upper }}"
+                    tipus: "{{ {'Éves leolvasás': 'eves', 'Mérőcsere': 'csere', 'Korrekció': 'korrekcio'}[tipus] }}"
+                    allas: "{{ allas if d else allas | int }}"
+                    uj_kezdo: "{{ (uj if d else uj | int) if tipus == 'Mérőcsere' else '-' }}"
+                    korrekcio: "{{ korr if d else korr | int }}"
+                    ha_elotte: "{{ ha_elotte if d else ha_elotte | int }}"
+                    lezart: "{{ (lezart if d else lezart | int) if lezart is number else '-' }}"
+                - action: input_number.set_value
+                  target:
+                    entity_id:
+                      - "input_number.{{ p }}_korrekcio"
+                      - "input_number.{{ p }}_leolvasas_allas"
+                      - "input_number.{{ p }}_uj_ora_kezdo"
+                  data:
+                    value: 0
+                - action: input_boolean.turn_off
+                  target:
+                    entity_id: "input_boolean.meroora_rogzit_{{ m }}"
+                - delay: 1
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.villany_leolvasas_tipus
+        data:
+          option: "Éves leolvasás"
+      - delay: 1
+      - action: homeassistant.update_entity
+        target:
+          entity_id:
+            - sensor.meroora_allas
+            - sensor.meroora_allas_h
+            - sensor.meroora_allas_eves
+            - sensor.meroora_allas_h_eves
+            - sensor.energy_h_teli
+            - sensor.energy_h_nyari
+            - sensor.gaz_meroora_allas
+            - sensor.gaz_meroora_allas_eves
