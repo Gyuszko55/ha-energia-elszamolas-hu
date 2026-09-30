@@ -51,7 +51,7 @@ config/
 Terminálból (Terminal & SSH add-on) egy lépésben:
 
 ```sh
-cd /config && wget -qO- https://github.com/Gyuszko55/ha-energia-elszamolas-hu/archive/refs/heads/main.tar.gz \
+cd /config && curl -sL https://github.com/Gyuszko55/ha-energia-elszamolas-hu/archive/refs/heads/main.tar.gz \
   | tar xz --strip-components=1 --wildcards '*/packages/*' '*/custom_templates/*' '*/energia_elszamolas/*' '*/www/*'
 ```
 
