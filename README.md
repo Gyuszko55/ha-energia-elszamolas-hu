@@ -38,7 +38,7 @@ Home Assistant csomag, amely a magyar lakossági áramszámlát **napra készen*
 
 ### 1. Fájlok másolása
 
-Töltsd le a [legfrissebb kiadást](../../releases/latest) (zip), és másold a tartalmát a Home Assistant `config` mappájába (Samba, File editor vagy Studio Code Server). A szerkezet:
+Töltsd le a [legfrissebb kiadás](../../releases/latest) zip-fájlját, és a benne lévő `config/` mappa **tartalmát** másold a Home Assistant `config` mappájába (Samba, File editor vagy Studio Code Server). A szerkezet:
 
 ```
 config/
