@@ -27,12 +27,18 @@ Home Assistant csomag, amely a magyar lakossági áramszámlát **napra készen*
 
 ---
 
-## Követelmények
+## Telepítés feltételei – mit kell előre telepíteni
 
-- **Home Assistant 2025.10 vagy újabb.** A csomag a sablonokban `default_entity_id`-t használ.
-- **[HACS](https://hacs.xyz/)** és abból a **html-template-card** kártya. HACS → Frontend → keresés: „Lovelace HTML Jinja2 Template card”.
-- **Egy folyamatosan növekvő villamosenergia-szenzor (kWh)** a főmérő áramkörén. Ilyen például egy Shelly EM / Pro EM teljes energia-szenzora, egy P1-es okosmérő-olvasó vagy bármely `total_increasing` energiaszenzor.
-- *Nem kötelező:* egy H-tarifás mérő-szenzor (kWh) és egy gáz-szenzor (m³). Ez utóbbi soha nem nullázódhat.
+| # | Mit | Honnan / hogyan | Kötelező? |
+|---|---|---|---|
+| 1 | **Home Assistant 2025.10 vagy újabb** | Beállítások → Rendszer → Frissítések | igen |
+| 2 | **Energiamérő a főmérő áramkörén**, amely folyamatosan növekvő kWh-értéket ad (`total_increasing`): pl. Shelly EM / Pro EM, P1-es okosmérő-olvasó, Zigbee mérő | a mérő integrációja | igen |
+| 3 | **Energiamérő a H-tarifás körön** (hőszivattyú, klíma) | a mérő integrációja | csak ha van H-tarifád |
+| 4 | **Gázfogyasztás-szenzor** (m³, soha nem nullázódó): gázóra-impulzusolvasó, vagy a [ha-futes-hu](https://github.com/Gyuszko55/ha-futes-hu) gázbecslése (`sensor.kazan_gaz_osszesen`) | a szenzor integrációja / ha-futes-hu | csak a gáz részhez |
+| 5 | **[HACS](https://hacs.xyz/)** | https://hacs.xyz/docs/use/ | igen (a 6. ponthoz) |
+| 6 | **html-template-card** | HACS → Frontend → „Lovelace HTML Jinja2 Template card” → Letöltés | igen (a táblázatokhoz) |
+| 7 | **Csomagok bekapcsolása** a `configuration.yaml`-ban (`packages: !include_dir_named packages`) | lásd lent, 2. lépés | igen |
+| 8 | **Terminal & SSH** vagy **File editor** / **Samba** add-on a fájlok másolásához | Beállítások → Bővítmények → Bővítménybolt | az egyik kell |
 
 ## Telepítés
 
