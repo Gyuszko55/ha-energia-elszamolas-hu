@@ -18,6 +18,7 @@ from homeassistant.helpers import device_registry as dr
 
 from .const import CONF_ALMERO, CONF_FIZETESI_MOD, CONF_KOZMU, CONF_NAPELEM, CONF_SZAMLA_MAPPA, DOMAIN, FIX_DIJAS
 from .modell import szelet_dict
+from .sensor import idenyszakok
 
 _LOGGER = logging.getLogger(__name__)
 STATIC_URL = "/hu_rezsi_static"
@@ -63,7 +64,8 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
     ny = a.nyitott
     honap = _honapok(a.tol, a.ig)
     szeletek = ny.eddig.szeletek
-    keretes = [s for s in szeletek if s.keret is not None and s.csatorna == szeletek[0].csatorna]
+    keret_csat = next((s.csatorna for s in szeletek if s.keret is not None), None)  # H-tarifánál a nyári regiszter
+    keretes = [s for s in szeletek if s.keret is not None and s.csatorna == keret_csat]
     keret = None
     if keretes:
         ossz = sum((s.keret for s in keretes), Decimal(0))
@@ -97,6 +99,8 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
                 "hatralevo_nap": _f(ny.hatralevo_nap, 1),
             },
             "keret": keret,
+            "idenyszakok": {"eddig": idenyszakok(ny.eddig), "varhato": idenyszakok(ny.varhato)} if idenyszakok(ny.eddig) else None,
+            "atalany": a.atalany,
             "aktualis_ar": _f(a.aktualis_ar, 3),
             "eves": {"fogyasztas": _f(a.eves_fogyasztas, 1), "bazis": _iso(a.eves_bazis)},
             "utolso_lezart": a.utolso_lezart,
@@ -160,8 +164,13 @@ def ws_adatok(hass: HomeAssistant, connection: websocket_api.ActiveConnection, m
             continue
         koord = entry.runtime_data
         fiokok = [_fiok_adat(hass, koord, sid, sub) for sid, sub in koord.fiokok().items()]
-        eddig = sum((f["eddig"]["havi_resz"] or f["eddig"]["osszeg"]) for f in fiokok if f.get("eddig"))
-        varhato = sum((f["varhato"]["havi_resz"] or f["varhato"]["osszeg"]) for f in fiokok if f.get("varhato"))
+        # Havi fizetendő: átalánynál az átalány napra leosztva, egyébként a költség (több hónapos időszakból a havi rész).
+        eddig = sum(
+            (f["atalany"]["eddig"] if f.get("atalany") else f["eddig"]["havi_resz"] or f["eddig"]["osszeg"]) for f in fiokok if f.get("eddig")
+        )
+        varhato = sum(
+            (f["atalany"]["havi"] if f.get("atalany") else f["varhato"]["havi_resz"] or f["varhato"]["osszeg"]) for f in fiokok if f.get("varhato")
+        )
         haztartasok.append({
             "entry_id": entry.entry_id,
             "nev": entry.title,

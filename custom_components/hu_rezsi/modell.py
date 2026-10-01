@@ -7,6 +7,8 @@ from decimal import Decimal
 from typing import Any
 
 from .const import (
+    CONF_H_NYARI,
+    CONF_H_TELI,
     CONF_ALMERO,
     CONF_ALMERO_BEEPITVE,
     CONF_ALMERO_KEZDO,
@@ -68,13 +70,13 @@ def kezdo_almero(beallitas: dict[str, Any]) -> dict[str, Any]:
 
 def mero_motorba(m: dict[str, Any], csatorna: str = "vetelezes") -> Mero:
     """Egy mérő egy regisztere (csatornája): vételezés (1.8.0) vagy betáplálás (2.8.0)."""
-    be = csatorna == "betaplalas"
+    fo = csatorna == "vetelezes"
     return Mero(
         gyari_szam=m.get("gyari_szam", ""),
         beepitve=d(m["beepitve"]),
-        kezdo_allas=dec(m.get("kezdo_betaplalas" if be else "kezdo_allas")) or Decimal(0),
+        kezdo_allas=dec(m.get("kezdo_allas" if fo else f"kezdo_{csatorna}")) or Decimal(0),
         kiszerelve=d(m.get("kiszerelve")),
-        zaro_allas=dec(m.get("zaro_betaplalas" if be else "zaro_allas")),
+        zaro_allas=dec(m.get("zaro_allas" if fo else f"zaro_{csatorna}")),
         leolvasasok=[
             Leolvasas(
                 datum=d(lo["datum"]),
@@ -106,7 +108,7 @@ def fiok_motorba(beallitas: dict[str, Any], tarolt: dict[str, Any]) -> Fiok:
         kozmu=Kozmu(beallitas[CONF_KOZMU]),
         szolgaltato=beallitas[CONF_SZOLGALTATO],
         dijszabasok=[DijszabasHozzarendeles(beallitas[CONF_DIJSZABAS], d(beallitas[CONF_DIJSZABAS_TOL]))],
-        csatornak=[
+        csatornak=h_regiszterek(beallitas, tarolt) or [
             Csatorna(
                 merok=[mero_motorba(m) for m in tarolt["merok"]],
                 keret_aktiv=bool(beallitas.get(CONF_KERET_AKTIV, True)),
@@ -132,6 +134,24 @@ def fiok_motorba(beallitas: dict[str, Any], tarolt: dict[str, Any]) -> Fiok:
         eves_bazis=eves_bazis(tarolt),
         futoertekek={k: Decimal(str(v)) for k, v in (tarolt.get("futoertekek") or {}).items()},
     )
+
+
+def h_regiszter_mod(beallitas: dict[str, Any]) -> bool:
+    return bool(beallitas.get(CONF_H_TELI) and beallitas.get(CONF_H_NYARI))
+
+
+def h_regiszterek(beallitas: dict[str, Any], tarolt: dict[str, Any]) -> list[Csatorna] | None:
+    """H-tarifa két regiszterrel: téli (1.81) és nyári (1.82) külön csatorna, külön mérés és elszámolás."""
+    if not h_regiszter_mod(beallitas):
+        return None
+    return [
+        Csatorna(szerep="h_teli", merok=[mero_motorba(m, "h_teli") for m in tarolt["merok"]], keret_aktiv=False),
+        Csatorna(
+            szerep="h_nyari",
+            merok=[mero_motorba(m, "h_nyari") for m in tarolt["merok"]],
+            keret_aktiv=bool(beallitas.get(CONF_KERET_AKTIV, True)),
+        ),
+    ]
 
 
 def betaplalas_csatorna(tarolt: dict[str, Any]) -> Csatorna:

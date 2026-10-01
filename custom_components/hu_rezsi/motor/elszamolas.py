@@ -165,7 +165,7 @@ def szamol(
     for ci, (csatorna, szamlalo) in enumerate(zip(fiok.csatornak, szamlalok, strict=True)):
         for a, b in zip(napok, napok[1:]):
             sajat = tar.felold(_hozzarendeles(fiok, a), a, fiok.szolgaltato, fiok.feluliras)
-            arak, keret_szabaly, ar_kulcs, idx = _szabaly(sajat, a, tar, fiok)
+            arak, keret_szabaly, ar_kulcs, idx = _szabaly(sajat, a, tar, fiok, csatorna.szerep)
 
             ta, tb = nap_kezdete(a), min(nap_kezdete(b), vege)
             if ta < tb:
@@ -194,6 +194,11 @@ def szamol(
                 keret = max(Decimal(keret_szabaly["ev_mennyiseg"]) - felhasznalt, Decimal(0))
             else:
                 keret = None
+            if keret is not None and csatorna.szerep.startswith("h_"):
+                # H-regiszter: a saját idényén kívül nem gyűlik kerete (pl. télen a nyári 1.82-es regiszteré).
+                datum_idx = (idenyszak(a, sajat.szabalyok.get("idenyszak") or []) or {}).get("nev")
+                if datum_idx != idx:
+                    keret = Decimal(0)
 
             if keret is None:
                 kedv, piaci = elsz, Decimal(0)
@@ -268,10 +273,16 @@ def szamol(
 
 
 def _szabaly(
-    sajat: Ervenyes, nap: date, tar: DijszabasTar, fiok: Fiok
+    sajat: Ervenyes, nap: date, tar: DijszabasTar, fiok: Fiok, szerep: str = "vetelezes"
 ) -> tuple[dict[str, Decimal], dict[str, Any] | None, str, str | None]:
-    """(árak, keret-szabály, ár-kulcs keret nélkül, idényszak neve) egy napra."""
-    sz = idenyszak(nap, sajat.szabalyok.get("idenyszak") or [])
+    """(árak, keret-szabály, ár-kulcs keret nélkül, idényszak neve) egy napra.
+
+    Ha a csatorna egy idényszak saját regisztere (pl. H-tarifa: „h_teli” = 1.81, „h_nyari” = 1.82), az idényszakot
+    a regiszter adja, nem a dátum – a mérő is így számol.
+    """
+    idenyek = sajat.szabalyok.get("idenyszak") or []
+    regiszter = next((x for x in idenyek if szerep == f"h_{x.get('nev')}"), None)
+    sz = regiszter or idenyszak(nap, idenyek)
     if sz is None:
         return sajat.dijak, sajat.szabalyok.get("keret"), sajat.szabalyok.get("ar", "energia_kedvezmenyes"), None
     if sz.get("dijszabas"):

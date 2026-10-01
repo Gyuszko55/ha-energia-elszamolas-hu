@@ -267,3 +267,40 @@ def test_negyedeves_idoszak_es_fix_dij(tar):
     f = Fiok(Kozmu.HULLADEK, "mohu", [DijszabasHozzarendeles("hulladek/mohu", date(2024, 1, 1))], [Csatorna(keret_aktiv=False)])
     r = szamol(f, tar, date(2026, 10, 1), date(2027, 1, 1), [Szamlalo([Pont(dt(2026, 1, 1), D(0), True)])])
     assert r.osszesen_ft == D(5772)  # a negyedéves számla összege
+
+
+def test_h_ket_regiszter_oktober(tar):
+    # okt. 1–14: a nyári regiszter (1.82) nő 30 kWh-t; okt. 15-től a téli (1.81) 50 kWh-t – külön csatornán mérve
+    f = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/h", date(2024, 1, 1))],
+             [Csatorna(szerep="h_teli", keret_aktiv=False), Csatorna(szerep="h_nyari")])
+    teli = Szamlalo([Pont(dt(2026, 10, 1), D(474), True), Pont(dt(2026, 10, 15), D(474), True), Pont(dt(2026, 11, 1), D(524), True)])
+    nyari = Szamlalo([Pont(dt(2026, 10, 1), D(528), True), Pont(dt(2026, 10, 15), D(558), True), Pont(dt(2026, 11, 1), D(558), True)])
+    r = szamol(f, tar, date(2026, 10, 1), date(2026, 11, 1), [teli, nyari])
+    t = [s for s in r.szeletek if s.csatorna == "h_teli"]
+    n = [s for s in r.szeletek if s.csatorna == "h_nyari"]
+    assert sum(s.mennyiseg for s in t) == D(50) and all(s.idenyszak == "teli" and s.keret is None for s in t)
+    assert sum(s.mennyiseg for s in n) == D(30) and all(s.idenyszak == "nyari" for s in n)
+    assert n[0].egysegar_kedvezmenyes == D("36.3855")  # nyári regiszter: A1 ár
+    assert r.alapdij_ft == D(51)  # egyszer, a fiókra
+
+
+def test_h_regiszter_elorejelzes_oktober_15_utan_a_telire(tar):
+    # okt. 10-ig 4 kWh/nap a nyári regiszteren; az előrejelzés okt. 15-től a télihez adja
+    f = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/h", date(2024, 1, 1))],
+             [Csatorna(szerep="h_teli", keret_aktiv=False), Csatorna(szerep="h_nyari")])
+    teli = Szamlalo([Pont(dt(2026, 9, 1), D(474), True), Pont(dt(2026, 10, 10), D(474), True)])
+    nyari = Szamlalo([Pont(dt(2026, 9, 1), D(400), True), Pont(dt(2026, 10, 10), D(556), True)])
+    n = nyitott(f, tar, date(2026, 10, 1), date(2026, 11, 1), [teli, nyari], dt(2026, 10, 10))
+    v_teli = sum(s.mennyiseg for s in n.varhato.szeletek if s.csatorna == "h_teli")
+    v_nyari = sum(s.mennyiseg for s in n.varhato.szeletek if s.csatorna == "h_nyari")
+    assert v_teli == D(4) * 17  # okt. 15–31
+    assert v_nyari == D(36) + D(4) * 5  # okt. 1–10 tényleges + okt. 10–15 előrejelzés
+
+
+def test_h_nyari_regiszter_kerete_csak_nyaron(tar):
+    f = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/h", date(2024, 1, 1))],
+             [Csatorna(szerep="h_teli", keret_aktiv=False), Csatorna(szerep="h_nyari")])
+    lapos = lambda v: Szamlalo([Pont(dt(2026, 10, 1), D(v), True)])  # noqa: E731
+    r = szamol(f, tar, date(2026, 10, 1), date(2026, 11, 1), [lapos(474), lapos(528)])
+    keretek = {(s.tol, s.ig): s.keret for s in r.szeletek if s.csatorna == "h_nyari"}
+    assert keretek == {(date(2026, 10, 1), date(2026, 10, 15)): D(97), (date(2026, 10, 15), date(2026, 11, 1)): D(0)}

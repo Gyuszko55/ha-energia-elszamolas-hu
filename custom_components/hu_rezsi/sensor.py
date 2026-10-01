@@ -98,9 +98,24 @@ def honapok(a: FiokAllapot) -> int:
     return max(1, (a.ig.year - a.tol.year) * 12 + a.ig.month - a.tol.month)
 
 
+def idenyszakok(e: Any) -> dict[str, Any] | None:
+    """Idényszakonkénti bontás (H-tarifa: téli 1.81 / nyári 1.82), ha van."""
+    out: dict[str, dict[str, float]] = {}
+    for s in e.szeletek:
+        nev = s.idenyszak or ({"h_teli": "teli", "h_nyari": "nyari"}.get(s.csatorna))
+        if not nev:
+            continue
+        x = out.setdefault(nev, {"mennyiseg": 0.0, "energia_ft": 0.0})
+        x["mennyiseg"] += float(s.mennyiseg)
+        x["energia_ft"] += float(s.energia_ft)
+    return {k: {"mennyiseg": round(v["mennyiseg"], 2), "energia_ft": round(v["energia_ft"])} for k, v in out.items()} or None
+
+
 def _eddig_attr(a: FiokAllapot) -> dict[str, Any]:
     e = a.nyitott.eddig
     return {
+        **({"idenyszakok": idenyszakok(e)} if idenyszakok(e) else {}),
+        **({"atalany_havi": a.atalany["havi"], "atalany_eddig": a.atalany["eddig"]} if a.atalany else {}),
         **({"havi_resz": int(round(e.osszesen_ft / honapok(a))), "idoszak_honap": honapok(a)} if honapok(a) > 1 else {}),
         "idoszak_kezdete": a.tol.isoformat(),
         "idoszak_vege": a.ig.isoformat(),
@@ -262,6 +277,16 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         elerheto=lambda a: a.elszamolas is not None,
     ),
     FiokLeiras(
+        key="atalany_havi",
+        translation_key="atalany_havi",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: a.atalany["havi"],
+        attr=lambda a: {**a.atalany, "jelentes": "átalányos fizetés: az átalány napra leosztva × a hónap napjai"},
+        elerheto=lambda a: a.atalany is not None,
+    ),
+    FiokLeiras(
         key="utolso_szamla",
         translation_key="utolso_szamla",
         device_class=SensorDeviceClass.MONETARY,
@@ -314,7 +339,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             [
                 FiokSzenzor(koord, entry, sid, sub.title, leiras)
                 for leiras in FIOK_LEIRASOK
-                if (leiras.key not in EGYENLEG_KULCSOK or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla")
+                if (leiras.key not in EGYENLEG_KULCSOK | {"atalany_havi"} or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla")
                 and (leiras.key not in NAPELEM_KULCSOK or sub.data.get(CONF_NAPELEM, "nincs") != "nincs")
                 and (leiras.key not in SZAMLA_KULCSOK or sub.data.get(CONF_SZAMLA_MAPPA))
                 and (sub.data.get(CONF_KOZMU) not in FIX_DIJAS or leiras.key in FIX_KULCSOK)
@@ -406,8 +431,12 @@ class HaztartasOsszesen(CoordinatorEntity[RezsiKoordinator], SensorEntity):
                 continue
             e = a.nyitott.eddig if self._fajta == "eddig" else a.nyitott.varhato
             sub = koord.fiokok().get(sid)
-            # Havi összesítő: a több hónapos (pl. negyedéves) időszakból a havi rész számít.
-            out[sub.title if sub else sid] = int(round(e.osszesen_ft / honapok(a)))
+            # Havi összesítő: átalánynál a fizetendő (napra leosztva), egyébként a költség; a több hónapos
+            # (pl. negyedéves) időszakból a havi rész.
+            if a.atalany:
+                out[sub.title if sub else sid] = a.atalany["eddig" if self._fajta == "eddig" else "havi"]
+            else:
+                out[sub.title if sub else sid] = int(round(e.osszesen_ft / honapok(a)))
         return out
 
     @property

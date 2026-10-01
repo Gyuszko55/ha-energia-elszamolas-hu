@@ -32,6 +32,8 @@ CONF_ALMERO_FORRAS = "almero_forras"
 CONF_RESZSZAMLA_OSSZEG = "reszszamla_osszeg"
 CONF_ELOZO_EV = "elozo_ev_mennyiseg"
 CONF_SZAMLA_MAPPA = "szamla_mappa"  # a config mappához képest, pl. "Dijnet /mvm_next_foldgaz"
+CONF_H_TELI = "h_teli_forras"  # H-tarifa téli regiszter (1.81) szenzora
+CONF_H_NYARI = "h_nyari_forras"  # H-tarifa nyári regiszter (1.82) szenzora
 CONF_SZAMLA_MEROK = "szamla_merok"  # vesszővel elválasztott gyári számok; üres: a mappa minden számlája
 
 EGYSEG = {"villany": "kWh", "gaz": "m³", "viz": "m³", "hulladek": "db"}  # a mért (óra) egység

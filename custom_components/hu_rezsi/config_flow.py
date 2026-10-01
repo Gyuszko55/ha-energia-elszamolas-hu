@@ -55,6 +55,8 @@ from .const import (
     CONF_DIJSZABAS_TOL,
     CONF_FORRAS,
     CONF_FORRAS_TIPUS,
+    CONF_H_NYARI,
+    CONF_H_TELI,
     CONF_FORRAS_TOL,
     CONF_GYARI_SZAM,
     CONF_IDOSZAK_MOD,
@@ -230,6 +232,10 @@ class FiokFlow(ConfigSubentryFlow):
                 SelectSelectorConfig(options=dn, custom_value=True)
             )
         if kozmu == "villany":
+            for kulcs in (CONF_H_TELI, CONF_H_NYARI):
+                mezok[vol.Optional(kulcs, **({"description": {"suggested_value": eddigi[kulcs]}} if eddigi.get(kulcs) else {}))] = EntitySelector(
+                    EntitySelectorConfig(domain="sensor")
+                )
             ajanlott = eddigi.get(CONF_BETAPLALAS) or await self._energia_betaplalas()
             mezok[vol.Required(CONF_NAPELEM, default=alap(CONF_NAPELEM, "nincs"))] = SelectSelector(
                 SelectSelectorConfig(options=["nincs", "brutto", "szaldo"], translation_key="napelem_mod")

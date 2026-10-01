@@ -30,7 +30,7 @@ leolvasas_rogzites:
       default: vetelezes
       selector:
         select:
-          options: [vetelezes, betaplalas, almero]
+          options: [vetelezes, betaplalas, almero, h_teli, h_nyari]
           translation_key: csatorna
 leolvasas_torles:
   fields:

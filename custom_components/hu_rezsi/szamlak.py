@@ -166,6 +166,7 @@ def dakov_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
         return None
     osszeg = re.search(r"Fizetendő összeg: (-?[\d ]+?) Ft", t)
     lm = re.search(r"Leolvasás módja \(LM\) jelen számlában: (\w+)", t)
+    idoszak = re.search(r"Elszámolt időszak: (\d{4}\.\d{2}\.\d{2})-(\d{4}\.\d{2}\.\d{2})", t)
     lm_s = lm.group(1) if lm else ("Becs" if "becsült fogyasztás" in t else "")
     sz = Szamla(
         forras="dakov",
@@ -173,6 +174,7 @@ def dakov_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
         kelte=_d(kelte.group(1)),
         osszeg=_szam(osszeg.group(1)) if osszeg else None,
         tipus="elszamolo" if "elszámoló számla" in t else "resz",
+        idoszak=(_d(idoszak.group(1)), _d(idoszak.group(2))) if idoszak else None,
         fajl=fajl,
     )
     for m in _DAKOV_MERO.finditer(t):

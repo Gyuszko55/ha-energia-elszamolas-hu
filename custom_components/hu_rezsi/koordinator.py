@@ -31,6 +31,8 @@ from .const import (
     CONF_FORRAS,
     CONF_FORRAS_TIPUS,
     CONF_FORRAS_TOL,
+    CONF_H_NYARI,
+    CONF_H_TELI,
     CONF_IDOSZAK_MOD,
     CONF_IDOSZAK_NAP,
     CONF_KOZMU,
@@ -47,11 +49,11 @@ from pathlib import Path
 from homeassistant.components import persistent_notification
 
 from . import dijnet, szamlak
-from .szamla_import import IMPORT_VERZIO, rogzit, szamla_statisztika, ujraertekel
+from .szamla_import import IMPORT_VERZIO, atalany_szamitas, rogzit, szamla_statisztika, ujraertekel
 from .modell import betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
 from .motor.egyenleg import EvesEgyenleg, VarhatoElszamolas, egy_ev_mulva, eves_egyenleg, varhato_elszamolas
-from .motor.elszamolas import _hozzarendeles, futoertek
+from .motor.elszamolas import _hozzarendeles, futoertek, idenyszak
 from .motor.dijszabas import DijszabasHiba, DijszabasTar
 from .motor.elorejelzes import NyitottIdoszak, idoszak, nyitott
 from .motor.elszamolas import szamol
@@ -82,6 +84,7 @@ class FiokAllapot:
     utolso_szamla: dict[str, Any] | None = None
     elszamolas: VarhatoElszamolas | None = None
     szamla_stat: dict[str, Any] | None = None
+    atalany: dict[str, Any] | None = None
     napelem_hiba: str | None = None
     egyenleg_hiba: str | None = None
     hiba: str | None = None
@@ -107,11 +110,16 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         sub = self.fiokok()[subentry_id]
         return fiok_motorba(dict(sub.data), self.tarolo.fiok(subentry_id))
 
-    async def szamlalo(self, subentry_id: str, fiok: Fiok, tol: datetime, most: datetime) -> Szamlalo:
-        """A fiók számlálója: leolvasások + a forrás-entitás napi statisztikája + élő állapota."""
+    async def szamlalo(self, subentry_id: str, fiok: Fiok, tol: datetime, most: datetime, index: int = 0) -> Szamlalo:
+        """Egy csatorna számlálója: leolvasások + a forrás-entitás napi statisztikája + élő állapota."""
         beall = self.fiokok()[subentry_id].data
-        csatorna = fiok.csatornak[0]
-        forras = beall.get(CONF_FORRAS)
+        csatorna = fiok.csatornak[index]
+        forras = {
+            "vetelezes": beall.get(CONF_FORRAS),
+            "h_teli": beall.get(CONF_H_TELI),
+            "h_nyari": beall.get(CONF_H_NYARI),
+            "almero": beall.get(CONF_ALMERO_FORRAS),
+        }.get(csatorna.szerep)
         if not forras:
             return Szamlalo.csatornabol(csatorna)
         # A sorozatpontokat a megelőző horgonyhoz igazítjuk, ezért a sorozatnak a szükséges
@@ -192,16 +200,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         mod = sub.data.get(CONF_IDOSZAK_MOD) or ("negyedev" if sub.data[CONF_KOZMU] in FIX_DIJAS else "naptari_honap")
         nap = int(sub.data.get(CONF_IDOSZAK_NAP) or 1)
         tol, ig = idoszak(most.date(), mod, nap)
-        szamlalo = await self.szamlalo(sid, fiok, datetime.combine(tol, datetime.min.time()) - timedelta(days=ELOZMENY_NAPOK), most)
+        elozmeny = datetime.combine(tol, datetime.min.time()) - timedelta(days=ELOZMENY_NAPOK)
+        # Csatornánként saját számláló (fő; H-tarifánál téli és nyári regiszter; víznél almérő).
+        szamlalok = [await self.szamlalo(sid, fiok, elozmeny, most, i) for i in range(len(fiok.csatornak))]
+        szamlalo, tovabbi = szamlalok[0], szamlalok[1:]
         self.utolso_szamlalok[sid] = szamlalo.pontok[-15:]
         hatarok = elszamolasi_napok(tarolt)
-        tovabbi: list[Szamlalo] = []
-        for csat in fiok.csatornak[1:]:  # víz-almérő
-            sorozat = None
-            if csat.szerep == "almero" and sub.data.get(CONF_ALMERO_FORRAS):
-                sorozat = await self._sorozat(sub.data[CONF_ALMERO_FORRAS], datetime.combine(tol, datetime.min.time()) - timedelta(days=ELOZMENY_NAPOK), most)
-            tovabbi.append(Szamlalo.csatornabol(csat, sorozat, meroallas=True))
-        szamlalok = [szamlalo, *tovabbi]
 
         # Lezárás: ha a tárolt nyitott időszak már véget ért (és eltelt a késleltetés).
         lezart_valt = False
@@ -227,7 +231,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         eves = None
         if fiok.eves_bazis:
             try:
-                eves, _ = szamlalo.fogyasztas(datetime.combine(fiok.eves_bazis, datetime.min.time()), most)
+                bazis = datetime.combine(fiok.eves_bazis, datetime.min.time())
+                eves = sum(
+                    (sz.fogyasztas(bazis, most)[0] for sz, cs in zip(szamlalok, fiok.csatornak, strict=True) if cs.szerep != "almero"),
+                    Decimal(0),
+                )
             except NincsAdat:
                 eves = None
         lezartak = sorted(tarolt["lezart"], key=lambda x: x["tol"])
@@ -267,6 +275,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 napelem=napelem_e,
                 utolso_szamla=_utolso_szamla(tarolt),
                 elszamolas=elszamolas,
+                atalany=atalany_szamitas(sub.data.get(CONF_RESZSZAMLA_OSSZEG), tarolt, tol, ig, most)
+                if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla" else None,
                 szamla_stat=szamla_statisztika(tarolt, most.date(), fix_dij=sub.data[CONF_KOZMU] in FIX_DIJAS),
                 napelem_hiba=napelem_hiba,
             ),
@@ -388,6 +398,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
     def _aktualis_ar(self, fiok: Fiok, ny: NyitottIdoszak, most: datetime) -> Decimal | None:
         """A következő elfogyasztott egység ára a mért egységben (gáznál Ft/m³), a HA Energia irányítópulthoz."""
         for s in ny.eddig.szeletek:
+            if s.csatorna.startswith("h_") and s.keret == 0 and s.keret is not None:
+                continue  # H-regiszter a saját idényén kívül: nem ez a „következő kWh” ára
+            if s.csatorna == "h_teli" and s.keret is None:
+                idx = (idenyszak(most.date(), self.tar.felold(_hozzarendeles(fiok, most.date()), most.date(), fiok.szolgaltato, fiok.feluliras).szabalyok.get("idenyszak") or []) or {}).get("nev")
+                if idx != "teli":
+                    continue
             if datetime.combine(s.tol, datetime.min.time()) <= most < datetime.combine(s.ig, datetime.min.time()):
                 ar = s.egysegar_kedvezmenyes if s.keret is None or (s.elszamolt or s.mennyiseg) < s.keret else s.egysegar_piaci
                 erv = self.tar.felold(_hozzarendeles(fiok, s.tol), s.tol, fiok.szolgaltato, fiok.feluliras)
@@ -414,3 +430,4 @@ def _utolso_szamla(tarolt: dict[str, Any]) -> dict[str, Any] | None:
 def _bef_kulcs(datum: Any, osszeg: Any) -> str:
     """Befizetés azonosítója sorszám híján: nap + összeg egységes formában (11202 = 11202.0)."""
     return f"{str(datum)[:10]}|{Decimal(str(osszeg)).quantize(Decimal('0.01'))}"
+

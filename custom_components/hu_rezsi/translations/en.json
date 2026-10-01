@@ -51,7 +51,9 @@
             "reszszamla_osszeg": "Partial bill amount (optional)",
             "elozo_ev_mennyiseg": "Previous year's consumption (optional)",
             "szamla_mappa": "Invoice folder (optional)",
-            "szamla_merok": "Invoice meters (optional)"
+            "szamla_merok": "Invoice meters (optional)",
+            "h_teli_forras": "H tariff: winter register (1.81) sensor",
+            "h_nyari_forras": "H tariff: summer register (1.82) sensor"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -70,7 +72,9 @@
             "reszszamla_osszeg": "HUF; if empty, this or last year's last partial bill.",
             "elozo_ev_mennyiseg": "If there are no two settlement readings.",
             "szamla_mappa": "Inside the config folder, e.g. the Díjnet download folder. New invoices add payments, real meter readings and monthly calorific values.",
-            "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account."
+            "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account.",
+            "h_teli_forras": "H tariff only. With both registers set, they are measured and billed separately.",
+            "h_nyari_forras": "H tariff only, together with the winter register."
           }
         },
         "reconfigure": {
@@ -103,7 +107,9 @@
             "reszszamla_osszeg": "Partial bill amount (optional)",
             "elozo_ev_mennyiseg": "Previous year's consumption (optional)",
             "szamla_mappa": "Invoice folder (optional)",
-            "szamla_merok": "Invoice meters (optional)"
+            "szamla_merok": "Invoice meters (optional)",
+            "h_teli_forras": "H tariff: winter register (1.81) sensor",
+            "h_nyari_forras": "H tariff: summer register (1.82) sensor"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -122,7 +128,9 @@
             "reszszamla_osszeg": "HUF; if empty, this or last year's last partial bill.",
             "elozo_ev_mennyiseg": "If there are no two settlement readings.",
             "szamla_mappa": "Inside the config folder, e.g. the Díjnet download folder. New invoices add payments, real meter readings and monthly calorific values.",
-            "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account."
+            "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account.",
+            "h_teli_forras": "H tariff only. With both registers set, they are measured and billed separately.",
+            "h_nyari_forras": "H tariff only, together with the winter register."
           }
         }
       },
@@ -193,6 +201,9 @@
       },
       "kovetkezo_szamla": {
         "name": "Next invoice expected"
+      },
+      "atalany_havi": {
+        "name": "Monthly payable (flat rate)"
       }
     }
   },
@@ -241,7 +252,9 @@
       "options": {
         "vetelezes": "Import (1.8.0)",
         "betaplalas": "Export (2.8.0)",
-        "almero": "Sub-meter (water)"
+        "almero": "Sub-meter (water)",
+        "h_teli": "H winter register (1.81)",
+        "h_nyari": "H summer register (1.82)"
       }
     }
   },

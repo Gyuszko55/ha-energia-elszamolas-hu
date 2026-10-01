@@ -151,3 +151,16 @@ def test_szamla_statisztika_negyedeves():
     assert "díjváltozás" in szamla_statisztika(t, date(2026, 10, 10), fix_dij=True)["figyelmeztetes"]
     assert szamla_statisztika(t, date(2026, 10, 10))["figyelmeztetes"] is None  # változó számlánál nem zaj
     assert "elmaradt" in szamla_statisztika({"szamlak": {k: v for k, v in t["szamlak"].items() if k != "9"}}, date(2026, 11, 15))["figyelmeztetes"]
+
+
+def test_atalany_napra_leosztva():
+    from datetime import datetime
+    from szamla_import import atalany_szamitas
+    t = {"szamlak": {
+        "1": {"kelte": "2026-07-27", "osszeg": "556", "tipus": "elszamolo", "idoszak": ["2025-07-12", "2026-07-14"]},
+        "2": {"kelte": "2026-08-24", "osszeg": "11185", "tipus": "resz", "idoszak": ["2026-07-15", "2026-08-13"]},
+    }}
+    a = atalany_szamitas(None, t, date(2026, 10, 1), date(2026, 11, 1), datetime(2026, 10, 10, 12))
+    assert a["napi"] == round(11185 / 30, 2) and a["havi"] == round(11185 / 30 * 31) and a["eltelt_nap"] == 10
+    b = atalany_szamitas(12000, t, date(2026, 10, 1), date(2026, 11, 1), datetime(2026, 10, 10, 12))
+    assert b["havi"] == round(12000 * 12 / 365 * 31) and "beállított" in b["forras"]

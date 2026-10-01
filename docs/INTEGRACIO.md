@@ -71,6 +71,14 @@ A fiók „Számlamappa” mezőjében megadott mappa (a config mappán belül; 
 - Közös mappánál (pl. A1 és H egy szerződésen) a „Számla-mérők” mezőben a mérő gyári számával választható szét.
 - Az új számlákról értesítés jön; az „Utolsó számla” entitás mutatja a legutóbbit.
 
+## H-tarifa: téli és nyári regiszter
+
+A H-tarifás fióknál megadható a **téli (1.81)** és a **nyári (1.82)** regiszter szenzora. Ekkor a két regiszter külön mérődik (külön leolvasás: `csatorna: h_teli` / `h_nyari`) és külön számolódik: a téli a H-áron, a nyári az A1 áron, saját kedvezményes kerettel, amely csak a nyári időszakban (ápr. 15. – okt. 15.) gyűlik. Októberben és áprilisban mindkét tarifa külön sorban jelenik meg.
+
+## Átalány
+
+Bármely fiók lehet **részszámlás (átalány)**. Ilyenkor a panelen „átalány” jelzés látszik, és a **Havi fizetendő (átalány)** = az átalány napra leosztva × a hónap napjai. A napi összeg az utolsó részszámla összege osztva az időszakának napjaival, vagy a beállított havi átalány × 12 / 365. A háztartás havi összesítőjében az átalányos szolgáltatás a fizetendővel szerepel; a tényleges fogyasztás költsége mellette látszik, és a várható elszámolás ebből számol.
+
 ## Fix díjas fiók (hulladékszállítás)
 
 Közmű: „Hulladékszállítás (fix díj)”. Nincs mérő: a költség a díjszabás havi díjrésze, az időszak a naptári negyedév (a számlázás ütemezése szerint), a havi rész a `havi_resz` attribútumban; a háztartás havi összesítőjébe a havi rész kerül. A számlák a számlamappából (pl. `Dijnet /mohu_zrt`) jönnek; a „Következő számla várható” figyelmeztet, ha a díj változik vagy egy számla elmarad.

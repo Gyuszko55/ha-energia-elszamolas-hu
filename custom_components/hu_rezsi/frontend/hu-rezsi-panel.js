@@ -114,6 +114,8 @@ class HuRezsiPanel extends HTMLElement {
   }
 
   _haztartas(h) {
+    if (!h.fiokok.length)
+      return `<section class="osszesito"><div class="hnev">${esc(h.nev)}</div><div class="megj">Ennek a háztartásnak még nincs fiókja. Beállítások → Eszközök és szolgáltatások → Rezsikövető → ${esc(h.nev)} → Fiók hozzáadása.</div></section>`;
     const figy = this._figyelmeztetesek(h);
     return `
       <section class="osszesito">
@@ -122,7 +124,7 @@ class HuRezsiPanel extends HTMLElement {
           <div><div class="cimke">Ebben a hónapban eddig</div><div class="nagy">${ft(h.osszesen.eddig)}</div></div>
           <div><div class="cimke">Várható hó végére</div><div class="nagy">${ft(h.osszesen.varhato)}</div></div>
         </div>
-        <div class="megj">A több hónapra számlázott díjakból (pl. negyedéves hulladékdíj) a havi rész szerepel.</div>
+        <div class="megj">Átalányos szolgáltatásnál az átalány napra leosztott része, a több hónapra számlázott díjakból (pl. negyedéves hulladékdíj) a havi rész szerepel.</div>
         ${figy.length ? `<ul class="figylista">${figy.map((x) => `<li class="${x.szint}">${esc(x.szoveg)}</li>`).join("")}</ul>` : `<div class="rendben">Nincs teendő.</div>`}
       </section>
       <div class="racs">${h.fiokok.map((f) => this._fiok(f)).join("")}</div>`;
@@ -138,18 +140,41 @@ class HuRezsiPanel extends HTMLElement {
     const negyedev = f.idoszak.honapok > 1;
     const egyseg = f.egyseg === "db" ? "" : f.egyseg;
     const blokkok = [];
-    // Mennyibe került? / Mennyi lesz?
+    // Átalány: a havi fizetendő az átalány napra leosztva; a tényleges fogyasztás alatta, másodlagosan.
+    if (f.atalany) {
+      const at = f.atalany;
+      blokkok.push(`
+      <div class="ket">
+        <div><div class="cimke">Fizetendő eddig (átalány)</div><div class="ertek">${ft(at.eddig)}</div>
+          <div class="kicsi">${at.eltelt_nap} nap × ${szam(at.napi)} Ft</div></div>
+        <div><div class="cimke">Havi fizetendő (átalány)</div><div class="ertek">${ft(at.havi)}</div>
+          <div class="kicsi">${at.napok} nap × ${szam(at.napi)} Ft</div></div>
+      </div>
+      <div class="kicsi">Az átalány forrása: ${esc(at.forras)}</div>`);
+    }
+    // Mennyibe került? / Mennyi lesz? (átalánynál: a tényleges fogyasztás költsége)
     blokkok.push(`
       <div class="ket">
-        <div><div class="cimke">${negyedev ? "Ebben a negyedévben" : "Eddig"}</div>
+        <div><div class="cimke">${negyedev ? "Ebben a negyedévben" : f.atalany ? "Tényleges fogyasztás eddig" : "Eddig"}</div>
           <div class="ertek">${ft(f.eddig.osszeg)}</div>
           ${f.eddig.havi_resz ? `<div class="dolt">havonta ${ft(f.eddig.havi_resz)}</div>` : ""}
           ${!f.fix_dij ? `<div class="kicsi">${szam(f.eddig.mennyiseg, egyseg)}</div>` : ""}</div>
-        <div><div class="cimke">Várható</div>
+        <div><div class="cimke">${f.atalany ? "Tényleges, várható" : "Várható"}</div>
           <div class="ertek">${ft(f.varhato.osszeg)}</div>
           ${f.varhato.havi_resz ? `<div class="dolt">havonta ${ft(f.varhato.havi_resz)}</div>` : ""}
           ${!f.fix_dij && f.varhato.napi_atlag !== null ? `<div class="kicsi">napi ${szam(f.varhato.napi_atlag, egyseg)}</div>` : ""}</div>
       </div>`);
+    // H-tarifa: téli (1.81) és nyári (1.82) külön – októberben és áprilisban mindkettő.
+    if (f.idenyszakok) {
+      const nevek = { teli: "Téli (1.81, H-ár)", nyari: "Nyári (1.82, A1 ár)" };
+      const sorok = ["teli", "nyari"].filter((k) => f.idenyszakok.eddig?.[k] || f.idenyszakok.varhato?.[k]).map((k) => {
+        const e = f.idenyszakok.eddig?.[k] || {}, v = f.idenyszakok.varhato?.[k] || {};
+        return `<tr><td>${nevek[k]}</td><td>${szam(e.mennyiseg, "kWh")}</td><td>${ft(e.energia_ft)}</td><td>${szam(v.mennyiseg, "kWh")}</td><td>${ft(v.energia_ft)}</td></tr>`;
+      });
+      if (sorok.length) blokkok.push(`
+        <div><div class="cimke">Téli és nyári tarifa (váltás okt. 15. és ápr. 15.)</div>
+          <div class="tablagorgeto"><table><thead><tr><th></th><th>Eddig</th><th></th><th>Várható</th><th></th></tr></thead><tbody>${sorok.join("")}</tbody></table></div></div>`);
+    }
     // Hol tartok a keretben?
     if (f.keret && f.keret.osszes > 0) {
       const arany = Math.min(100, (100 * f.keret.felhasznalt) / f.keret.osszes);
@@ -194,7 +219,7 @@ class HuRezsiPanel extends HTMLElement {
     return `
       <div class="kartya">
         <div class="kfej"><ha-icon icon="${ikon}"></ha-icon>
-          <div><div class="knev">${esc(f.nev)}</div><div class="kicsi">${KOZMU[f.kozmu] || ""} · ${idoszak}${f.aktualis_ar && !f.fix_dij ? ` · ${szam(f.aktualis_ar)} Ft/${esc(egyseg)}` : ""}</div></div></div>
+          <div><div class="knev">${esc(f.nev)}${f.atalany || f.reszszamlas ? ' <span class="cimkeszalag atalany">átalány</span>' : ""}</div><div class="kicsi">${KOZMU[f.kozmu] || ""} · ${idoszak}${f.aktualis_ar && !f.fix_dij ? ` · ${szam(f.aktualis_ar)} Ft/${esc(egyseg)}` : ""}</div></div></div>
         ${blokkok.join("")}
         <div class="gombok">
           <button data-reszlet="${f.sid}">${nyitva ? "Kevesebb" : "Részletek"}</button>
@@ -334,6 +359,7 @@ const STILUS = `
   .sav .toltes.kozel { background: var(--warning-color, #ff9800); }
   .sav .toltes.tele { background: var(--error-color, #db4437); }
   .figyszoveg { color: var(--warning-color, #ff9800); }
+  .cimkeszalag.atalany { background: var(--info-color, #039be5); }
   .cimkeszalag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--warning-color, #ff9800); color: #fff; margin-left: 4px; }
   .gombok { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: auto; }
   button { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 18px; cursor: pointer; border: 1px solid var(--divider-color);

@@ -1,5 +1,11 @@
 # Változások
 
+## [Fejlesztés] Rezsikövető 2.0.0b2 (2026-10-01)
+
+- **H-tarifa két regiszterrel:** a téli (1.81) és a nyári (1.82) regiszter külön szenzorból és külön leolvasással mérődik, és külön számolódik (téli: H-ár, nyári: A1 ár saját kerettel, amely csak nyáron gyűlik). Az októberi és áprilisi váltás hónapjában mindkét tarifa külön sorban látszik (panel, `idenyszakok` attribútum). Az előrejelzés a két regiszter együttes napi átlagát naptár szerint osztja szét (okt. 15-től a téli, ápr. 15-től a nyári).
+- **Átalány bármely szolgáltatásnál:** „átalány” jelzés; **Havi fizetendő (átalány)** entitás = az átalány napra leosztva × a hónap napjai (az utolsó részszámla összege / időszakának napjai, vagy a beállított havi átalány × 12 / 365); a háztartás havi összesítőjében átalánynál a fizetendő szerepel.
+- DAKÖV-számlák elszámolt időszaka (import-verzió 4); üres háztartás a panelen.
+
 ## Rezsikövető 2.0.0b1 – 2026-10-01 (első béta)
 
 - **„Rezsi” oldalsáv-panel** (HTML/JS webkomponens + websocket-végpont): háztartás-összesítő, figyelmeztetések, fiókonkénti kártyák (eddig/várható, keret, várható elszámolás, éves egyenleg, számlák, napelem), részletek, mérőállás rögzítése; mobilon is.

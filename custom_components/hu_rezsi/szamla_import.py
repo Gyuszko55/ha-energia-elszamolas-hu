@@ -20,7 +20,8 @@ except ImportError:  # tesztek: a csomag HA nélkül, közvetlenül
 
 # 2: a számla időszakán belüli (számított) állások kimaradnak; elszámoló csak az időszak végén.
 # 3: a számla időszaka és utolsó valódi mérőállásának napja is tárolva (várható elszámoláshoz).
-IMPORT_VERZIO = 3
+# 4: a DAKÖV-számlák elszámolt időszaka is (átalány napi összegéhez).
+IMPORT_VERZIO = 4
 
 
 @dataclass
@@ -224,4 +225,46 @@ def szamla_statisztika(tarolt: dict[str, Any], ma: date, fix_dij: bool = False) 
         "kovetkezo_osszeg": int(sz[-1][1]),
         "idokoz_nap": idokoz,
         "figyelmeztetes": "; ".join(figy) or None,
+    }
+
+
+def atalany_szamitas(beallitott: Any, tarolt: dict[str, Any], tol: date, ig: date, most: Any) -> dict[str, Any] | None:
+    """Átalányos (részszámlás) fiók havi fizetendője: az átalány napra leosztva × a hónap napjai.
+
+    A napi összeg: a beállított átalány × 12 / 365, vagy az utolsó részszámla összege / a számla időszakának napjai
+    (ha a számlán nincs időszak: összeg × 12 / 365).
+    """
+    napi, forras = None, None
+    if beallitott:
+        napi = Decimal(str(beallitott)) * 12 / 365
+        forras = f"beállított átalány: {int(Decimal(str(beallitott)))} Ft/hó"
+    else:
+        reszek = sorted(
+            ((k, x) for k, x in (tarolt.get("szamlak") or {}).items()
+             if x.get("tipus") == "resz" and x.get("osszeg") is not None and Decimal(str(x["osszeg"])) > 0),
+            key=lambda kv: kv[1]["kelte"],
+        )
+        if reszek:
+            sorszam, x = reszek[-1]
+            osszeg = Decimal(str(x["osszeg"]))
+            if x.get("idoszak"):
+                napok = (_d(x["idoszak"][1]) - _d(x["idoszak"][0])).days + 1
+                napi, forras = osszeg / napok, f"{sorszam} részszámla: {int(osszeg)} Ft / {napok} nap"
+            else:
+                napi, forras = osszeg * 12 / 365, f"{sorszam} részszámla: {int(osszeg)} Ft/hó"
+        elif tarolt.get("reszszamlak"):
+            utolso = sorted(tarolt["reszszamlak"], key=lambda r: r["datum"])[-1]
+            napi = Decimal(str(utolso["osszeg"])) * 12 / 365
+            forras = f"kézi részszámla {utolso['datum']}: {utolso['osszeg']} Ft/hó"
+    if napi is None:
+        return None
+    honap_napjai = (ig - tol).days
+    eltelt = min(max((most.date() - tol).days + 1, 0), honap_napjai)
+    return {
+        "napi": round(float(napi), 2),
+        "havi": int(round(napi * honap_napjai)),
+        "eddig": int(round(napi * eltelt)),
+        "napok": honap_napjai,
+        "eltelt_nap": eltelt,
+        "forras": forras,
     }

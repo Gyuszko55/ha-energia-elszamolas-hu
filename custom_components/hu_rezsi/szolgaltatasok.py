@@ -62,7 +62,7 @@ async def leolvasas_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
         csatorna = "vetelezes"  # az almérő saját mérője: a fő regiszterébe kerül
     else:
         mero = _aktiv_mero(tarolt, nap)
-    kezdo = mero.get("kezdo_betaplalas" if csatorna == "betaplalas" else "kezdo_allas") or 0
+    kezdo = mero.get("kezdo_allas" if csatorna == "vetelezes" else f"kezdo_{csatorna}") or 0
     if allas < Decimal(str(kezdo)):
         raise ServiceValidationError("Az állás kisebb, mint a mérő kezdőállása.")
     for lo in mero["leolvasasok"]:
@@ -264,7 +264,7 @@ def regisztral(hass: HomeAssistant) -> None:
                 vol.Optional("tipus", default="kezi"): vol.In(TIPUSOK),
                 vol.Optional("elszamolasi", default=False): cv.boolean,
                 vol.Optional("megjegyzes", default=""): cv.string,
-                vol.Optional("csatorna", default="vetelezes"): vol.In(["vetelezes", "betaplalas", "almero"]),
+                vol.Optional("csatorna", default="vetelezes"): vol.In(["vetelezes", "betaplalas", "almero", "h_teli", "h_nyari"]),
             }
         ),
     )

@@ -238,6 +238,9 @@ def varhato_elszamolas(
     alap_db = len(honap_kezdetek(tol, ma + timedelta(days=1)))
     tenyleges = energia + havi_alapdij_brutto(fiok, tar, ma) * alap_db
     q, becsult = szamlalo.fogyasztas(nap_kezdete(tol), most)
+    for csat, t in zip(fiok.csatornak[1:], tovabbi or [], strict=False):
+        if csat.szerep != "almero":  # pl. a H-tarifa nyári regisztere; az almérő a főmérő része
+            q += t.fogyasztas(nap_kezdete(tol), most)[0]
     sajat = [(d, x) for d, x in befizetesek if d > tol]
     return VarhatoElszamolas(
         tol=tol,
