@@ -20,7 +20,7 @@ előző stabil. Méret: **K** = kicsi (néhány este), **K+** = közepes, **N** 
 - [~] **T1** A nyitott kérdések (00, K1–K7) eldöntése a javaslattevővel
 - [ ] **T2** Tároló előkészítése (eldöntve: ez a tároló), közreműködői jog a javaslattevőnek, licenc (MIT), jegysablonok
 - [~] **T3** Ezek a tervdokumentumok átnézve, a megjegyzések beépítve
-- [ ] **T4** Legalább 3 anonimizált valódi számla összegyűjtése tesztadatnak (villany A1, H, gáz)
+- [~] **T4** Valódi számlák tesztadatnak: villany A1 (2026-06) és gáz (2026-08) kész – `tests/motor/test_szamlak.py`; H-tarifás számla még kell
 - [x] **T5** Díjfájl-séma (`schema.json`) és az első díjfájlok: `villany/a1`, `villany/h`, `gaz/lakossagi` a mostani díjtáblázatból
 
 **Kész, ha:** a T1 döntései le vannak írva a `00_ATTEKINTES.md`-ben, és a tároló készen áll az első kódra.
@@ -55,7 +55,7 @@ tests/
 - [x] **I8** Entitások: havi eddigi és várható költség, hátralévő keret, aktuális ár (a HA Energia irányítópulthoz is)
 - [x] **I9** Automatikus havi lezárás (1-jén 00:00:30, mint a v1-ben)
 - [x] **I10** v1-importáló: a leolvasási napló, a havi napló és a beállított díjak átvétele
-- [~] **I11** Tesztek: egység + v1-paritás (18 hónap) kész; számlatesztek a T4 számláira várnak
+- [x] **I11** Tesztek: egység + v1-paritás (18 hónap) + 2 számlateszt (villany forintra pontos, gáz ±3 Ft az m³-alapú számítás miatt)
 - [x] **I12** Dokumentáció: telepítés, átállás v1-ről, „tájékoztató jellegű” figyelmeztetés
 
 **Állapot (2026-10-01):** az élő HA-n fut a v1 mellett; az október 31-i hónapzárás a párhuzamos futás első próbája.

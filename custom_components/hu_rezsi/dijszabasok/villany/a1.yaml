@@ -4,16 +4,22 @@ kozmu: villany
 egyseg: kWh
 verziok:
   - ervenyes_tol: 2024-01-01
-    forras: "A v1 díjtáblázata (2026. szeptemberi lakossági árak), visszamenőleg is alkalmazva – ELLENŐRIZENDŐ a számlán"
+    forras: >-
+      MVM Next villanyszámla, 2026-06-09 (2026.05.14–06.08): nettó 5,25 + 23,40 (rendszerhasználati) Ft/kWh
+      a keretig, 31,80 + 23,40 Ft/kWh felette, elosztói alapdíj 120,50 Ft/számla, ÁFA 27%.
+      A más elosztói területek kedvezményes árai a v1 díjtáblázatából – ELLENŐRIZENDŐ.
     szabalyok:
       keret:
         tipus: napi_aranyos
-        napi_mennyiseg: 6.91   # 2523 kWh/év ÷ 365, a v1-gyel azonos kerekítéssel
+        ev_mennyiseg: 2523     # kWh/év; a számlán a keret egész kWh (26 nap → 180 kWh)
+        kerekites: 0
+      alapdij:
+        mod: idoszakonkent     # számlánként 1 havi alapdíj, nem napra arányosítva
     dijak:
       alap:                    # bruttó Ft
-        energia_kedvezmenyes: 36.386
-        energia_piaci: 70.104
-        alapdij_ho: 153.035
+        energia_kedvezmenyes: 36.386   # (5,25 + 23,40) × 1,27
+        energia_piaci: 70.104          # (31,80 + 23,40) × 1,27
+        alapdij_ho: 153.035            # 120,50 × 1,27
       eon: {energia_kedvezmenyes: 35.293}
       opus_titasz: {energia_kedvezmenyes: 35.293}
       elmu: {energia_kedvezmenyes: 36.208}

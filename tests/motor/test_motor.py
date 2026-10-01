@@ -154,8 +154,8 @@ def test_a1_keret_alatt_es_felett(tar):
     t, i = date(2025, 6, 1), date(2025, 7, 1)
     r = szamol(fiok("villany/a1"), tar, t, i, [egyenes(t, i, "300")])
     s = r.szeletek[0]
-    assert s.keret == D("207.30") and s.kedvezmenyes == D("207.30") and s.piaci == D("92.70")
-    assert r.energia_ft == (D("207.3") * D("36.386") + D("92.7") * D("70.104")).quantize(D(1))
+    assert s.keret == D(207) and s.kedvezmenyes == D(207) and s.piaci == D(93)  # 2523/365×30 = 207,4 → 207
+    assert r.energia_ft == (D(207) * D("36.386") + D(93) * D("70.104")).quantize(D(1))
     assert r.alapdij_ft == D(153)
 
 
@@ -173,9 +173,9 @@ def test_h_idenyvaltas_oktober(tar):
     r = szamol(fiok("villany/h"), tar, t, i, [s])
     nyari, teli = r.szeletek
     assert (nyari.idenyszak, nyari.tol, nyari.ig, nyari.mennyiseg) == ("nyari", t, date(2025, 10, 15), D(50))
-    assert nyari.keret == D("6.91") * 14 and nyari.egysegar_kedvezmenyes == D("36.386")
+    assert nyari.keret == D(97) and nyari.egysegar_kedvezmenyes == D("36.386")  # 2523/365×14 = 96,8 → 97
     assert (teli.idenyszak, teli.mennyiseg, teli.keret, teli.egysegar_kedvezmenyes) == ("teli", D(200), None, D("22.962"))
-    assert r.alapdij_ft == D(50)  # a H saját alapdíja, nem az A1-é
+    assert r.alapdij_ft == D(50)  # a H saját alapdíja (számlánként egy hónap), nem az A1-é
 
 
 def test_idenyszak_fordulo():
@@ -196,7 +196,8 @@ def test_gaz_eves_keret(tar):
     r = szamol(f, tar, date(2026, 1, 1), date(2026, 2, 1), [s])
     sz = r.szeletek[0]
     assert sz.keret == D(29) and sz.kedvezmenyes == D(29) and sz.piaci == D(71)
-    assert r.energia_ft == D(29 * 102 + 71 * 747)
+    assert r.energia_ft == (29 * D("99.163") + 71 * D("761.47")).quantize(D(1))
+    assert r.alapdij_ft == D(973)
 
 
 def test_idoszak_modok():
@@ -211,6 +212,6 @@ def test_nyitott_idoszak_elorejelzes(tar):
     n = nyitott(fiok("villany/a1"), tar, date(2025, 6, 1), date(2025, 7, 1), [s], dt(2025, 6, 11))
     assert n.napi_atlag[0] == D(10)
     assert n.varhato.mennyiseg == D(300)
-    assert n.hatralevo_keret == D("107.30")
+    assert n.hatralevo_keret == D(107)
     assert n.varhato_keretatlepes == date(2025, 6, 21)
     assert n.eddig.alapdij_ft == D(153)  # az alapdíj a teljes hónapra jár

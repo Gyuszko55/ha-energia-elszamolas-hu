@@ -139,6 +139,8 @@ def szamol(
                 keret = Decimal(0)
             elif tipus == "napi_aranyos":
                 keret = _napi_keret(keret_szabaly) * napszam
+                if keret_szabaly.get("kerekites") is not None:  # pl. MVM: egész kWh-ra
+                    keret = keret.quantize(Decimal(1).scaleb(-int(keret_szabaly["kerekites"])), rounding=ROUND_HALF_UP)
             elif tipus == "eves":
                 if fiok.eves_bazis is None:
                     raise DijszabasHiba("éves kerethez meg kell adni a fiók éves bázisdátumát")
@@ -156,7 +158,12 @@ def szamol(
 
             alapdij = Decimal(0)
             if ci == 0:  # az alapdíj a fiókot terheli, nem csatornánként
-                alapdij = (sajat.dijak.get("alapdij_ho") or Decimal(0)) * honap_aranya(a, b)
+                havi = sajat.dijak.get("alapdij_ho") or Decimal(0)
+                if (sajat.szabalyok.get("alapdij") or {}).get("mod") == "idoszakonkent":
+                    # Számlánként (havi időszakonként) egy teljes havi alapdíj, a szeletek között napok szerint.
+                    alapdij = havi * napszam / Decimal((ig - tol).days)
+                else:
+                    alapdij = havi * honap_aranya(a, b)
 
             szeletek.append(
                 SzeletEredmeny(

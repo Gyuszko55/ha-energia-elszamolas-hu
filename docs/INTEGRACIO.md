@@ -3,6 +3,19 @@
 > **Tájékoztató jellegű számítás, a hivatalos számlát nem helyettesíti.**
 > A 0.1 a v1 YAML-csomag tudását hozza integrációként. A víz, a gáz MJ-alapú elszámolása és a napelem a következő lépcsőkben jön (lásd `docs/terv/04_UTEMTERV.md`).
 
+## Mennyire pontos?
+
+Két valódi MVM Next számlán ellenőrizve (`tests/motor/test_szamlak.py`):
+
+| Számla | Számla végösszege | Rezsikövető |
+|---|---|---|
+| Villany A1, 2026.05.14–06.08 (293 kWh) | 14 624 Ft | **14 624 Ft** |
+| Gáz, 2026.07.15–08.13 (103 m³) | 11 185 Ft | 11 187 Ft (a gáz MJ-alapú számítása a 2. lépcsőben jön) |
+
+A számlákból átvett szabályok: a kedvezményes keret egész kWh-ra kerekítve jár (26 nap → 180 kWh), az alapdíj számlánként egy teljes hónap.
+
+**Fontos:** a szolgáltató részszámlái gyakran becsült mennyiségről szólnak (a fenti gázszámla 103 m³-t számlázott, a gázóra valójában ~20 m³-t mért). A Rezsikövető a mért fogyasztásból számol, ezért egy-egy részszámlától eltérhet; az éves elszámolással kell egyeznie.
+
 ## Telepítés
 
 1. Másold a `custom_components/hu_rezsi` mappát a HA `config/custom_components/` mappájába (később: HACS egyéni tároló).

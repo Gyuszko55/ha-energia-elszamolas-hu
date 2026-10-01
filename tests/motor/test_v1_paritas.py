@@ -42,9 +42,20 @@ def _dt(d: date) -> datetime:
     return datetime(d.year, d.month, d.day)
 
 
+def v1_mod_tar() -> DijszabasTar:
+    """A díjfájlok a v1 szabályaival: 6,91 kWh/nap kerekítés nélkül, napra arányosított alapdíj."""
+    tar = DijszabasTar.mappabol(DIJSZABASOK)
+    for azon in ("villany/a1", "villany/h"):
+        for v in tar[azon].verziok:
+            v.szabalyok["alapdij"] = {"mod": "napi_aranyos"}
+            if "keret" in v.szabalyok:
+                v.szabalyok["keret"] = {"tipus": "napi_aranyos", "napi_mennyiseg": D("6.91")}
+    return tar
+
+
 @pytest.mark.parametrize("m", _honapok(), ids=lambda m: m["honap"])
 def test_v1_honap(m):
-    tar = DijszabasTar.mappabol(DIJSZABASOK)
+    tar = v1_mod_tar()
     tol, ig = _hatarok(m["honap"])
 
     a = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/a1", date(2024, 1, 1))], [Csatorna()])

@@ -3,6 +3,7 @@
 ## [Fejlesztés] Rezsikövető integráció 0.1.0-dev (2026-10-01)
 
 - Új: `custom_components/hu_rezsi` HA-integráció (1. lépcső): fiókok felületről, verziózott díjfájlok, elszámoló motor (HA nélkül tesztelhető), leolvasás/mérőcsere/felülírás/napló/CSV szolgáltatások, automatikus hónapzárás, v1-importáló, diagnosztika.
+- Számlák alapján: a keret egész kWh-ra kerekítve, az alapdíj számlánként egy hónap; gáz díjai (99,163 Ft/m³, alapdíj 972,82 Ft/hó) a 2026-08-as számlából. Számlatesztek.
 - A v1 YAML-csomag változatlan.
 
 ## 1.0.0 – 2026-09-30

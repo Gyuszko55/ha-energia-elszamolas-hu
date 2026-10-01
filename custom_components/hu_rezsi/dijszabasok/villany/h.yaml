@@ -6,6 +6,8 @@ verziok:
   - ervenyes_tol: 2024-01-01
     forras: "A v1 díjtáblázata (2026. szeptemberi lakossági árak), visszamenőleg is alkalmazva – ELLENŐRIZENDŐ a számlán"
     szabalyok:
+      alapdij:
+        mod: idoszakonkent
       idenyszak:
         - nev: teli            # fűtési idény: kedvezményes H-ár, keret nélkül
           tol: "10-15"

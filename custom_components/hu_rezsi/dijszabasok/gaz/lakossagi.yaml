@@ -2,16 +2,23 @@ azonosito: gaz/lakossagi
 nev: "Lakossági földgáz (m³-alapú, 1. lépcső)"
 kozmu: gaz
 egyseg: m3
-# A 2. lépcsőben MJ-alapúra vált (fűtőérték, korrekciós tényező) – lásd docs/terv/02.
+# A szolgáltató MJ-ban számláz (m³ × korrekciós tényező × fűtőérték). Az 1. lépcső m³-ben számol,
+# egy rögzített fűtőértékkel átváltott árral; a 2. lépcsőben MJ-alapúra vált (docs/terv/02).
 verziok:
   - ervenyes_tol: 2024-01-01
-    forras: "A v1 beállításai (102 / 747 Ft/m³, 1729 m³/év) – ELLENŐRIZENDŐ a számlán"
+    forras: >-
+      MVM Next gázszámla, 2026-08-24 (2026.07.15–08.13): kedvezményes gázdíj nettó 2,256 Ft/MJ,
+      háztartási alapdíj nettó 766 Ft/hó, fűtőérték 34,61 MJ/m³, korrekciós tényező 1,0000, ÁFA 27%.
+      A piaci ár a számla „rezsicsökkentett díj nélkül” összegéből visszaszámolva (~17,32 Ft/MJ nettó) – ELLENŐRIZENDŐ.
+      Éves keret: 1729 m³ (a v1 beállítása) – ELLENŐRIZENDŐ.
     szabalyok:
       keret:
         tipus: eves
         ev_mennyiseg: 1729
+      alapdij:
+        mod: idoszakonkent
     dijak:
-      alap:
-        energia_kedvezmenyes: 102
-        energia_piaci: 747
-        alapdij_ho: 0
+      alap:                            # bruttó Ft/m³, 34,61 MJ/m³ fűtőértékkel
+        energia_kedvezmenyes: 99.163   # 2,256 × 1,27 × 34,61
+        energia_piaci: 761.47          # ~17,3239 × 1,27 × 34,61
+        alapdij_ho: 972.82             # 766 × 1,27
