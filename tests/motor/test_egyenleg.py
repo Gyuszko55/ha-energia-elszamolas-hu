@@ -114,3 +114,14 @@ def test_h_regiszteres_eves_egyenleg_rovid_ev_utan():
     e = eves_egyenleg(h, TAR, teli, datetime(2026, 10, 1), [], reszszamla_db_ev=11, reszszamla_osszeg=D(347), tovabbi=[nyari])
     assert D(1300) < e.varhato_fogyasztas < D(1600)  # ~1 002 kWh / 235 nap × 365
     assert e.varhato_egyenleg < -20000 and "óta mért" in e.modszer  # a 10 kWh/hó átalány messze kevés
+
+
+def test_atalany_almero_aranya_levonodik():
+    from motor.egyenleg import atalany_havi
+    from motor.tipusok import Csatorna as Cs
+    viz = Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))],
+               [Cs(szerep="fo"), Cs(szerep="almero", csatornadij_aktiv=False, levonas_fobol=True)])
+    _, q0, ft0 = atalany_havi(viz, TAR, date(2026, 10, 1), date(2026, 11, 1), D(11))
+    _, q1, ft1 = atalany_havi(viz, TAR, date(2026, 10, 1), date(2026, 11, 1), D(11), D("0.28"))
+    assert q0 == q1  # a mennyiség ugyanaz (az almérő a főmérő része)
+    assert ft1 < ft0  # de a csatornadíj kevesebb

@@ -54,7 +54,9 @@
             "szamla_merok": "Számla-mérők (opcionális)",
             "h_teli_forras": "H-tarifa: téli regiszter (1.81) szenzora",
             "h_nyari_forras": "H-tarifa: nyári regiszter (1.82) szenzora",
-            "atalany_mennyiseg": "Átalány mennyisége havonta (opcionális)"
+            "atalany_mennyiseg": "Átalány mennyisége havonta (opcionális)",
+            "szamlazas_honap": "Számlázási ütem",
+            "elszamolas_honap": "Elszámolási ciklus"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -76,7 +78,9 @@
             "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik.",
             "h_teli_forras": "Csak H-tarifánál. Ha a téli és a nyári regiszter szenzora is meg van adva, a két regiszter külön mérődik és számolódik (a téli H-áron, a nyári A1 áron saját kerettel).",
             "h_nyari_forras": "Csak H-tarifánál, a téli regiszterrel együtt.",
-            "atalany_mennyiseg": "Ha a szolgáltató havi mennyiséget számláz átalányként (pl. 293 kWh vagy 10 kWh): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. Elsőbbséget élvez az összeggel szemben."
+            "atalany_mennyiseg": "Ha a szolgáltató havi mennyiséget számláz átalányként (pl. 293 kWh vagy 10 kWh): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. Elsőbbséget élvez az összeggel szemben.",
+            "szamlazas_honap": "Milyen gyakran jön számla (az esedékes havi fizetendőhöz). Üresen a számlákból becsli.",
+            "elszamolas_honap": "Milyen gyakran jön elszámoló számla (pl. DAKÖV: félévente). Az egyenleg erre a ciklusra számol."
           }
         },
         "reconfigure": {
@@ -112,7 +116,9 @@
             "szamla_merok": "Számla-mérők (opcionális)",
             "h_teli_forras": "H-tarifa: téli regiszter (1.81) szenzora",
             "h_nyari_forras": "H-tarifa: nyári regiszter (1.82) szenzora",
-            "atalany_mennyiseg": "Átalány mennyisége havonta (opcionális)"
+            "atalany_mennyiseg": "Átalány mennyisége havonta (opcionális)",
+            "szamlazas_honap": "Számlázási ütem",
+            "elszamolas_honap": "Elszámolási ciklus"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -134,7 +140,9 @@
             "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik.",
             "h_teli_forras": "Csak H-tarifánál. Ha a téli és a nyári regiszter szenzora is meg van adva, a két regiszter külön mérődik és számolódik (a téli H-áron, a nyári A1 áron saját kerettel).",
             "h_nyari_forras": "Csak H-tarifánál, a téli regiszterrel együtt.",
-            "atalany_mennyiseg": "Ha a szolgáltató havi mennyiséget számláz átalányként (pl. 293 kWh vagy 10 kWh): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. Elsőbbséget élvez az összeggel szemben."
+            "atalany_mennyiseg": "Ha a szolgáltató havi mennyiséget számláz átalányként (pl. 293 kWh vagy 10 kWh): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. Elsőbbséget élvez az összeggel szemben.",
+            "szamlazas_honap": "Milyen gyakran jön számla (az esedékes havi fizetendőhöz). Üresen a számlákból becsli.",
+            "elszamolas_honap": "Milyen gyakran jön elszámoló számla (pl. DAKÖV: félévente). Az egyenleg erre a ciklusra számol."
           }
         }
       },
@@ -208,6 +216,9 @@
       },
       "atalany_havi": {
         "name": "Havi fizetendő (átalány)"
+      },
+      "osszesen_esedekes": {
+        "name": "Rezsi esedékes ebben a hónapban"
       }
     }
   },
@@ -259,6 +270,21 @@
         "almero": "Almérő (víz)",
         "h_teli": "H téli regiszter (1.81)",
         "h_nyari": "H nyári regiszter (1.82)"
+      }
+    },
+    "szamlazas_honap": {
+      "options": {
+        "1": "havonta",
+        "2": "kéthavonta",
+        "3": "negyedévente",
+        "6": "félévente",
+        "12": "évente"
+      }
+    },
+    "elszamolas_honap": {
+      "options": {
+        "6": "félévente",
+        "12": "évente"
       }
     }
   },

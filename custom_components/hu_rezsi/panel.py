@@ -101,6 +101,8 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
             "keret": keret,
             "idenyszakok": {"eddig": idenyszakok(ny.eddig), "varhato": idenyszakok(ny.varhato)} if idenyszakok(ny.eddig) else None,
             "atalany": a.atalany,
+            "esedekes": {**a.esedekes, "kovetkezo_datum": _iso(a.esedekes["kovetkezo_datum"])} if a.esedekes else None,
+            "utem": {**a.utem, "kovetkezo_elszamolas": _iso(a.utem.get("kovetkezo_elszamolas"))} if a.utem else None,
             "aktualis_ar": _f(a.aktualis_ar, 3),
             "eves": {"fogyasztas": _f(a.eves_fogyasztas, 1), "bazis": _iso(a.eves_bazis)},
             "utolso_lezart": a.utolso_lezart,
@@ -175,7 +177,7 @@ def ws_adatok(hass: HomeAssistant, connection: websocket_api.ActiveConnection, m
             "entry_id": entry.entry_id,
             "nev": entry.title,
             "frissitve": _iso(koord.last_update_success_time) if hasattr(koord, "last_update_success_time") else None,
-            "osszesen": {"eddig": eddig, "varhato": varhato},
+            "osszesen": {"eddig": eddig, "varhato": varhato, "esedekes": sum((f.get("esedekes") or {}).get("e_havi_osszesen", 0) for f in fiokok)},
             "fiokok": fiokok,
         })
     connection.send_result(msg["id"], {"haztartasok": haztartasok, "ma": date.today().isoformat()})

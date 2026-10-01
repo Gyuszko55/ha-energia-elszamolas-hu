@@ -159,13 +159,13 @@ def betaplalas_csatorna(tarolt: dict[str, Any]) -> Csatorna:
     return Csatorna(szerep="betaplalas", merok=[mero_motorba(m, "betaplalas") for m in tarolt["merok"]], keret_aktiv=False)
 
 
-def elozo_bazis(tarolt: dict[str, Any]) -> date | None:
+def elozo_bazis(tarolt: dict[str, Any], ciklus_honap: int = 12) -> date | None:
     """Az előző elszámolási év kezdete: a legutóbbi elszámoló leolvasásnál legalább ~10 hónappal korábbi
     elszámoló leolvasás (évközi, pl. szerződésváltáskori elszámolás nem számít évkezdetnek)."""
     napok = sorted({d(lo["datum"]) for m in tarolt["merok"] for lo in m.get("leolvasasok", []) if lo.get("elszamolasi")})
     if len(napok) < 2:
         return None
-    korabbiak = [x for x in napok[:-1] if (napok[-1] - x).days >= 300]
+    korabbiak = [x for x in napok[:-1] if (napok[-1] - x).days >= ciklus_honap * 25]
     return korabbiak[-1] if korabbiak else None
 
 

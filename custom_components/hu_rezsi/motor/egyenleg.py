@@ -36,10 +36,14 @@ def _ft(x: Decimal) -> Decimal:
 
 
 def egy_ev_mulva(d: date) -> date:
-    try:
-        return d.replace(year=d.year + 1)
-    except ValueError:  # febr. 29.
-        return d.replace(year=d.year + 1, day=28)
+    return honap_mulva(d, 12)
+
+
+def honap_mulva(d: date, honap: int) -> date:
+    """Ugyanaz a nap n hónappal később (hónap végén a hónap utolsó napja)."""
+    ev, ho = divmod(d.month - 1 + honap, 12)
+    ev, ho = d.year + ev, ho + 1
+    return d.replace(year=ev, month=ho, day=min(d.day, calendar.monthrange(ev, ho)[1]))
 
 
 def _profil_resz(tol: date, ig: date, kozmu: str) -> Decimal:
@@ -112,12 +116,13 @@ def eves_egyenleg(
     tovabbi: list[Szamlalo] | None = None,
     reszszamla_osszeg: Decimal | None = None,
     elozo_ev_mennyiseg: Decimal | None = None,
+    ciklus_honap: int = 12,
 ) -> EvesEgyenleg:
     """tovabbi: a fiók további csatornáinak (pl. víz-almérő) számlálói, előrejelzés nélkül."""
     bazis = fiok.eves_bazis
     if bazis is None:
         raise ValueError("részszámlás egyenleghez éves bázis (elszámoló leolvasás) kell")
-    ev_ig = egy_ev_mulva(bazis)
+    ev_ig = honap_mulva(bazis, ciklus_honap)  # az elszámolási ciklus vége (pl. DAKÖV: félév)
     ma = most.date()
     havi_alap = havi_alapdij_brutto(fiok, tar, ma)
 
@@ -151,7 +156,11 @@ def eves_egyenleg(
 
     elozo = None
     if elozo_bazis is not None:
+        # Az előző ciklus fogyasztása éves szintre vetítve (a profil éves).
         elozo = fogy(nap_kezdete(elozo_bazis), nap_kezdete(bazis))
+        resz = _profil_resz(elozo_bazis, bazis, str(fiok.kozmu))
+        if resz and resz < Decimal("0.95"):
+            elozo = elozo / resz
     kozmu = str(fiok.kozmu)
     most_ertek, _ = szamlalo.ertek(most)
     pontok = [p for p in szamlalo.pontok if p.ido <= most] + [Pont(most, most_ertek, False)]
@@ -276,7 +285,7 @@ def varhato_elszamolas(
 
 
 def atalany_havi(
-    fiok: Fiok, tar: DijszabasTar, tol: date, ig: date, havi_mennyiseg: Decimal
+    fiok: Fiok, tar: DijszabasTar, tol: date, ig: date, havi_mennyiseg: Decimal, almero_arany: Decimal = Decimal(0)
 ) -> tuple[Decimal, Decimal, Decimal]:
     """Mennyiségben megadott átalány (pl. 293 kWh/hó) a [tol, ig) időszakra: (napi mennyiség, időszak
     mennyisége, fizetendő Ft). A napi mennyiség = havi × 12 / 365; az időszak mennyiségét a fiók díjszabása
@@ -297,8 +306,10 @@ def atalany_havi(
             cel = szerepek[0]  # az almérő nem kap átalányt (a főmérő része)
         if cel in ertek:
             ertek[cel] += napi
+        if "almero" in ertek:
+            ertek["almero"] += napi * almero_arany  # a locsolóvíz része: a csatornadíjból levonódik
         d = d + timedelta(days=1)
         for sz in szerepek:
             pontok[sz].append(Pont(nap_kezdete(d), ertek[sz], True))
     r = szamol(fiok, tar, tol, ig, [Szamlalo(pontok[sz]) for sz in szerepek])
-    return napi, sum(ertek.values(), Decimal(0)), r.osszesen_ft
+    return napi, sum((v for k, v in ertek.items() if k != "almero"), Decimal(0)), r.osszesen_ft

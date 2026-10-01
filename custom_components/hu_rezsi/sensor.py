@@ -310,9 +310,11 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         key="kovetkezo_szamla",
         translation_key="kovetkezo_szamla",
         device_class=SensorDeviceClass.DATE,
-        ertek=lambda a: a.szamla_stat["kovetkezo_datum"],
+        ertek=lambda a: (a.esedekes or a.szamla_stat)["kovetkezo_datum"],
         attr=lambda a: {
-            "varhato_osszeg": a.szamla_stat["kovetkezo_osszeg"],
+            "varhato_osszeg": (a.esedekes or a.szamla_stat)["kovetkezo_osszeg"],
+            "szamlazasi_utem_honap": (a.utem or {}).get("szamlazas_honap"),
+            "e_havi_esedekes": (a.esedekes or {}).get("e_havi_osszesen"),
             "szokasos_idokoz_nap": a.szamla_stat["idokoz_nap"],
             "figyelmeztetes": a.szamla_stat["figyelmeztetes"],
         },
@@ -333,7 +335,7 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     koord: RezsiKoordinator = entry.runtime_data
-    async_add_entities([HaztartasOsszesen(koord, entry, "eddig"), HaztartasOsszesen(koord, entry, "varhato")])
+    async_add_entities([HaztartasOsszesen(koord, entry, k) for k in ("eddig", "varhato", "esedekes")])
     for sid, sub in koord.fiokok().items():
         async_add_entities(
             [
@@ -413,7 +415,7 @@ class HaztartasOsszesen(CoordinatorEntity[RezsiKoordinator], SensorEntity):
 
     def __init__(self, koord: RezsiKoordinator, entry: ConfigEntry, fajta: str) -> None:
         super().__init__(koord)
-        self._fajta = fajta
+        self._fajta = fajta  # eddig | varhato | esedekes
         self._attr_translation_key = f"osszesen_{fajta}"
         self._attr_unique_id = f"{entry.entry_id}_osszesen_{fajta}"
         self._attr_device_info = DeviceInfo(
@@ -427,6 +429,11 @@ class HaztartasOsszesen(CoordinatorEntity[RezsiKoordinator], SensorEntity):
         koord = self.coordinator
         out: dict[str, int] = {}
         for sid, a in (koord.data or {}).items():
+            if self._fajta == "esedekes":
+                sub = koord.fiokok().get(sid)
+                if a.esedekes:
+                    out[sub.title if sub else sid] = a.esedekes["e_havi_osszesen"]
+                continue
             if a.nyitott is None:
                 continue
             e = a.nyitott.eddig if self._fajta == "eddig" else a.nyitott.varhato

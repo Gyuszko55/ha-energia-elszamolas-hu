@@ -54,7 +54,9 @@
             "szamla_merok": "Invoice meters (optional)",
             "h_teli_forras": "H tariff: winter register (1.81) sensor",
             "h_nyari_forras": "H tariff: summer register (1.82) sensor",
-            "atalany_mennyiseg": "Flat-rate monthly quantity (optional)"
+            "atalany_mennyiseg": "Flat-rate monthly quantity (optional)",
+            "szamlazas_honap": "Billing interval",
+            "elszamolas_honap": "Settlement cycle"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -76,7 +78,9 @@
             "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account.",
             "h_teli_forras": "H tariff only. With both registers set, they are measured and billed separately.",
             "h_nyari_forras": "H tariff only, together with the winter register.",
-            "atalany_mennyiseg": "If the provider bills a fixed monthly quantity (e.g. 293 kWh): per day × days of the month, priced with the account's tariff."
+            "atalany_mennyiseg": "If the provider bills a fixed monthly quantity (e.g. 293 kWh): per day × days of the month, priced with the account's tariff.",
+            "szamlazas_honap": "How often invoices arrive.",
+            "elszamolas_honap": "How often a settlement invoice arrives."
           }
         },
         "reconfigure": {
@@ -112,7 +116,9 @@
             "szamla_merok": "Invoice meters (optional)",
             "h_teli_forras": "H tariff: winter register (1.81) sensor",
             "h_nyari_forras": "H tariff: summer register (1.82) sensor",
-            "atalany_mennyiseg": "Flat-rate monthly quantity (optional)"
+            "atalany_mennyiseg": "Flat-rate monthly quantity (optional)",
+            "szamlazas_honap": "Billing interval",
+            "elszamolas_honap": "Settlement cycle"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -134,7 +140,9 @@
             "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account.",
             "h_teli_forras": "H tariff only. With both registers set, they are measured and billed separately.",
             "h_nyari_forras": "H tariff only, together with the winter register.",
-            "atalany_mennyiseg": "If the provider bills a fixed monthly quantity (e.g. 293 kWh): per day × days of the month, priced with the account's tariff."
+            "atalany_mennyiseg": "If the provider bills a fixed monthly quantity (e.g. 293 kWh): per day × days of the month, priced with the account's tariff.",
+            "szamlazas_honap": "How often invoices arrive.",
+            "elszamolas_honap": "How often a settlement invoice arrives."
           }
         }
       },
@@ -208,6 +216,9 @@
       },
       "atalany_havi": {
         "name": "Monthly payable (flat rate)"
+      },
+      "osszesen_esedekes": {
+        "name": "Utilities due this month"
       }
     }
   },
@@ -259,6 +270,21 @@
         "almero": "Sub-meter (water)",
         "h_teli": "H winter register (1.81)",
         "h_nyari": "H summer register (1.82)"
+      }
+    },
+    "szamlazas_honap": {
+      "options": {
+        "1": "monthly",
+        "2": "every 2 months",
+        "3": "quarterly",
+        "6": "half-yearly",
+        "12": "yearly"
+      }
+    },
+    "elszamolas_honap": {
+      "options": {
+        "6": "half-yearly",
+        "12": "yearly"
       }
     }
   },

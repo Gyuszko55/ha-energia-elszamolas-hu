@@ -23,11 +23,14 @@ from .const import (
     CONF_NAPELEM,
     CONF_FIZETESI_MOD,
     CONF_ATALANY_MENNYISEG,
+    CONF_ELSZAMOLAS_HONAP,
+    CONF_SZAMLAZAS_HONAP,
     CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
     CONF_RESZSZAMLA_OSSZEG,
     CONF_SZAMLA_MAPPA,
     CONF_SZAMLA_MEROK,
+    CONF_SZOLGALTATO,
     DIJNET_MINTA,
     CONF_FORRAS,
     CONF_FORRAS_TIPUS,
@@ -50,10 +53,19 @@ from pathlib import Path
 from homeassistant.components import persistent_notification
 
 from . import dijnet, szamlak
-from .szamla_import import IMPORT_VERZIO, atalany_szamitas, rogzit, szamla_statisztika, ujraertekel
+from .szamla_import import IMPORT_VERZIO, atalany_szamitas, esedekes, rogzit, szamla_statisztika, ujraertekel
 from .modell import betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
-from .motor.egyenleg import EvesEgyenleg, VarhatoElszamolas, atalany_havi, egy_ev_mulva, eves_egyenleg, varhato_elszamolas
+from .motor.egyenleg import (
+    EvesEgyenleg,
+    VarhatoElszamolas,
+    atalany_havi,
+    egy_ev_mulva,
+    eves_egyenleg,
+    havi_alapdij_brutto,
+    honap_mulva,
+    varhato_elszamolas,
+)
 from .motor.elszamolas import _hozzarendeles, futoertek, idenyszak
 from .motor.dijszabas import DijszabasHiba, DijszabasTar
 from .motor.elorejelzes import NyitottIdoszak, idoszak, nyitott
@@ -86,6 +98,8 @@ class FiokAllapot:
     elszamolas: VarhatoElszamolas | None = None
     szamla_stat: dict[str, Any] | None = None
     atalany: dict[str, Any] | None = None
+    esedekes: dict[str, Any] | None = None
+    utem: dict[str, Any] | None = None  # szolgáltató, számlázási ütem, elszámolási ciklus
     napelem_hiba: str | None = None
     egyenleg_hiba: str | None = None
     hiba: str | None = None
@@ -258,13 +272,31 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         atalany_e = None
         if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
             if sub.data.get(CONF_ATALANY_MENNYISEG):
-                atalany_e = self._mennyisegi_atalany(sub, fiok, tol, ig, most)
+                atalany_e = self._mennyisegi_atalany(sub, fiok, tol, ig, most, szamlalok)
             else:
                 atalany_e = atalany_szamitas(sub.data.get(CONF_RESZSZAMLA_OSSZEG), tarolt, tol, ig, most)
+        periodus = int(sub.data.get(CONF_SZAMLAZAS_HONAP) or 0) or None
+        ciklus = int(sub.data.get(CONF_ELSZAMOLAS_HONAP) or 12)
+        # A következő számla várható összege: fix díjnál a díj × ütem, átalánynál a napi átalány × az ütem napjai.
+        varhato_szamla = None
+        if sub.data[CONF_KOZMU] in FIX_DIJAS:
+            varhato_szamla = havi_alapdij_brutto(fiok, self.tar, most.date()) * (periodus or 3)
+        elif atalany_e:
+            varhato_szamla = Decimal(str(atalany_e["napi"])) * Decimal(round((periodus or 1) * 365 / 12))
+        esedekes_e = esedekes(tarolt, most.date(), periodus, varhato_szamla)
+        utem = {
+            "szolgaltato": (self.tar.szolgaltatok.get(sub.data.get(CONF_SZOLGALTATO)) or {}).get("nev") or sub.data.get(CONF_SZOLGALTATO),
+            "szamlazas_honap": periodus or (esedekes_e or {}).get("periodus_honap"),
+            "elszamolas_honap": ciklus,
+            "kovetkezo_elszamolas": honap_mulva(fiok.eves_bazis, ciklus) if fiok.eves_bazis and sub.data[CONF_KOZMU] not in FIX_DIJAS else None,
+        }
         egyenleg, egyenleg_hiba = None, None
         if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
             try:
-                egyenleg = await self._egyenleg(sub, tarolt, fiok, szamlalo, most, tovabbi, atalany_e["havi"] if atalany_e else None)
+                # Egy részszámla az ütem szerinti hónapok átalánya (pl. DAKÖV: két hónap).
+                egyenleg = await self._egyenleg(
+                    sub, tarolt, fiok, szamlalo, most, tovabbi, atalany_e["havi"] * (periodus or 1) if atalany_e else None
+                )
             except (NincsAdat, ValueError, DijszabasHiba) as err:
                 egyenleg_hiba = str(err)
         return (
@@ -283,6 +315,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 utolso_szamla=_utolso_szamla(tarolt),
                 elszamolas=elszamolas,
                 atalany=atalany_e,
+                esedekes=esedekes_e,
+                utem=utem,
                 szamla_stat=szamla_statisztika(tarolt, most.date(), fix_dij=sub.data[CONF_KOZMU] in FIX_DIJAS),
                 napelem_hiba=napelem_hiba,
             ),
@@ -369,9 +403,22 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         befizetesek = [v for k, v in reszek.items() if k not in kizart]
         return varhato_elszamolas(fiok, self.tar, szamlalo, most, tol, befizetesek, tovabbi)
 
-    def _mennyisegi_atalany(self, sub: ConfigSubentry, fiok: Fiok, tol: date, ig: date, most: datetime) -> dict[str, Any]:
+    def _mennyisegi_atalany(
+        self, sub: ConfigSubentry, fiok: Fiok, tol: date, ig: date, most: datetime, szamlalok: list[Szamlalo] | None = None
+    ) -> dict[str, Any]:
         havi_q = Decimal(str(sub.data[CONF_ATALANY_MENNYISEG]))
-        napi_q, idoszak_q, havi_ft = atalany_havi(fiok, self.tar, tol, ig, havi_q)
+        arany = Decimal(0)
+        szerepek = [c.szerep for c in fiok.csatornak]
+        if "almero" in szerepek and szamlalok:
+            # A locsolási almérő aránya az elmúlt egy évben (a csatornadíj levonásához).
+            try:
+                t1 = most - timedelta(days=365)
+                fo = szamlalok[0].fogyasztas(t1, most)[0]
+                al = szamlalok[szerepek.index("almero")].fogyasztas(t1, most)[0]
+                arany = max(min(al / fo, Decimal(1)), Decimal(0)) if fo > 0 else Decimal(0)
+            except NincsAdat:
+                arany = Decimal(0)
+        napi_q, idoszak_q, havi_ft = atalany_havi(fiok, self.tar, tol, ig, havi_q, arany)
         napok = (ig - tol).days
         eltelt = min(max((most.date() - tol).days + 1, 0), napok)
         egyseg = EGYSEG.get(sub.data[CONF_KOZMU], "")
@@ -384,6 +431,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             "mennyiseg_havi": float(havi_q),
             "mennyiseg_napi": round(float(napi_q), 3),
             "mennyiseg_idoszak": round(float(idoszak_q), 1),
+            "almero_arany": round(float(arany), 3),
             "forras": (
                 f"átalány {float(havi_q):g} {egyseg}/hó → napi {float(napi_q):.2f} {egyseg}, "
                 f"ebben a hónapban {float(idoszak_q):.1f} {egyseg}"
@@ -395,8 +443,13 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         lista = list((await self._befizetesek(sub, tarolt)).values())
         return eves_egyenleg(
             fiok, self.tar, szamlalo, most, lista,
-            reszszamla_db_ev=int(sub.data.get(CONF_RESZSZAMLA_DB) or 11),
-            elozo_bazis=elozo_bazis(tarolt),
+            reszszamla_db_ev=(
+                max(int(sub.data[CONF_ELSZAMOLAS_HONAP]) // int(sub.data[CONF_SZAMLAZAS_HONAP]) - 1, 0)
+                if sub.data.get(CONF_ELSZAMOLAS_HONAP) and sub.data.get(CONF_SZAMLAZAS_HONAP)
+                else int(sub.data.get(CONF_RESZSZAMLA_DB) or 11)
+            ),
+            elozo_bazis=elozo_bazis(tarolt, int(sub.data.get(CONF_ELSZAMOLAS_HONAP) or 12)),
+            ciklus_honap=int(sub.data.get(CONF_ELSZAMOLAS_HONAP) or 12),
             tovabbi=tovabbi,
             reszszamla_osszeg=(
                 Decimal(str(sub.data[CONF_RESZSZAMLA_OSSZEG])) if sub.data.get(CONF_RESZSZAMLA_OSSZEG)

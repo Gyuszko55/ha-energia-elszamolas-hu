@@ -268,3 +268,50 @@ def atalany_szamitas(beallitott: Any, tarolt: dict[str, Any], tol: date, ig: dat
         "eltelt_nap": eltelt,
         "forras": forras,
     }
+
+
+def _honap_mulva(d: date, honap: int) -> date:
+    import calendar  # noqa: PLC0415
+
+    ev, ho = divmod(d.month - 1 + honap, 12)
+    ev, ho = d.year + ev, ho + 1
+    return d.replace(year=ev, month=ho, day=min(d.day, calendar.monthrange(ev, ho)[1]))
+
+
+def esedekes(
+    tarolt: dict[str, Any], ma: date, periodus_honap: int | None, varhato_osszeg: Decimal | None
+) -> dict[str, Any] | None:
+    """Ebben a hónapban esedékes számlák: a már kiállítottak és a számlázási ütem szerint még várható.
+
+    periodus_honap: számlázási ütem (1 havi, 2 kéthavi, 3 negyedéves); ha nincs megadva, a számlák
+    szokásos időközéből. varhato_osszeg: a következő számla várható összege (átalány × időszak, fix díj);
+    ha nincs, az utolsó számla összege.
+    """
+    sz = sorted(
+        (_d(x["kelte"]), Decimal(str(x["osszeg"])), k)
+        for k, x in (tarolt.get("szamlak") or {}).items()
+        if x.get("osszeg") is not None and Decimal(str(x["osszeg"])) != 0
+    )
+    if not sz:
+        return None
+    if not periodus_honap:
+        utolsok = sz[-5:]
+        kozok = sorted((b[0] - a[0]).days for a, b in zip(utolsok, utolsok[1:]))
+        periodus_honap = max(1, round((kozok[len(kozok) // 2] if kozok else 30) / 30.4))
+    ho_eleje = ma.replace(day=1)
+    ho_vege = _honap_mulva(ho_eleje, 1)
+    e_havi = [(d, x, k) for d, x, k in sz if ho_eleje <= d < ho_vege]
+    kovetkezo = _honap_mulva(sz[-1][0], periodus_honap)
+    elmaradt = kovetkezo < ho_eleje
+    osszeg = Decimal(varhato_osszeg) if varhato_osszeg is not None else sz[-1][1]
+    e_havi_varhato = osszeg if (ho_eleje <= kovetkezo < ho_vege) else (osszeg if elmaradt else Decimal(0))
+    return {
+        "periodus_honap": periodus_honap,
+        "kovetkezo_datum": kovetkezo,
+        "kovetkezo_osszeg": int(round(osszeg)),
+        "elmaradt": elmaradt,
+        "e_havi_kiallitott": int(sum((x for _, x, _ in e_havi), Decimal(0))),
+        "e_havi_szamlak": [{"kelte": d.isoformat(), "osszeg": int(x), "sorszam": k} for d, x, k in e_havi],
+        "e_havi_varhato": int(round(e_havi_varhato)),
+        "e_havi_osszesen": int(sum((x for _, x, _ in e_havi), Decimal(0)) + round(e_havi_varhato)),
+    }

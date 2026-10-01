@@ -79,6 +79,10 @@ A H-tarifás fióknál megadható a **téli (1.81)** és a **nyári (1.82)** reg
 
 Bármely fiók lehet **részszámlás (átalány)**. Ilyenkor a panelen „átalány” jelzés látszik, és a **Havi fizetendő (átalány)** = az átalány napra leosztva × a hónap napjai. A napi összeg az utolsó részszámla összege osztva az időszakának napjaival, vagy a beállított havi átalány × 12 / 365. Ha a szolgáltató **mennyiséget** számláz átalányként (pl. MVM: 293 kWh/hó), az „Átalány mennyisége havonta” mezőben adható meg: napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. A háztartás havi összesítőjében az átalányos szolgáltatás a fizetendővel szerepel; a panel tételes forintszámítás helyett a fogyasztást mutatja, összevetve az átalány mennyiségével. A várható elszámolás és az éves egyenleg a tényleges fogyasztásból számol.
 
+## Számlázási ütem, elszámolási ciklus, esedékes számlák
+
+Fiókonként megadható a **számlázási ütem** (havonta, kéthavonta, negyedévente) és az **elszámolási ciklus** (félévente, évente). A kártya mutatja a szolgáltatót, az ütemet és a következő elszámolás várható idejét; az egyenleg az elszámolási ciklusra számol (pl. DAKÖV: félévente, közben 2 kéthavi részszámla). A háztartás összesítőjének fő száma az **ebben a hónapban esedékes számlák** összege: a már kiállítottak és az ütem szerint még várhatók (a következő számla = az utolsó + az ütem; összege átalánynál az ütem hónapjainak átalánya, fix díjnál a díj). A késő számla „késik” jelzést kap.
+
 ## Fix díjas fiók (hulladékszállítás)
 
 Közmű: „Hulladékszállítás (fix díj)”. Nincs mérő: a költség a díjszabás havi díjrésze, az időszak a naptári negyedév (a számlázás ütemezése szerint), a havi rész a `havi_resz` attribútumban; a háztartás havi összesítőjébe a havi rész kerül. A számlák a számlamappából (pl. `Dijnet /mohu_zrt`) jönnek; a „Következő számla várható” figyelmeztet, ha a díj változik vagy egy számla elmarad.

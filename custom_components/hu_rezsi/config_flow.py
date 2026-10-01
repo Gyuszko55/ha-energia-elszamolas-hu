@@ -45,6 +45,8 @@ from .const import (
     CONF_DIJNET,
     CONF_FIZETESI_MOD,
     CONF_ATALANY_MENNYISEG,
+    CONF_ELSZAMOLAS_HONAP,
+    CONF_SZAMLAZAS_HONAP,
     CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
     CONF_RESZSZAMLA_OSSZEG,
@@ -167,6 +169,9 @@ class FiokFlow(ConfigSubentryFlow):
                 SelectSelectorConfig(options=mappak, custom_value=True)
             ),
         }
+        mezok[vol.Optional(CONF_SZAMLAZAS_HONAP, **({"description": {"suggested_value": str(eddigi[CONF_SZAMLAZAS_HONAP])}} if eddigi.get(CONF_SZAMLAZAS_HONAP) else {}))] = SelectSelector(
+            SelectSelectorConfig(options=["1", "2", "3", "6", "12"], translation_key="szamlazas_honap")
+        )
         if uj:
             mezok[vol.Required(CONF_BEEPITVE, default=date.today().isoformat())] = DateSelector()
         return vol.Schema(mezok)
@@ -218,6 +223,12 @@ class FiokFlow(ConfigSubentryFlow):
                 NumberSelectorConfig(min=1, max=12, step=1, mode=NumberSelectorMode.BOX)
             ),
         }
+        mezok[vol.Optional(CONF_SZAMLAZAS_HONAP, **({"description": {"suggested_value": str(eddigi[CONF_SZAMLAZAS_HONAP])}} if eddigi.get(CONF_SZAMLAZAS_HONAP) else {}))] = SelectSelector(
+            SelectSelectorConfig(options=["1", "2", "3", "6", "12"], translation_key="szamlazas_honap")
+        )
+        mezok[vol.Optional(CONF_ELSZAMOLAS_HONAP, **({"description": {"suggested_value": str(eddigi[CONF_ELSZAMOLAS_HONAP])}} if eddigi.get(CONF_ELSZAMOLAS_HONAP) else {}))] = SelectSelector(
+            SelectSelectorConfig(options=["6", "12"], translation_key="elszamolas_honap")
+        )
         for kulcs in (CONF_ATALANY_MENNYISEG, CONF_RESZSZAMLA_OSSZEG, CONF_ELOZO_EV):
             mezok[vol.Optional(kulcs, **({"description": {"suggested_value": eddigi[kulcs]}} if eddigi.get(kulcs) else {}))] = NumberSelector(
                 NumberSelectorConfig(min=0, max=10000000, step="any", mode=NumberSelectorMode.BOX)

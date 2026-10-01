@@ -164,3 +164,19 @@ def test_atalany_napra_leosztva():
     assert a["napi"] == round(11185 / 30, 2) and a["havi"] == round(11185 / 30 * 31) and a["eltelt_nap"] == 10
     b = atalany_szamitas(12000, t, date(2026, 10, 1), date(2026, 11, 1), datetime(2026, 10, 10, 12))
     assert b["havi"] == round(12000 * 12 / 365 * 31) and "beállított" in b["forras"]
+
+
+def test_esedekes_ketthavi_es_negyedeves():
+    from decimal import Decimal as D2
+    from szamla_import import esedekes
+    viz = {"szamlak": {"a": {"kelte": "2026-06-02", "osszeg": "24616"}, "b": {"kelte": "2026-08-04", "osszeg": "11202"}}}
+    e = esedekes(viz, date(2026, 10, 1), 2, D2(13000))
+    assert e["kovetkezo_datum"] == date(2026, 10, 4) and e["e_havi_varhato"] == 13000 and e["e_havi_osszesen"] == 13000
+    assert esedekes(viz, date(2026, 11, 1), 2, D2(13000)) is not None
+    mohu = {"szamlak": {"1": {"kelte": "2026-04-15", "osszeg": "5772"}, "2": {"kelte": "2026-07-08", "osszeg": "5772"}}}
+    m = esedekes(mohu, date(2026, 10, 1), 3, D2(5772))
+    assert m["kovetkezo_datum"] == date(2026, 10, 8) and m["e_havi_osszesen"] == 5772
+    assert esedekes(mohu, date(2026, 11, 2), 3, D2(5772))["e_havi_osszesen"] == 5772  # késik: még várható
+    mohu["szamlak"]["3"] = {"kelte": "2026-10-09", "osszeg": "5772"}
+    n = esedekes(mohu, date(2026, 11, 2), 3, D2(5772))
+    assert n["e_havi_osszesen"] == 0 and n["kovetkezo_datum"] == date(2027, 1, 9)  # novemberben nincs számla

@@ -8,6 +8,9 @@
 - **Mennyiségi átalány** (pl. 293 kWh/hó): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva (H-nál a téli/nyári ár naptár szerint). Átalányos fióknál a panel tételes forintszámítás helyett a fogyasztást mutatja, az átalány mennyiségével összevetve.
 - Éves egyenleg: az előző év kezdete legalább ~10 hónappal korábbi elszámoló leolvasás; rövid év esetén a mérő felszerelése óta mért fogyasztásból becsül; H-tarifánál a két regiszter együtt, naptár szerint szétosztva.
 - H-kártya: „Nyári (1.82) rezsicsökkentett keret – a téli H-árra nincs keret”.
+- **Számlázási ütem és elszámolási ciklus** fiókonként (havonta / kéthavonta / negyedévente; félévente / évente): a kártyán a szolgáltató, az ütem és a következő elszámolás; az egyenleg az elszámolási ciklusra számol (pl. DAKÖV: félév, 2 részszámla).
+- **Ebben a hónapban esedékes számlák:** a háztartás összesítője a számlázási ütem szerint ebben a hónapban kiállított és várható számlák összege (pl. víz kéthavonta, MOHU negyedévente), késő számla jelzéssel; új entitás: „Rezsi esedékes ebben a hónapban”. A havi átlag másodlagosan.
+- Víz-átalány: a locsolási almérő tavalyi aránya a csatornadíjból levonódik.
 
 ## Rezsikövető 2.0.0b1 – 2026-10-01 (első béta)
 
