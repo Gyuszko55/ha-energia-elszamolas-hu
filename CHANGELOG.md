@@ -11,6 +11,8 @@
 - **Számlázási ütem és elszámolási ciklus** fiókonként (havonta / kéthavonta / negyedévente; félévente / évente): a kártyán a szolgáltató, az ütem és a következő elszámolás; az egyenleg az elszámolási ciklusra számol (pl. DAKÖV: félév, 2 részszámla).
 - **Ebben a hónapban esedékes számlák:** a háztartás összesítője a számlázási ütem szerint ebben a hónapban kiállított és várható számlák összege (pl. víz kéthavonta, MOHU negyedévente), késő számla jelzéssel; új entitás: „Rezsi esedékes ebben a hónapban”. A havi átlag másodlagosan.
 - Víz-átalány: a locsolási almérő tavalyi aránya a csatornadíjból levonódik.
+- Panel: minden kártya jobb felső sarkában hárompontos menü – **Előzmények** (HA előzmény-nézet), **Beállítások** (a fiók entitásai értékkel; koppintásra az entitás beállításai, „Eszköz oldala” gomb), **Kapcsolódó** (eszköz, integráció).
+- Saját ikon minden szenzorhoz (`icons.json`).
 
 ## Rezsikövető 2.0.0b1 – 2026-10-01 (első béta)
 

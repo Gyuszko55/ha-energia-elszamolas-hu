@@ -1,0 +1,69 @@
+{
+  "entity": {
+    "sensor": {
+      "koltseg_eddig": {
+        "default": "mdi:cash"
+      },
+      "koltseg_varhato": {
+        "default": "mdi:cash-clock"
+      },
+      "fogyasztas_idoszak": {
+        "default": "mdi:gauge"
+      },
+      "hatralevo_keret": {
+        "default": "mdi:gauge-low"
+      },
+      "aktualis_ar": {
+        "default": "mdi:tag-outline"
+      },
+      "eves_fogyasztas": {
+        "default": "mdi:chart-bar"
+      },
+      "befizetve": {
+        "default": "mdi:cash-check"
+      },
+      "varhato_eves_koltseg": {
+        "default": "mdi:calendar-clock"
+      },
+      "varhato_egyenleg": {
+        "default": "mdi:scale-balance"
+      },
+      "betaplalas": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "betaplalas_jovairas": {
+        "default": "mdi:cash-plus"
+      },
+      "napelem_egyenleg": {
+        "default": "mdi:solar-power-variant"
+      },
+      "varhato_elszamolas": {
+        "default": "mdi:file-document-check-outline"
+      },
+      "atalany_havi": {
+        "default": "mdi:cash-sync"
+      },
+      "utolso_szamla": {
+        "default": "mdi:receipt-text-outline"
+      },
+      "eves_szamlaosszeg": {
+        "default": "mdi:receipt-text-clock-outline"
+      },
+      "kovetkezo_szamla": {
+        "default": "mdi:calendar-arrow-right"
+      },
+      "utolso_lezart": {
+        "default": "mdi:calendar-check"
+      },
+      "osszesen_eddig": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
+      "osszesen_varhato": {
+        "default": "mdi:home-clock-outline"
+      },
+      "osszesen_esedekes": {
+        "default": "mdi:calendar-alert"
+      }
+    }
+  }
+}

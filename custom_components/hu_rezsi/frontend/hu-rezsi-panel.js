@@ -97,6 +97,28 @@ class HuRezsiPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-leolvas]").forEach((el) =>
       el.addEventListener("click", () => this._dialogusNyit(fiokok.find((f) => f.sid === el.dataset.leolvas))),
     );
+    this.shadowRoot.querySelectorAll("[data-menu]").forEach((el) =>
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._menuSid = this._menuSid === el.dataset.menu ? null : el.dataset.menu;
+        this._rajzol();
+      }),
+    );
+    this.shadowRoot.querySelectorAll("[data-menu-muvelet]").forEach((el) =>
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._menuMuvelet(el.dataset.menuMuvelet, fiokok.find((f) => f.sid === el.dataset.sid));
+      }),
+    );
+    if (this._menuSid) {
+      this.shadowRoot.querySelector(".tartalom").addEventListener("click", () => {
+        this._menuSid = null;
+        this._rajzol();
+      }, { once: true });
+    }
+    const bd = this.shadowRoot.getElementById("beallit");
+    this.shadowRoot.getElementById("beallitbezar").addEventListener("click", () => bd.close());
+    bd.addEventListener("click", (ev) => ev.target === bd && bd.close());
     this._dialogusKezelo();
   }
 
@@ -145,7 +167,7 @@ class HuRezsiPanel extends HTMLElement {
   _fiok(f) {
     const ikon = IKON[f.kozmu] || "mdi:cash";
     if (!f.eddig) {
-      return `<div class="kartya"><div class="kfej"><ha-icon icon="${ikon}"></ha-icon><div><div class="knev">${esc(f.nev)}</div></div></div>
+      return `<div class="kartya"><div class="kfej"><ha-icon icon="${ikon}"></ha-icon><div><div class="knev">${esc(f.nev)}</div></div>${this._menu3(f)}</div>
         <div class="hiba">${esc(f.hiba || "nincs adat")}</div></div>`;
     }
     const idoszak = `${nap(f.idoszak.tol)} – ${nap(elozoNap(f.idoszak.ig))}`;
@@ -249,7 +271,7 @@ class HuRezsiPanel extends HTMLElement {
       <div class="kartya">
         <div class="kfej"><ha-icon icon="${ikon}"></ha-icon>
           <div><div class="knev">${esc(f.nev)}${f.atalany || f.reszszamlas ? ' <span class="cimkeszalag atalany">átalány</span>' : ""}</div><div class="kicsi">${KOZMU[f.kozmu] || ""} · ${idoszak}${f.aktualis_ar && !f.fix_dij ? ` · ${szam(f.aktualis_ar)} Ft/${esc(egyseg)}` : ""}</div>
-          ${f.utem ? `<div class="kicsi">${esc(f.utem.szolgaltato || "")}${f.utem.szamlazas_honap ? ` · ${UTEM[f.utem.szamlazas_honap] || f.utem.szamlazas_honap + " havonta"} számláz` : ""}${!f.fix_dij ? ` · elszámolás ${UTEM[f.utem.elszamolas_honap] || ""}${f.utem.kovetkezo_elszamolas ? ` (következő: ${nap(f.utem.kovetkezo_elszamolas)} körül)` : ""}` : ""}</div>` : ""}</div></div>
+          ${f.utem ? `<div class="kicsi">${esc(f.utem.szolgaltato || "")}${f.utem.szamlazas_honap ? ` · ${UTEM[f.utem.szamlazas_honap] || f.utem.szamlazas_honap + " havonta"} számláz` : ""}${!f.fix_dij ? ` · elszámolás ${UTEM[f.utem.elszamolas_honap] || ""}${f.utem.kovetkezo_elszamolas ? ` (következő: ${nap(f.utem.kovetkezo_elszamolas)} körül)` : ""}` : ""}</div>` : ""}</div>${this._menu3(f)}</div>
         ${blokkok.join("")}
         <div class="gombok">
           <button data-reszlet="${f.sid}">${nyitva ? "Kevesebb" : "Részletek"}</button>
@@ -257,6 +279,99 @@ class HuRezsiPanel extends HTMLElement {
         </div>
         ${nyitva ? this._reszletek(f) : ""}
       </div>`;
+  }
+
+  // ---------------------------------------------------------------- hárompontos menü
+
+  _entitasok(f) {
+    if (!f.device_id || !this._hass?.entities) return [];
+    return Object.values(this._hass.entities)
+      .filter((e) => e.device_id === f.device_id)
+      .sort((a, b) => (a.entity_category ? 1 : 0) - (b.entity_category ? 1 : 0) || a.entity_id.localeCompare(b.entity_id));
+  }
+
+  _foEntitas(f) {
+    const lista = this._entitasok(f);
+    const elso = (tk) => lista.find((e) => e.translation_key === tk);
+    return (elso("koltseg_eddig") || elso("atalany_havi") || elso("kovetkezo_szamla") || lista[0])?.entity_id;
+  }
+
+  _menu3(f) {
+    if (!f.device_id) return "";
+    const nyitva = this._menuSid === f.sid;
+    const tetel = (muvelet, ikon, szoveg) =>
+      `<button class="mtetel" data-menu-muvelet="${muvelet}" data-sid="${f.sid}"><ha-icon icon="${ikon}"></ha-icon>${szoveg}</button>`;
+    return `<div class="menu3">
+        <button class="ikongomb pontok" data-menu="${f.sid}" title="Továbbiak" aria-haspopup="menu" aria-expanded="${nyitva}"><ha-icon icon="mdi:dots-vertical"></ha-icon></button>
+        ${nyitva ? `<div class="menulista" role="menu">
+          ${tetel("elozmenyek", "mdi:chart-box-outline", "Előzmények")}
+          ${tetel("beallitasok", "mdi:cog-outline", "Beállítások")}
+          ${tetel("kapcsolodo", "mdi:information-outline", "Kapcsolódó")}
+        </div>` : ""}
+      </div>`;
+  }
+
+  _tobbInfo(entityId, view) {
+    if (!entityId) return;
+    this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId, view }, bubbles: true, composed: true }));
+  }
+
+  _navigal(utvonal) {
+    history.pushState(null, "", utvonal);
+    window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+  }
+
+  _menuMuvelet(muvelet, f) {
+    this._menuSid = null;
+    this._rajzol();
+    if (muvelet === "elozmenyek") this._tobbInfo(this._foEntitas(f), "history");
+    else if (muvelet === "kapcsolodo") this._tobbInfo(this._foEntitas(f), "related");
+    else if (muvelet === "beallitasok") this._beallitasNyit(f);
+  }
+
+  _beallitasNyit(f) {
+    const d = this.shadowRoot.getElementById("beallit");
+    this.shadowRoot.getElementById("beallitcim").textContent = `${f.nev} – entitások`;
+    const allapot = (id) => {
+      const st = this._hass.states[id];
+      if (!st) return "–";
+      if (st.state === "unavailable" || st.state === "unknown") return "nincs adat";
+      let szoveg;
+      try {
+        szoveg = this._hass.formatEntityState ? this._hass.formatEntityState(st) : null;
+      } catch (e) {
+        szoveg = null;
+      }
+      szoveg = szoveg || (st.attributes.unit_of_measurement ? `${st.state} ${st.attributes.unit_of_measurement}` : st.state);
+      return esc(szoveg.replace(/\s?HUF\b/, " Ft"));
+    };
+    const nev = (e) => {
+      const st = this._hass.states[e.entity_id];
+      const teljes = e.name || st?.attributes.friendly_name || e.entity_id;
+      return teljes.startsWith(f.nev + " ") ? teljes.slice(f.nev.length + 1) : teljes;
+    };
+    const lista = this._entitasok(f);
+    this.shadowRoot.getElementById("entlista").innerHTML = lista.length
+      ? lista.map((e) => `<button class="entsor" data-ent="${esc(e.entity_id)}">
+          <ha-state-icon data-ikon="${esc(e.entity_id)}"></ha-state-icon>
+          <span class="entnev">${esc(nev(e))}<span class="kicsi">${esc(e.entity_id)}${e.hidden ? " · rejtett" : ""}</span></span>
+          <span class="entertek">${allapot(e.entity_id)}</span></button>`).join("")
+      : `<div class="kicsi">Nincs entitás.</div>`;
+    this.shadowRoot.querySelectorAll("#entlista [data-ikon]").forEach((el) => {
+      el.hass = this._hass;
+      el.stateObj = this._hass.states[el.dataset.ikon];
+    });
+    this.shadowRoot.querySelectorAll("#entlista [data-ent]").forEach((el) =>
+      el.addEventListener("click", () => {
+        d.close();
+        this._tobbInfo(el.dataset.ent, "settings");
+      }),
+    );
+    this.shadowRoot.getElementById("eszkozoldal").onclick = () => {
+      d.close();
+      this._navigal(`/config/devices/device/${f.device_id}`);
+    };
+    d.showModal();
   }
 
   _reszletek(f) {
@@ -305,6 +420,15 @@ class HuRezsiPanel extends HTMLElement {
             <button class="fo" type="submit">Mentés</button>
           </div>
         </form>
+      </dialog>
+      <dialog id="beallit">
+        <h3 id="beallitcim">Entitások</h3>
+        <div class="kicsi">Koppints egy entitásra a beállításaihoz (név, ikon, láthatóság).</div>
+        <div id="entlista"></div>
+        <div class="gombok">
+          <button type="button" id="eszkozoldal">Eszköz oldala</button>
+          <button type="button" class="fo" id="beallitbezar">Bezárás</button>
+        </div>
       </dialog>`;
   }
 
@@ -382,6 +506,26 @@ const STILUS = `
   .kfej ha-icon { color: var(--state-icon-color, var(--primary-color)); background: color-mix(in srgb, var(--primary-color) 12%, transparent);
                   border-radius: 50%; padding: 8px; }
   .knev { font-size: 18px; font-weight: 500; }
+  .kfej > div:nth-child(2) { flex: 1; min-width: 0; }
+  .menu3 { position: relative; align-self: flex-start; margin: -8px -8px 0 0; }
+  .kfej .pontok { color: var(--secondary-text-color); padding: 8px; line-height: 0; border: 0; }
+  .kfej .pontok ha-icon { background: none; padding: 0; color: inherit; }
+  .kfej .pontok:hover { background: color-mix(in srgb, var(--primary-text-color) 8%, transparent); }
+  .menulista { position: absolute; right: 0; top: 40px; z-index: 5; min-width: 190px; padding: 6px 0; border-radius: 10px;
+               background: var(--card-background-color); border: 1px solid var(--divider-color); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  .mtetel { display: flex; align-items: center; gap: 14px; width: 100%; border: 0; border-radius: 0; padding: 10px 16px;
+            color: var(--primary-text-color); text-align: left; }
+  .mtetel:hover { background: color-mix(in srgb, var(--primary-text-color) 8%, transparent); }
+  .mtetel ha-icon { color: var(--secondary-text-color); background: none !important; padding: 0 !important; }
+  #beallit { width: min(460px, 92vw); }
+  #entlista { margin: 10px 0 14px; max-height: 60vh; overflow-y: auto; }
+  .entsor { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; border-radius: 8px; padding: 8px; text-align: left;
+            color: var(--primary-text-color); }
+  .entsor:hover { background: color-mix(in srgb, var(--primary-text-color) 6%, transparent); }
+  .entsor ha-state-icon { color: var(--state-icon-color, var(--primary-color)); }
+  .entnev { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .entnev .kicsi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entertek { white-space: nowrap; font-size: 13px; color: var(--secondary-text-color); }
   .ket { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .ertek { font-size: 22px; font-weight: 500; white-space: nowrap; }
   .ertek.minusz { color: var(--error-color, #db4437); }
