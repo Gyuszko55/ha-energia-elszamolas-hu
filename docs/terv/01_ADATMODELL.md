@@ -42,6 +42,23 @@ Egy szerződés egy közművel. Egy háztartásban lehet pl. két villanyfiók (
 | `idoszak_mod` | `naptari_honap` \| `leolvasas_alapu` \| `egyedi_nap` | Hogyan vágjuk időszakokra (lásd 03) |
 | `idoszak_nap` | egész | `egyedi_nap` esetén a hónap hányadik napján indul az időszak |
 | `ugyfelazonosito` | szöveg, opcionális | Csak megjelenítésre |
+| `fizetesi_mod` | `fogyasztas_szerint` \| `reszszamla` | Lásd lent: részszámlás (átalány) elszámolás |
+
+### Részszámla (átalányfizetés)
+
+Sok háztartásban – főleg gáznál – nem a havi tényleges fogyasztást fizetjük: a szolgáltató az előző év
+fogyasztása alapján havi **részszámlát** állít ki (azonos vagy szezonálisan súlyozott összeggel), és az
+**éves elszámoló számla** a tényleges fogyasztás alapján **ráfizetést vagy visszatérítést** hoz.
+
+| Mező | Típus | Leírás |
+|---|---|---|
+| `datum` | dátum | A részszámla kelte vagy esedékessége |
+| `osszeg` | Ft | A részszámla bruttó összege |
+| `mennyiseg` | szám, opcionális | A részszámlán szereplő (gyakran becsült) mennyiség |
+| `forras` | `kezi` \| `terv` \| `entitas` | Kézzel rögzítve, éves részszámla-tervből, vagy HA-entitásból (pl. Díjnet-integráció) |
+
+Részszámlás fióknál a motor két dolgot számol párhuzamosan: a **tényleges költséget** a mért fogyasztásból
+(ahogy eddig), és a **befizetéseket** a részszámlákból. A kettő különbsége a várható éves egyenleg.
 
 ### Díjszabás-hozzárendelés
 
