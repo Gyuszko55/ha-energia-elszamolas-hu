@@ -1,0 +1,446 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Utility tracker – household",
+        "description": "Name the household. Add utility accounts (electricity, gas) afterwards on the entry.",
+        "data": {
+          "nev": "Name"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "fiok": {
+      "step": {
+        "user": {
+          "title": "New account",
+          "description": "One account = one contract with one meter (e.g. A1 electricity, H tariff, gas).",
+          "data": {
+            "nev": "Account name",
+            "kozmu": "Utility"
+          }
+        },
+        "reszletek": {
+          "title": "Account settings",
+          "description": "Rates start from the provider's official tariff and can be overridden later. Informational only.",
+          "data": {
+            "szolgaltato": "Provider",
+            "dijszabas": "Tariff",
+            "dijszabas_tol": "Tariff valid from",
+            "idoszak_mod": "Billing period",
+            "idoszak_nap": "Period start day (custom)",
+            "forras_entitas": "Automatic meter sensor (optional)",
+            "forras_szorzo": "Sensor multiplier",
+            "keret_aktiv": "Discounted allowance applies",
+            "gyari_szam": "Meter serial",
+            "beepitve": "Meter installed / start date",
+            "kezdo_allas": "Meter reading on that date",
+            "forras_tipus": "Sensor value meaning",
+            "fizetesi_mod": "Payment mode",
+            "reszszamla_db_ev": "Partial bills per year",
+            "dijnet_szolgaltato": "Díjnet provider (for partial bills)",
+            "csatornadij_aktiv": "Sewage fee",
+            "forras_tol": "Sensor valid from",
+            "napelem_mod": "Solar (experimental)",
+            "betaplalas_entitas": "Feed-in sensor (2.8.0)",
+            "almero": "Irrigation sub-meter behind the main meter",
+            "almero_forras": "Sub-meter sensor (optional)",
+            "almero_beepitve": "Sub-meter start date",
+            "almero_kezdo_allas": "Sub-meter reading on that date",
+            "reszszamla_osszeg": "Partial bill amount (optional)",
+            "elozo_ev_mennyiseg": "Previous year's consumption (optional)",
+            "szamla_mappa": "Invoice folder (optional)",
+            "szamla_merok": "Invoice meters (optional)"
+          },
+          "data_description": {
+            "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
+            "forras_szorzo": "If the sensor consistently deviates from the meter (e.g. 1.0412).",
+            "idoszak_nap": "Only used in custom-day mode.",
+            "kezdo_allas": "Calculation starts here; record later readings with the service.",
+            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings.",
+            "fizetesi_mod": "Partial billing (flat): fixed monthly partial bills, yearly settlement with extra payment or refund. The expected yearly balance is calculated too.",
+            "reszszamla_db_ev": "Excluding the settlement bill (MVM gas: 11).",
+            "dijnet_szolgaltato": "Payments are read from the Díjnet integration's paid invoices.",
+            "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
+            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored.",
+            "napelem_mod": "Gross: monthly billing, feed-in credited at the purchase price. Net (szaldó): yearly netting (10 years from commissioning).",
+            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured.",
+            "almero": "Its volume is deducted from the sewage fee (its water is already on the main meter).",
+            "reszszamla_osszeg": "HUF; if empty, this or last year's last partial bill.",
+            "elozo_ev_mennyiseg": "If there are no two settlement readings.",
+            "szamla_mappa": "Inside the config folder, e.g. the Díjnet download folder. New invoices add payments, real meter readings and monthly calorific values.",
+            "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account."
+          }
+        },
+        "reconfigure": {
+          "title": "Edit account",
+          "data": {
+            "nev": "Account name",
+            "szolgaltato": "Provider",
+            "dijszabas": "Tariff",
+            "dijszabas_tol": "Tariff valid from",
+            "idoszak_mod": "Billing period",
+            "idoszak_nap": "Period start day (custom)",
+            "forras_entitas": "Automatic meter sensor (optional)",
+            "forras_szorzo": "Sensor multiplier",
+            "keret_aktiv": "Discounted allowance applies",
+            "gyari_szam": "Meter serial",
+            "beepitve": "Meter installed / start date",
+            "kezdo_allas": "Meter reading on that date",
+            "forras_tipus": "Sensor value meaning",
+            "fizetesi_mod": "Payment mode",
+            "reszszamla_db_ev": "Partial bills per year",
+            "dijnet_szolgaltato": "Díjnet provider (for partial bills)",
+            "csatornadij_aktiv": "Sewage fee",
+            "forras_tol": "Sensor valid from",
+            "napelem_mod": "Solar (experimental)",
+            "betaplalas_entitas": "Feed-in sensor (2.8.0)",
+            "almero": "Irrigation sub-meter behind the main meter",
+            "almero_forras": "Sub-meter sensor (optional)",
+            "almero_beepitve": "Sub-meter start date",
+            "almero_kezdo_allas": "Sub-meter reading on that date",
+            "reszszamla_osszeg": "Partial bill amount (optional)",
+            "elozo_ev_mennyiseg": "Previous year's consumption (optional)",
+            "szamla_mappa": "Invoice folder (optional)",
+            "szamla_merok": "Invoice meters (optional)"
+          },
+          "data_description": {
+            "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
+            "forras_szorzo": "If the sensor consistently deviates from the meter (e.g. 1.0412).",
+            "idoszak_nap": "Only used in custom-day mode.",
+            "kezdo_allas": "Calculation starts here; record later readings with the service.",
+            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings.",
+            "fizetesi_mod": "Partial billing (flat): fixed monthly partial bills, yearly settlement with extra payment or refund. The expected yearly balance is calculated too.",
+            "reszszamla_db_ev": "Excluding the settlement bill (MVM gas: 11).",
+            "dijnet_szolgaltato": "Payments are read from the Díjnet integration's paid invoices.",
+            "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
+            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored.",
+            "napelem_mod": "Gross: monthly billing, feed-in credited at the purchase price. Net (szaldó): yearly netting (10 years from commissioning).",
+            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured.",
+            "almero": "Its volume is deducted from the sewage fee (its water is already on the main meter).",
+            "reszszamla_osszeg": "HUF; if empty, this or last year's last partial bill.",
+            "elozo_ev_mennyiseg": "If there are no two settlement readings.",
+            "szamla_mappa": "Inside the config folder, e.g. the Díjnet download folder. New invoices add payments, real meter readings and monthly calorific values.",
+            "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account."
+          }
+        }
+      },
+      "initiate_flow": {
+        "user": "Add account"
+      },
+      "entry_type": "Utility account",
+      "abort": {
+        "reconfigure_successful": "Account settings updated."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "koltseg_eddig": {
+        "name": "Cost so far"
+      },
+      "koltseg_varhato": {
+        "name": "Projected cost"
+      },
+      "fogyasztas_idoszak": {
+        "name": "Consumption this period"
+      },
+      "hatralevo_keret": {
+        "name": "Remaining discounted allowance"
+      },
+      "aktualis_ar": {
+        "name": "Current unit price"
+      },
+      "eves_fogyasztas": {
+        "name": "Yearly consumption"
+      },
+      "utolso_lezart": {
+        "name": "Last closed period"
+      },
+      "osszesen_eddig": {
+        "name": "Utilities so far total"
+      },
+      "osszesen_varhato": {
+        "name": "Utilities projected total"
+      },
+      "befizetve": {
+        "name": "Paid (partial bills)"
+      },
+      "varhato_eves_koltseg": {
+        "name": "Expected yearly cost"
+      },
+      "varhato_egyenleg": {
+        "name": "Expected yearly balance"
+      },
+      "betaplalas": {
+        "name": "Feed-in"
+      },
+      "betaplalas_jovairas": {
+        "name": "Feed-in credit"
+      },
+      "napelem_egyenleg": {
+        "name": "Solar balance"
+      },
+      "utolso_szamla": {
+        "name": "Last invoice"
+      },
+      "varhato_elszamolas": {
+        "name": "Expected settlement"
+      },
+      "eves_szamlaosszeg": {
+        "name": "Invoices in the last 12 months"
+      },
+      "kovetkezo_szamla": {
+        "name": "Next invoice expected"
+      }
+    }
+  },
+  "selector": {
+    "kozmu": {
+      "options": {
+        "villany": "Electricity",
+        "gaz": "Gas",
+        "viz": "Water",
+        "hulladek": "Waste collection (fixed fee)"
+      }
+    },
+    "idoszak_mod": {
+      "options": {
+        "naptari_honap": "Calendar month",
+        "egyedi_nap": "Custom start day (monthly)",
+        "negyedev": "Calendar quarter"
+      }
+    },
+    "leolvasas_tipus": {
+      "options": {
+        "kezi": "Own (manual)",
+        "szolgaltatoi": "Provider"
+      }
+    },
+    "forras_tipus": {
+      "options": {
+        "meroallas": "Meter reading (e.g. sensor.meroora_allas)",
+        "szamlalo": "Increasing counter only (e.g. Shelly total energy)"
+      }
+    },
+    "fizetesi_mod": {
+      "options": {
+        "fogyasztas_szerint": "By consumption",
+        "reszszamla": "Partial billing (flat)"
+      }
+    },
+    "napelem_mod": {
+      "options": {
+        "nincs": "No solar",
+        "brutto": "Gross billing",
+        "szaldo": "Net billing (szaldó)"
+      }
+    },
+    "csatorna": {
+      "options": {
+        "vetelezes": "Import (1.8.0)",
+        "betaplalas": "Export (2.8.0)",
+        "almero": "Sub-meter (water)"
+      }
+    }
+  },
+  "services": {
+    "leolvasas_rogzites": {
+      "name": "Record meter reading",
+      "description": "Manual or provider reading for an account's meter. Always overrides the automatic sensor.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "datum": {
+          "name": "Date",
+          "description": ""
+        },
+        "allas": {
+          "name": "Reading",
+          "description": "Meter value."
+        },
+        "tipus": {
+          "name": "Type",
+          "description": ""
+        },
+        "elszamolasi": {
+          "name": "Billing (yearly) reading",
+          "description": "Starts the yearly allowance and splits the period here."
+        },
+        "megjegyzes": {
+          "name": "Note",
+          "description": ""
+        },
+        "csatorna": {
+          "name": "Meter register",
+          "description": "For a bidirectional meter: import or export."
+        }
+      }
+    },
+    "leolvasas_torles": {
+      "name": "Delete reading",
+      "description": "Deletes all readings of a day from the account.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "datum": {
+          "name": "Date",
+          "description": ""
+        }
+      }
+    },
+    "merocsere": {
+      "name": "Meter replacement",
+      "description": "Closes the current meter and opens a new one; consumption stays continuous.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "datum": {
+          "name": "Date",
+          "description": ""
+        },
+        "regi_zaro_allas": {
+          "name": "Old meter final reading",
+          "description": ""
+        },
+        "uj_kezdo_allas": {
+          "name": "New meter initial reading",
+          "description": ""
+        },
+        "uj_gyari_szam": {
+          "name": "New meter serial",
+          "description": ""
+        },
+        "csatorna": {
+          "name": "Meter register",
+          "description": "For a bidirectional meter: import or export."
+        }
+      }
+    },
+    "feluliras": {
+      "name": "Override rate",
+      "description": "Custom value for a rate or rule from a date. Without a value the override is removed.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "kulcs": {
+          "name": "Key",
+          "description": "E.g. dijak.energia_kedvezmenyes, dijak.energia_piaci, dijak.alapdij_ho"
+        },
+        "ertek": {
+          "name": "Value",
+          "description": "Gross HUF"
+        },
+        "ervenyes_tol": {
+          "name": "Valid from",
+          "description": ""
+        }
+      }
+    },
+    "naplo": {
+      "name": "Get log",
+      "description": "Closed periods, meters, readings and overrides of the account.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        }
+      }
+    },
+    "csv_export": {
+      "name": "CSV export",
+      "description": "Writes closed periods and readings to CSV in /config/hu_rezsi.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        }
+      }
+    },
+    "v1_import": {
+      "name": "Import from v1 package",
+      "description": "Copies the old YAML package's reading log and monthly bills. Dry run by default.",
+      "fields": {
+        "a_fiok": {
+          "name": "A1 account",
+          "description": ""
+        },
+        "h_fiok": {
+          "name": "H tariff account",
+          "description": ""
+        },
+        "gaz_fiok": {
+          "name": "Gas account",
+          "description": ""
+        },
+        "probafuttatas": {
+          "name": "Dry run only",
+          "description": "Turn off to save."
+        }
+      }
+    },
+    "futoertek_rogzites": {
+      "name": "Record calorific value",
+      "description": "Monthly calorific value from the gas bill (MJ/m³). Without value it is removed.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "honap": {
+          "name": "Month",
+          "description": "YYYY-MM"
+        },
+        "ertek": {
+          "name": "Calorific value",
+          "description": "MJ/m³"
+        }
+      }
+    },
+    "reszszamla_rogzites": {
+      "name": "Record partial bill",
+      "description": "Manually recorded paid partial bill (without Díjnet).",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "datum": {
+          "name": "Date",
+          "description": ""
+        },
+        "osszeg": {
+          "name": "Amount",
+          "description": "Gross HUF"
+        },
+        "megjegyzes": {
+          "name": "Note",
+          "description": ""
+        }
+      }
+    },
+    "reszszamla_torles": {
+      "name": "Delete partial bill",
+      "description": "Delete a manually recorded partial bill of a day.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "datum": {
+          "name": "Date",
+          "description": ""
+        }
+      }
+    }
+  }
+}

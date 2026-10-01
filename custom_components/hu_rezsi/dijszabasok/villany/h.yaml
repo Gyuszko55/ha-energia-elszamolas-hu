@@ -1,0 +1,30 @@
+azonosito: villany/h
+nev: "H – hőszivattyús"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      A v1 díjtáblázatának bruttó árai nettóra visszaszámolva (ÁFA 27%), H-tarifás számla nélkül – ELLENŐRIZENDŐ.
+      A téli ár itt az energia- és a rendszerhasználati díj együtt.
+    szabalyok:
+      alapdij:
+        mod: idoszakonkent
+      idenyszak:
+        - nev: teli            # fűtési idény: kedvezményes H-ár, keret nélkül
+          tol: "10-15"
+          ig: "04-15"
+          keret: {tipus: nincs}
+          ar: energia_teli
+        - nev: nyari           # az A1 szabályai és árai, a H-mérőre külön kerettel
+          dijszabas: villany/a1
+          sajat_keret: true
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        energia_teli: 18.08031   # bruttó 22,962
+        alapdij_ho: 39.50        # bruttó 50,165
+      eon: {energia_teli: 18.51969}
+      opus_titasz: {energia_teli: 18.51969}
+      elmu: {energia_teli: 18.22992}
+      elmu_emasz: {energia_teli: 17.85984}

@@ -1,0 +1,446 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Rezsikövető – háztartás",
+        "description": "Add meg a háztartás nevét. A szolgáltatói fiókokat (villany, gáz) utána, a bejegyzésnél veheted fel.",
+        "data": {
+          "nev": "Név"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "fiok": {
+      "step": {
+        "user": {
+          "title": "Új fiók",
+          "description": "Egy fiók = egy szerződés egy mérővel (pl. A1 villany, H-tarifa, gáz).",
+          "data": {
+            "nev": "Fiók neve",
+            "kozmu": "Közmű"
+          }
+        },
+        "reszletek": {
+          "title": "Fiók beállításai",
+          "description": "A díjak a kiválasztott szolgáltató hivatalos díjaival indulnak, később felülírhatók. Tájékoztató jellegű számítás.",
+          "data": {
+            "szolgaltato": "Szolgáltató",
+            "dijszabas": "Díjszabás (tarifa)",
+            "dijszabas_tol": "Díjszabás érvényes ettől",
+            "idoszak_mod": "Elszámolási időszak",
+            "idoszak_nap": "Időszak kezdőnapja (egyedi napnál)",
+            "forras_entitas": "Automatikus mérőállás-szenzor (opcionális)",
+            "forras_szorzo": "Szenzor-szorzó",
+            "keret_aktiv": "Kedvezményes (rezsicsökkentett) keret jár",
+            "gyari_szam": "Mérő gyári száma",
+            "beepitve": "Mérő beépítése / kezdőnap",
+            "kezdo_allas": "Mérő állása ezen a napon",
+            "forras_tipus": "A szenzor értéke",
+            "fizetesi_mod": "Fizetés módja",
+            "reszszamla_db_ev": "Részszámlák száma évente",
+            "dijnet_szolgaltato": "Díjnet-szolgáltató (részszámlákhoz)",
+            "csatornadij_aktiv": "Csatornadíj",
+            "forras_tol": "A szenzor érvényes ettől",
+            "napelem_mod": "Napelem (kísérleti)",
+            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)",
+            "almero": "Locsolási almérő a főmérő mögött",
+            "almero_forras": "Almérő-szenzor (opcionális)",
+            "almero_beepitve": "Almérő kezdőnapja",
+            "almero_kezdo_allas": "Almérő állása ezen a napon",
+            "reszszamla_osszeg": "Részszámla összege (opcionális)",
+            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)",
+            "szamla_mappa": "Számlamappa (opcionális)",
+            "szamla_merok": "Számla-mérők (opcionális)"
+          },
+          "data_description": {
+            "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
+            "forras_szorzo": "Ha a szenzor rendszeresen eltér az órától (pl. 1,0412).",
+            "idoszak_nap": "Csak az „egyedi nap” módnál számít.",
+            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted.",
+            "forras_tipus": "Mérőóra-állásnál a szenzor értéke maga az óraállás. Számlálónál csak a változását vesszük át, a kézi leolvasásokhoz igazítva.",
+            "fizetesi_mod": "Részszámlás (átalány): havi fix részszámla, év végén elszámoló számla ráfizetéssel vagy visszatérítéssel. Ilyenkor a várható éves egyenleget is számoljuk.",
+            "reszszamla_db_ev": "Az elszámoló számlán kívül (MVM gáz: 11).",
+            "dijnet_szolgaltato": "A Díjnet-integráció kifizetett számláiból veszi a befizetéseket.",
+            "csatornadij_aktiv": "Locsolási almérőnél kapcsold ki.",
+            "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk.",
+            "napelem_mod": "Bruttó: havi elszámolás, a betáplálás átvételi áron. Szaldó: éves nettózás (az üzembe helyezéstől 10 évig). Részletek: docs/terv/05_NAPELEM.md.",
+            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk.",
+            "almero": "A mennyisége a csatornadíjból levonódik (a vize a főmérőn már szerepel).",
+            "reszszamla_osszeg": "Ft; ha üres, az idei, illetve a tavalyi utolsó részszámla.",
+            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132).",
+            "szamla_mappa": "A config mappán belül, pl. a Díjnet letöltési mappája. Az új számlákból a befizetés, a valódi (diktált/leolvasott) mérőállás és gáznál a havi fűtőérték magától rögzül.",
+            "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik."
+          }
+        },
+        "reconfigure": {
+          "title": "Fiók szerkesztése",
+          "data": {
+            "nev": "Fiók neve",
+            "szolgaltato": "Szolgáltató",
+            "dijszabas": "Díjszabás (tarifa)",
+            "dijszabas_tol": "Díjszabás érvényes ettől",
+            "idoszak_mod": "Elszámolási időszak",
+            "idoszak_nap": "Időszak kezdőnapja (egyedi napnál)",
+            "forras_entitas": "Automatikus mérőállás-szenzor (opcionális)",
+            "forras_szorzo": "Szenzor-szorzó",
+            "keret_aktiv": "Kedvezményes (rezsicsökkentett) keret jár",
+            "gyari_szam": "Mérő gyári száma",
+            "beepitve": "Mérő beépítése / kezdőnap",
+            "kezdo_allas": "Mérő állása ezen a napon",
+            "forras_tipus": "A szenzor értéke",
+            "fizetesi_mod": "Fizetés módja",
+            "reszszamla_db_ev": "Részszámlák száma évente",
+            "dijnet_szolgaltato": "Díjnet-szolgáltató (részszámlákhoz)",
+            "csatornadij_aktiv": "Csatornadíj",
+            "forras_tol": "A szenzor érvényes ettől",
+            "napelem_mod": "Napelem (kísérleti)",
+            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)",
+            "almero": "Locsolási almérő a főmérő mögött",
+            "almero_forras": "Almérő-szenzor (opcionális)",
+            "almero_beepitve": "Almérő kezdőnapja",
+            "almero_kezdo_allas": "Almérő állása ezen a napon",
+            "reszszamla_osszeg": "Részszámla összege (opcionális)",
+            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)",
+            "szamla_mappa": "Számlamappa (opcionális)",
+            "szamla_merok": "Számla-mérők (opcionális)"
+          },
+          "data_description": {
+            "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
+            "forras_szorzo": "Ha a szenzor rendszeresen eltér az órától (pl. 1,0412).",
+            "idoszak_nap": "Csak az „egyedi nap” módnál számít.",
+            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted.",
+            "forras_tipus": "Mérőóra-állásnál a szenzor értéke maga az óraállás. Számlálónál csak a változását vesszük át, a kézi leolvasásokhoz igazítva.",
+            "fizetesi_mod": "Részszámlás (átalány): havi fix részszámla, év végén elszámoló számla ráfizetéssel vagy visszatérítéssel. Ilyenkor a várható éves egyenleget is számoljuk.",
+            "reszszamla_db_ev": "Az elszámoló számlán kívül (MVM gáz: 11).",
+            "dijnet_szolgaltato": "A Díjnet-integráció kifizetett számláiból veszi a befizetéseket.",
+            "csatornadij_aktiv": "Locsolási almérőnél kapcsold ki.",
+            "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk.",
+            "napelem_mod": "Bruttó: havi elszámolás, a betáplálás átvételi áron. Szaldó: éves nettózás (az üzembe helyezéstől 10 évig). Részletek: docs/terv/05_NAPELEM.md.",
+            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk.",
+            "almero": "A mennyisége a csatornadíjból levonódik (a vize a főmérőn már szerepel).",
+            "reszszamla_osszeg": "Ft; ha üres, az idei, illetve a tavalyi utolsó részszámla.",
+            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132).",
+            "szamla_mappa": "A config mappán belül, pl. a Díjnet letöltési mappája. Az új számlákból a befizetés, a valódi (diktált/leolvasott) mérőállás és gáznál a havi fűtőérték magától rögzül.",
+            "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik."
+          }
+        }
+      },
+      "initiate_flow": {
+        "user": "Fiók hozzáadása"
+      },
+      "entry_type": "Szolgáltatói fiók",
+      "abort": {
+        "reconfigure_successful": "A fiók beállításai frissültek."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "koltseg_eddig": {
+        "name": "Költség eddig"
+      },
+      "koltseg_varhato": {
+        "name": "Várható költség"
+      },
+      "fogyasztas_idoszak": {
+        "name": "Fogyasztás az időszakban"
+      },
+      "hatralevo_keret": {
+        "name": "Hátralévő kedvezményes keret"
+      },
+      "aktualis_ar": {
+        "name": "Aktuális egységár"
+      },
+      "eves_fogyasztas": {
+        "name": "Éves fogyasztás"
+      },
+      "utolso_lezart": {
+        "name": "Utolsó lezárt időszak"
+      },
+      "osszesen_eddig": {
+        "name": "Rezsi eddig összesen"
+      },
+      "osszesen_varhato": {
+        "name": "Rezsi várható összesen"
+      },
+      "befizetve": {
+        "name": "Befizetve (részszámlák)"
+      },
+      "varhato_eves_koltseg": {
+        "name": "Várható éves költség"
+      },
+      "varhato_egyenleg": {
+        "name": "Várható éves egyenleg"
+      },
+      "betaplalas": {
+        "name": "Betáplálás"
+      },
+      "betaplalas_jovairas": {
+        "name": "Betáplálás jóváírása"
+      },
+      "napelem_egyenleg": {
+        "name": "Napelemes egyenleg"
+      },
+      "utolso_szamla": {
+        "name": "Utolsó számla"
+      },
+      "varhato_elszamolas": {
+        "name": "Várható elszámolás"
+      },
+      "eves_szamlaosszeg": {
+        "name": "Számlák az utolsó 12 hónapban"
+      },
+      "kovetkezo_szamla": {
+        "name": "Következő számla várható"
+      }
+    }
+  },
+  "selector": {
+    "kozmu": {
+      "options": {
+        "villany": "Villany",
+        "gaz": "Gáz",
+        "viz": "Víz",
+        "hulladek": "Hulladékszállítás (fix díj)"
+      }
+    },
+    "idoszak_mod": {
+      "options": {
+        "naptari_honap": "Naptári hónap",
+        "egyedi_nap": "Egyedi kezdőnap (havi)",
+        "negyedev": "Naptári negyedév"
+      }
+    },
+    "leolvasas_tipus": {
+      "options": {
+        "kezi": "Saját (kézi)",
+        "szolgaltatoi": "Szolgáltatói"
+      }
+    },
+    "forras_tipus": {
+      "options": {
+        "meroallas": "Mérőóra-állás (pl. sensor.meroora_allas)",
+        "szamlalo": "Csak növekvő számláló (pl. Shelly összes energia)"
+      }
+    },
+    "fizetesi_mod": {
+      "options": {
+        "fogyasztas_szerint": "Fogyasztás szerint",
+        "reszszamla": "Részszámlás (átalány)"
+      }
+    },
+    "napelem_mod": {
+      "options": {
+        "nincs": "Nincs napelem",
+        "brutto": "Bruttó elszámolás",
+        "szaldo": "Szaldó elszámolás"
+      }
+    },
+    "csatorna": {
+      "options": {
+        "vetelezes": "Vételezés (1.8.0)",
+        "betaplalas": "Betáplálás (2.8.0)",
+        "almero": "Almérő (víz)"
+      }
+    }
+  },
+  "services": {
+    "leolvasas_rogzites": {
+      "name": "Mérőállás rögzítése",
+      "description": "Kézi vagy szolgáltatói leolvasás egy fiók mérőjére. Az automatikus szenzornál mindig erősebb.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        },
+        "allas": {
+          "name": "Állás",
+          "description": "A mérőóra állása."
+        },
+        "tipus": {
+          "name": "Típus",
+          "description": ""
+        },
+        "elszamolasi": {
+          "name": "Elszámoló (éves) leolvasás",
+          "description": "Ettől indul az éves keret, és itt kettéválik az időszak."
+        },
+        "megjegyzes": {
+          "name": "Megjegyzés",
+          "description": ""
+        },
+        "csatorna": {
+          "name": "Mérőregiszter",
+          "description": "Napelemes ad-vesz mérőnél: vételezés vagy betáplálás."
+        }
+      }
+    },
+    "leolvasas_torles": {
+      "name": "Leolvasás törlése",
+      "description": "Egy nap összes leolvasását törli a fiókból.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        }
+      }
+    },
+    "merocsere": {
+      "name": "Mérőcsere",
+      "description": "Lezárja a mostani mérőt, és újat nyit. A fogyasztás a cserén át folytonos marad.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        },
+        "regi_zaro_allas": {
+          "name": "Régi mérő záró állása",
+          "description": ""
+        },
+        "uj_kezdo_allas": {
+          "name": "Új mérő kezdő állása",
+          "description": ""
+        },
+        "uj_gyari_szam": {
+          "name": "Új mérő gyári száma",
+          "description": ""
+        },
+        "csatorna": {
+          "name": "Mérőregiszter",
+          "description": "Napelemes ad-vesz mérőnél: vételezés vagy betáplálás."
+        }
+      }
+    },
+    "feluliras": {
+      "name": "Díj felülírása",
+      "description": "Egy díj vagy szabály egyedi értéke dátumtól. Érték nélkül a felülírás törlődik.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "kulcs": {
+          "name": "Kulcs",
+          "description": "Pl. dijak.energia_kedvezmenyes, dijak.energia_piaci, dijak.alapdij_ho"
+        },
+        "ertek": {
+          "name": "Érték",
+          "description": "Bruttó Ft"
+        },
+        "ervenyes_tol": {
+          "name": "Érvényes ettől",
+          "description": ""
+        }
+      }
+    },
+    "naplo": {
+      "name": "Napló lekérése",
+      "description": "A fiók lezárt időszakai, mérői, leolvasásai és felülírásai.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        }
+      }
+    },
+    "csv_export": {
+      "name": "CSV-export",
+      "description": "A lezárt időszakokat és a leolvasásokat CSV-be írja a /config/hu_rezsi mappába.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        }
+      }
+    },
+    "v1_import": {
+      "name": "Átvétel a v1-csomagból",
+      "description": "A régi YAML-csomag leolvasási naplóját és havi elszámolásait átmásolja. Alapból csak próbafuttatás.",
+      "fields": {
+        "a_fiok": {
+          "name": "A1 fiók",
+          "description": ""
+        },
+        "h_fiok": {
+          "name": "H-tarifa fiók",
+          "description": ""
+        },
+        "gaz_fiok": {
+          "name": "Gáz fiók",
+          "description": ""
+        },
+        "probafuttatas": {
+          "name": "Csak próbafuttatás",
+          "description": "Kikapcsolva ment is."
+        }
+      }
+    },
+    "futoertek_rogzites": {
+      "name": "Fűtőérték rögzítése",
+      "description": "A gázszámlán szereplő havi fűtőérték (MJ/m³). Érték nélkül törli.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "honap": {
+          "name": "Hónap",
+          "description": "ÉÉÉÉ-HH"
+        },
+        "ertek": {
+          "name": "Fűtőérték",
+          "description": "MJ/m³"
+        }
+      }
+    },
+    "reszszamla_rogzites": {
+      "name": "Részszámla rögzítése",
+      "description": "Kézzel rögzített befizetett részszámla (ha nincs Díjnet).",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        },
+        "osszeg": {
+          "name": "Összeg",
+          "description": "Bruttó Ft"
+        },
+        "megjegyzes": {
+          "name": "Megjegyzés",
+          "description": ""
+        }
+      }
+    },
+    "reszszamla_torles": {
+      "name": "Részszámla törlése",
+      "description": "Egy napon kézzel rögzített részszámla törlése.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        }
+      }
+    }
+  }
+}

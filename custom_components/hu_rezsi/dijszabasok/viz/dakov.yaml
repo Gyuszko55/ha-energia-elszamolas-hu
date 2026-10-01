@@ -1,0 +1,26 @@
+azonosito: viz/dakov
+nev: "DAKÖV – lakossági víz és csatorna"
+kozmu: viz
+egyseg: m3
+verziok:
+  - ervenyes_tol: 2022-01-01
+    forras: >-
+      DAKÖV vízszámla (1. részszámla), 2026-03-03, elszámolt időszak 2026.01.24–03.02: ivóvíz nettó 269,52 Ft/m³,
+      szennyvíz nettó 373,82 Ft/m³, ivóvíz-alapdíj és szennyvíz-alapdíj nettó 177,21–177,21 Ft/hó, ÁFA 27%.
+      Ugyanezek a díjak a 2023-as, 2024-es és 2025-ös számlákon is (2023-01-26, 2024-04-30, 2025-09-30).
+      A tételek fillérre pontosak, csak a végösszeg kerekül forintra. A 2026-07-es számla szerint a locsolási
+      almérő a főmérő mögött van: a mennyisége a főmérő csatornadíjából levonódik. Az alapdíj naptári
+      hónaponként jár (a júliusi számlán 2026.06.01–07.31: 2 hónap).
+    szabalyok:
+      keret: {tipus: nincs}
+      ar: viz_m3
+      csatornadij: {alapertelmezes: be}
+      szamla_kerekites: vegosszeg
+      alapdij:
+        mod: honaponkent       # naptári hónaponként (a havi elszámolásban 1 hónap = 1 alapdíj)
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        viz_m3: 269.52
+        csatorna_m3: 373.82
+        alapdij_ho: 354.42     # ivóvíz 177,21 + szennyvíz 177,21

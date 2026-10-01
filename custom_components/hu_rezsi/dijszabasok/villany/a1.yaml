@@ -1,0 +1,28 @@
+azonosito: villany/a1
+nev: "A1 – általános lakossági"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MVM Next villanyszámla, 2026-06-09 (2026.05.14–06.08): nettó 5,25 Ft/kWh a keretig, 31,80 Ft/kWh felette,
+      rendszerhasználati díj 23,40 Ft/kWh, elosztói alapdíj 120,50 Ft/számla, ÁFA 27%.
+      A többi elosztói terület kedvezményes energiadíja a v1 díjtáblázatának bruttó áraiból visszaszámolva – ELLENŐRIZENDŐ.
+    szabalyok:
+      keret:
+        tipus: napi_aranyos
+        ev_mennyiseg: 2523     # kWh/év; a számlán a keret egész kWh (26 nap → 180 kWh)
+        kerekites: 0
+      alapdij:
+        mod: idoszakonkent     # számlánként 1 havi alapdíj, nem napra arányosítva
+    dijak:
+      alap:                    # NETTÓ Ft; a számla tételsoronként kerekít, az ÁFA a nettó összegre jön
+        afa: 27
+        energia_kedvezmenyes: 5.25
+        energia_piaci: 31.80
+        rendszerhasznalati: 23.40      # minden kWh-ra (bruttó: 36,386 / 70,104 Ft/kWh)
+        alapdij_ho: 120.50             # bruttó 153,035
+      eon: {energia_kedvezmenyes: 4.38976}         # bruttó 35,293
+      opus_titasz: {energia_kedvezmenyes: 4.38976} # bruttó 35,293
+      elmu: {energia_kedvezmenyes: 5.11024}        # bruttó 36,208
+      elmu_emasz: {energia_kedvezmenyes: 4.94016}  # bruttó 35,992

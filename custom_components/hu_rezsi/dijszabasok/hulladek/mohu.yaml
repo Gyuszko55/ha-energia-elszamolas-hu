@@ -1,0 +1,16 @@
+azonosito: hulladek/mohu
+nev: "Hulladékszállítás – MOHU (fix díj)"
+kozmu: hulladek
+egyseg: db
+# Fix díjas közszolgáltatás: nincs mérő; a költség a havi díjrész (a negyedéves díj harmada).
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MOHU Zrt. számlák (Díjnet) 2024-07 – 2026-07: negyedévente 5 772 Ft (jan., ápr., júl., okt.), változatlan.
+    szabalyok:
+      keret: {tipus: nincs}
+      alapdij:
+        mod: honaponkent
+    dijak:
+      alap:                    # bruttó Ft
+        alapdij_ho: 1924       # 5 772 Ft / negyedév
