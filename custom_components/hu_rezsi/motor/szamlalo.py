@@ -45,13 +45,16 @@ class Szamlalo:
         sorozat: list[tuple[datetime, Decimal]] | None = None,
         szorzo: Decimal = Decimal(1),
         meroallas: bool = False,
+        sorozat_tol: datetime | None = None,
     ) -> Szamlalo:
         """Számláló a mérők leolvasásaiból, opcionálisan egy automatikus (HA) sorozattal kiegészítve.
 
         meroallas=True: a sorozat értéke (× szorzó) maga az éppen beépített mérő állása.
         meroallas=False: a sorozat csak egy növekvő számláló; minden pontját a megelőző horgonyhoz
         igazítjuk, és csak a változását (× szorzó) adjuk hozzá.
-        A leolvasás mindkét esetben felülbírálja a sorozatot.
+        A leolvasás mindkét esetben felülbírálja a sorozatot. A sorozat_tol előtti pontokat (pl. egy szenzor
+        képletének javítása előtti, hibás adatot) figyelmen kívül hagyjuk, és a leolvasásoknak ellentmondó
+        pontokat (a számláló nem mehet visszafelé) is eldobjuk.
         """
         horgonyok: dict[datetime, tuple[int, Pont]] = {}
 
@@ -76,7 +79,7 @@ class Szamlalo:
         if not sorozat:
             return alap
 
-        sor = sorted(sorozat)
+        sor = sorted((t, v) for t, v in sorozat if sorozat_tol is None or t >= sorozat_tol)
         if meroallas:
             pontok = list(alap.pontok)
             for t, v in sor:
@@ -84,7 +87,9 @@ class Szamlalo:
                     continue
                 for mero, elt in reversed(merok):
                     if nap_kezdete(mero.beepitve) <= t and (mero.kiszerelve is None or t < nap_kezdete(mero.kiszerelve)):
-                        pontok.append(Pont(t, elt + v * szorzo - mero.kezdo_allas, False))
+                        ertek = elt + v * szorzo - mero.kezdo_allas
+                        if alap._hiheto(t, ertek):
+                            pontok.append(Pont(t, ertek, False))
                         break
             return cls(pontok)
 
@@ -105,8 +110,19 @@ class Szamlalo:
             sh = sor_ertek(h.ido)
             if sh is None:
                 continue
-            pontok.append(Pont(t, h.ertek + (v - sh) * szorzo, False))
+            ertek = h.ertek + (v - sh) * szorzo
+            if alap._hiheto(t, ertek):
+                pontok.append(Pont(t, ertek, False))
         return cls(pontok)
+
+    def _hiheto(self, t: datetime, ertek: Decimal) -> bool:
+        """A sorozatpont nem lehet kisebb az előtte lévő, és nem lehet nagyobb az utána lévő horgonynál."""
+        i = bisect_right(self._idok, t)
+        if i > 0 and ertek < self.pontok[i - 1].ertek:
+            return False
+        if i < len(self.pontok) and ertek > self.pontok[i].ertek:
+            return False
+        return True
 
     @property
     def utolso(self) -> Pont | None:

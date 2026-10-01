@@ -65,12 +65,14 @@ tests/
 
 ## 2. lépcső – Gáz MJ, víz, időszakok
 
-- [ ] **G1** `atvaltas: gaz_mj`: havi fűtőérték kézzel vagy entitásból, korrekciós tényező, „becsült” jelzés
-- [ ] **G2** Gázkeret MJ-ban, éves bázisdátumtól
-- [ ] **V1** Víz modul: vízdíj, csatornadíj (csatornánként kikapcsolható), alapdíj; `viz/egyedi` sablon
-- [ ] **V2** Locsolási almérő: a fővízmérőből levonva, csatornadíj nélkül
-- [ ] **P1** `egyedi_nap` és `leolvasas_alapu` időszakmód
-- [ ] **R1** Részszámlás (átalány) fiók: részszámlák rögzítése (kézzel, éves tervből, vagy entitásból – pl. Díjnet), befizetve / tényleges / várható éves költség, **várható éves egyenleg** (ráfizetés vagy visszatérítés), figyelmeztetés küszöb felett. A szezonális gáz-előrejelzés (E1) ehhez szükséges, ezért a kettő együtt készül.
+- [x] **G1** `atvaltas: gaz_mj`: havi fűtőérték kézzel vagy entitásból, korrekciós tényező, „becsült” jelzés
+- [x] **G2** Gázkeret MJ-ban, éves bázisdátumtól
+- [x] **V1** Víz modul: vízdíj, csatornadíj (csatornánként kikapcsolható), alapdíj; `viz/egyedi` sablon
+- [~] **V2** Locsolási almérő: csatornadíj fiókonként kikapcsolható; a fővízmérőből való levonás még hátra
+- [~] **P1** `egyedi_nap` kész; `leolvasas_alapu` még hátra
+- [x] **R1** Részszámlás (átalány) fiók: részszámlák rögzítése (kézzel, éves tervből, vagy entitásból – pl. Díjnet), befizetve / tényleges / várható éves költség, **várható éves egyenleg** (ráfizetés vagy visszatérítés), figyelmeztetés küszöb felett. A szezonális gáz-előrejelzés (E1) ehhez szükséges, ezért a kettő együtt készül.
+
+**Állapot (2026-10-01):** élesben; mindkét valódi számla forintra pontos (nettó tételsoros számlázás ÁFÁ-val). Részszámla-egyenleg a Díjnet-fájlból; két év visszamérése: −2,3% és +5,6% (a havi fűtőértékek és a régi árak hiánya miatt). Új: a szenzor érvényességi dátuma és ellentmondásszűrés (hibás régi szenzoradat ellen).
 
 ## 3. lépcső – Napelem
 

@@ -75,3 +75,29 @@ v1_import:
       default: true
       selector:
         boolean:
+futoertek_rogzites:
+  fields:
+    device_id: *fiok
+    honap:
+      required: true
+      example: "2026-08"
+      selector:
+        text:
+    ertek:
+      selector:
+        number: {min: 20, max: 45, step: 0.001, mode: box}
+reszszamla_rogzites:
+  fields:
+    device_id: *fiok
+    datum: *datum
+    osszeg:
+      required: true
+      selector:
+        number: {min: 0, max: 10000000, step: 1, mode: box}
+    megjegyzes:
+      selector:
+        text:
+reszszamla_torles:
+  fields:
+    device_id: *fiok
+    datum: *datum

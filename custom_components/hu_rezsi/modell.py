@@ -8,6 +8,7 @@ from typing import Any
 
 from .const import (
     CONF_BEEPITVE,
+    CONF_CSATORNADIJ,
     CONF_DIJSZABAS,
     CONF_DIJSZABAS_TOL,
     CONF_GYARI_SZAM,
@@ -91,13 +92,21 @@ def fiok_motorba(beallitas: dict[str, Any], tarolt: dict[str, Any]) -> Fiok:
             Csatorna(
                 merok=[mero_motorba(m) for m in tarolt["merok"]],
                 keret_aktiv=bool(beallitas.get(CONF_KERET_AKTIV, True)),
+                csatornadij_aktiv=bool(beallitas.get(CONF_CSATORNADIJ, True)),
             )
         ],
         feluliras=[
             Feluliras(f["kulcs"], Decimal(str(f["ertek"])), d(f["ervenyes_tol"])) for f in tarolt.get("feluliras", [])
         ],
         eves_bazis=eves_bazis(tarolt),
+        futoertekek={k: Decimal(str(v)) for k, v in (tarolt.get("futoertekek") or {}).items()},
     )
+
+
+def elozo_bazis(tarolt: dict[str, Any]) -> date | None:
+    """Az utolsó előtti elszámoló leolvasás napja (az előző elszámolási év kezdete)."""
+    napok = sorted({d(lo["datum"]) for m in tarolt["merok"] for lo in m.get("leolvasasok", []) if lo.get("elszamolasi")})
+    return napok[-2] if len(napok) >= 2 else None
 
 
 def eredmeny_tarolhato(e) -> dict[str, Any]:
@@ -121,6 +130,9 @@ def szelet_dict(s) -> dict[str, Any]:
         "dijszabas": s.dijszabas_verzio,
         "idenyszak": s.idenyszak,
         "mennyiseg": round(float(s.mennyiseg), 3),
+        "elszamolt": None if s.elszamolt is None else round(float(s.elszamolt), 3),
+        "egyseg": s.egyseg,
+        "csatorna_ft": float(s.csatorna_ft),
         "kedvezmenyes": round(float(s.kedvezmenyes), 3),
         "piaci": round(float(s.piaci), 3),
         "keret": None if s.keret is None else round(float(s.keret), 3),

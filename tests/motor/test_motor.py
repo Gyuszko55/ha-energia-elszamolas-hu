@@ -148,6 +148,16 @@ def test_sorozat_meroallas_modban():
     assert s.ertek(dt(2025, 7, 1))[0] == D(200) + D(50)
 
 
+def test_sorozat_ellentmondas_es_ervenyesseg():
+    m = Mero("M", date(2026, 7, 14), D(8668))
+    # régi, hibás képletű adatok: a leolvasásnál kisebb értékek július–augusztusban, aztán ugrás
+    sorozat = [(dt(2026, 7, 20), D(8643)), (dt(2026, 8, 15), D(8676.7)), (dt(2026, 9, 30), D(8678.2)), (dt(2026, 10, 1), D(8687.7))]
+    s = Szamlalo.csatornabol(Csatorna(merok=[m]), sorozat, meroallas=True)
+    assert dt(2026, 7, 20) not in [p.ido for p in s.pontok]  # visszafelé futna: eldobva
+    s2 = Szamlalo.csatornabol(Csatorna(merok=[m]), sorozat, meroallas=True, sorozat_tol=dt(2026, 9, 30))
+    assert [p.ido for p in s2.pontok if not p.horgony] == [dt(2026, 9, 30), dt(2026, 10, 1)]
+
+
 # --- Elszámolás ----------------------------------------------------------------------------------
 
 

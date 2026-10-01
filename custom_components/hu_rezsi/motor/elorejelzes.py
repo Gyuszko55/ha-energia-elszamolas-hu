@@ -85,8 +85,11 @@ def nyitott(
     if keretes:
         mai = [s for s in keretes if nap_kezdete(s.tol) <= most < nap_kezdete(s.ig)] or keretes[-1:]
         s = mai[0]
-        hatralevo = max(s.keret - s.mennyiseg, Decimal(0))
+        felhasznalt = s.elszamolt if s.elszamolt is not None else s.mennyiseg  # gáznál MJ
+        hatralevo = max(s.keret - felhasznalt, Decimal(0))
         n = atlagok[0]
+        if s.elszamolt is not None and s.mennyiseg > 0:
+            n = n * s.elszamolt / s.mennyiseg  # napi átlag elszámolási egységben
         if s.piaci == 0 and n > 0:
             nap = (most + timedelta(days=float(hatralevo / n))).date()
             if nap < s.ig:

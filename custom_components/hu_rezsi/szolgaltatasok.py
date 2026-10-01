@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -126,6 +127,42 @@ async def feluliras(hass: HomeAssistant, call: ServiceCall) -> None:
     await _ment(koord)
 
 
+async def futoertek_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
+    koord, sid = _celpont(hass, call.data["device_id"])
+    honap = call.data["honap"]
+    if not re.fullmatch(r"\d{4}-\d{2}", honap):
+        raise ServiceValidationError("A hónap formátuma ÉÉÉÉ-HH, pl. 2026-08.")
+    tarolt = koord.tarolo.fiok(sid)
+    tarolt.setdefault("futoertekek", {})
+    if call.data.get("ertek") is None:
+        tarolt["futoertekek"].pop(honap, None)
+    else:
+        tarolt["futoertekek"][honap] = str(call.data["ertek"])
+    await _ment(koord)
+
+
+async def reszszamla_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
+    koord, sid = _celpont(hass, call.data["device_id"])
+    tarolt = koord.tarolo.fiok(sid)
+    nap = call.data["datum"].isoformat()
+    tarolt["reszszamlak"] = [r for r in tarolt.get("reszszamlak", []) if r["datum"] != nap] + [
+        {"datum": nap, "osszeg": str(call.data["osszeg"]), "megjegyzes": call.data.get("megjegyzes", "")}
+    ]
+    tarolt["reszszamlak"].sort(key=lambda r: r["datum"])
+    await _ment(koord)
+
+
+async def reszszamla_torles(hass: HomeAssistant, call: ServiceCall) -> None:
+    koord, sid = _celpont(hass, call.data["device_id"])
+    tarolt = koord.tarolo.fiok(sid)
+    nap = call.data["datum"].isoformat()
+    elotte = len(tarolt.get("reszszamlak", []))
+    tarolt["reszszamlak"] = [r for r in tarolt.get("reszszamlak", []) if r["datum"] != nap]
+    if len(tarolt["reszszamlak"]) == elotte:
+        raise ServiceValidationError(f"{nap} napon nincs kézzel rögzített részszámla (a Díjnet-számlák nem törölhetők innen).")
+    await _ment(koord)
+
+
 async def naplo(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
     koord, sid = _celpont(hass, call.data["device_id"])
     tarolt = koord.tarolo.fiok(sid)
@@ -133,6 +170,8 @@ async def naplo(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
         "lezart_idoszakok": sorted(tarolt["lezart"], key=lambda x: x["tol"]),
         "merok": tarolt["merok"],
         "feluliras": tarolt["feluliras"],
+        "futoertekek": tarolt.get("futoertekek", {}),
+        "reszszamlak": tarolt.get("reszszamlak", []),
     }
 
 
@@ -237,6 +276,26 @@ def regisztral(hass: HomeAssistant) -> None:
             }
         ),
     )
+    reg(
+        DOMAIN,
+        "futoertek_rogzites",
+        kezelo(futoertek_rogzites),
+        vol.Schema({DEV: cv.string, vol.Required("honap"): cv.string, vol.Optional("ertek"): vol.Any(None, vol.Coerce(float))}),
+    )
+    reg(
+        DOMAIN,
+        "reszszamla_rogzites",
+        kezelo(reszszamla_rogzites),
+        vol.Schema(
+            {
+                DEV: cv.string,
+                vol.Required("datum"): cv.date,
+                vol.Required("osszeg"): vol.Coerce(float),
+                vol.Optional("megjegyzes", default=""): cv.string,
+            }
+        ),
+    )
+    reg(DOMAIN, "reszszamla_torles", kezelo(reszszamla_torles), vol.Schema({DEV: cv.string, vol.Required("datum"): cv.date}))
     reg(DOMAIN, "naplo", kezelo(naplo), vol.Schema({DEV: cv.string}), supports_response=SupportsResponse.ONLY)
     reg(DOMAIN, "csv_export", kezelo(csv_export), vol.Schema({DEV: cv.string}), supports_response=SupportsResponse.OPTIONAL)
     reg(

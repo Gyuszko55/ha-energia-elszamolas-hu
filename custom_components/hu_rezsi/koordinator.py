@@ -16,8 +16,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_DIJNET,
+    CONF_FIZETESI_MOD,
+    CONF_RESZSZAMLA_DB,
+    DIJNET_MINTA,
     CONF_FORRAS,
     CONF_FORRAS_TIPUS,
+    CONF_FORRAS_TOL,
     CONF_IDOSZAK_MOD,
     CONF_IDOSZAK_NAP,
     CONF_KOZMU,
@@ -28,7 +33,12 @@ from .const import (
     FRISSITES_PERC,
     LEZARAS_KESLELTETES_ORA,
 )
-from .modell import d, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
+from pathlib import Path
+
+from . import dijnet
+from .modell import d, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
+from .motor.egyenleg import EvesEgyenleg, eves_egyenleg
+from .motor.elszamolas import _hozzarendeles, futoertek
 from .motor.dijszabas import DijszabasHiba, DijszabasTar
 from .motor.elorejelzes import NyitottIdoszak, idoszak, nyitott
 from .motor.elszamolas import szamol
@@ -54,6 +64,8 @@ class FiokAllapot:
     eves_fogyasztas: Decimal | None = None
     aktualis_ar: Decimal | None = None
     utolso_lezart: dict[str, Any] | None = None
+    egyenleg: EvesEgyenleg | None = None
+    egyenleg_hiba: str | None = None
     hiba: str | None = None
 
 
@@ -93,7 +105,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         sorozat = await self._sorozat(forras, datetime.combine(kezdet, datetime.min.time()) - timedelta(days=1), most)
         szorzo = Decimal(str(beall.get(CONF_SZORZO) or 1))
         meroallas = beall.get(CONF_FORRAS_TIPUS, "meroallas") == "meroallas"
-        return Szamlalo.csatornabol(csatorna, sorozat, szorzo, meroallas=meroallas)
+        tol_nap = d(beall.get(CONF_FORRAS_TOL))
+        return Szamlalo.csatornabol(
+            csatorna, sorozat, szorzo, meroallas=meroallas,
+            sorozat_tol=datetime.combine(tol_nap, datetime.min.time()) if tol_nap else None,
+        )
 
     async def _sorozat(self, entity_id: str, tol: datetime, most: datetime) -> list[tuple[datetime, Decimal]]:
         tz = dt_util.get_default_time_zone()
@@ -181,6 +197,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             except NincsAdat:
                 eves = None
         lezartak = sorted(tarolt["lezart"], key=lambda x: x["tol"])
+        egyenleg, egyenleg_hiba = None, None
+        if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
+            try:
+                egyenleg = await self._egyenleg(sub, tarolt, fiok, szamlalo, most)
+            except (NincsAdat, ValueError, DijszabasHiba) as err:
+                egyenleg_hiba = str(err)
         return (
             FiokAllapot(
                 egyseg=egyseg,
@@ -189,18 +211,39 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 nyitott=ny,
                 eves_bazis=fiok.eves_bazis,
                 eves_fogyasztas=eves,
-                aktualis_ar=_aktualis_ar(ny, most),
+                aktualis_ar=self._aktualis_ar(fiok, ny, most),
                 utolso_lezart=lezartak[-1] if lezartak else None,
+                egyenleg=egyenleg,
+                egyenleg_hiba=egyenleg_hiba,
             ),
             lezart_valt,
         )
 
 
-def _aktualis_ar(ny: NyitottIdoszak, most: datetime) -> Decimal | None:
-    """A következő elfogyasztott egység ára (a HA Energia irányítópult ár-entitásához)."""
-    for s in ny.eddig.szeletek:
-        if datetime.combine(s.tol, datetime.min.time()) <= most < datetime.combine(s.ig, datetime.min.time()):
-            if s.keret is None or s.mennyiseg < s.keret:
-                return s.egysegar_kedvezmenyes
-            return s.egysegar_piaci
-    return None
+    async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime) -> EvesEgyenleg:
+        """Részszámlás fiók: kézzel rögzített + Díjnet-számlák, éves egyenleg."""
+        reszek = {r["datum"]: Decimal(str(r["osszeg"])) for r in tarolt.get("reszszamlak", [])}
+        if sub.data.get(CONF_DIJNET):
+            for kelt, osszeg, _ in await self.hass.async_add_executor_job(
+                dijnet.szamlak, Path(self.hass.config.config_dir), DIJNET_MINTA, sub.data[CONF_DIJNET]
+            ):
+                reszek.setdefault(kelt.isoformat(), Decimal(0))
+                reszek[kelt.isoformat()] += osszeg  # azonos napon több számla összeadódik
+        lista = [(d(k), v) for k, v in reszek.items()]
+        return eves_egyenleg(
+            fiok, self.tar, szamlalo, most, lista,
+            reszszamla_db_ev=int(sub.data.get(CONF_RESZSZAMLA_DB) or 11),
+            elozo_bazis=elozo_bazis(tarolt),
+        )
+
+    def _aktualis_ar(self, fiok: Fiok, ny: NyitottIdoszak, most: datetime) -> Decimal | None:
+        """A következő elfogyasztott egység ára a mért egységben (gáznál Ft/m³), a HA Energia irányítópulthoz."""
+        for s in ny.eddig.szeletek:
+            if datetime.combine(s.tol, datetime.min.time()) <= most < datetime.combine(s.ig, datetime.min.time()):
+                ar = s.egysegar_kedvezmenyes if s.keret is None or (s.elszamolt or s.mennyiseg) < s.keret else s.egysegar_piaci
+                atv = self.tar.felold(_hozzarendeles(fiok, s.tol), s.tol, fiok.szolgaltato, fiok.feluliras).szabalyok.get("atvaltas")
+                if atv:
+                    fe, _ = futoertek(s.tol, atv, fiok)
+                    ar = ar * fe * Decimal(atv.get("korrekcios_tenyezo_alap", 1))
+                return ar
+        return None

@@ -10,9 +10,9 @@ Két valódi MVM Next számlán ellenőrizve (`tests/motor/test_szamlak.py`):
 | Számla | Számla végösszege | Rezsikövető |
 |---|---|---|
 | Villany A1, 2026.05.14–06.08 (293 kWh) | 14 624 Ft | **14 624 Ft** |
-| Gáz, 2026.07.15–08.13 (103 m³) | 11 185 Ft | 11 187 Ft (a gáz MJ-alapú számítása a 2. lépcsőben jön) |
+| Gáz, 2026.07.15–08.13 (103 m³ = 3 564 MJ) | 11 185 Ft | **11 185 Ft** |
 
-A számlákból átvett szabályok: a kedvezményes keret egész kWh-ra kerekítve jár (26 nap → 180 kWh), az alapdíj számlánként egy teljes hónap.
+A számlákból átvett szabályok: a díjak nettók, a számla tételsoronként forintra kerekít, és az ÁFA a nettóra jön; a kedvezményes keret egész kWh-ra kerekítve jár (26 nap → 180 kWh); az alapdíj számlánként egy teljes hónap; a gáz MJ-ban számol (m³ × korrekció × havi fűtőérték, egész MJ, hónaponként).
 
 **Fontos:** a szolgáltató részszámlái gyakran becsült mennyiségről szólnak (a fenti gázszámla 103 m³-t számlázott, a gázóra valójában ~20 m³-t mért). A Rezsikövető a mért fogyasztásból számol, ezért egy-egy részszámlától eltérhet; az éves elszámolással kell egyeznie.
 
@@ -31,9 +31,20 @@ A számlákból átvett szabályok: a kedvezményes keret egész kWh-ra kerekít
 | Elszámolási időszak | Naptári hónap, vagy egyedi kezdőnap (pl. minden hónap 12-e) |
 | Automatikus mérőállás-szenzor | Opcionális. Statisztikával rendelkező szenzor (`state_class: total_increasing`) |
 | A szenzor értéke | **Mérőóra-állás:** a szenzor értéke maga az óraállás (pl. a v1 `sensor.meroora_allas`). **Számláló:** csak a változását vesszük át, a kézi leolvasásokhoz igazítva (pl. Shelly összes energia). |
+| A szenzor érvényes ettől | A szenzor ez előtti adatait figyelmen kívül hagyja (pl. hibás régi képlet). A leolvasásoknak ellentmondó (visszafelé futó) értékeket a motor magától is eldobja. |
 | Szenzor-szorzó | Ha a szenzor rendszeresen eltér az órától |
 | Kedvezményes keret | Kikapcsolva minden mennyiség a keret feletti áron számol |
 | Mérő beépítése, kezdőállás | Innen indul a számítás |
+
+## Részszámlás (átalány) fiók
+
+Ha a fiók fizetési módja „Részszámlás”, három entitás jön létre: **Befizetve (részszámlák)**, **Várható éves költség** és **Várható éves egyenleg** (pozitív: visszatérítés, negatív: ráfizetés). Az elszámolási év az utolsó elszámoló leolvasástól tart egy évig.
+
+- A befizetések a Díjnet-integráció kifizetett számláiból (a fiókban kiválasztott szolgáltató) és kézzel rögzített részszámlákból jönnek (`hu_rezsi.reszszamla_rogzites`). Az év kezdete utáni 20 napon belül kelt számla az előző év elszámolója.
+- A hátralévő részszámlák: (évi darabszám − eddigi) × az utolsó összeg.
+- Az előrejelzés a tavalyi éves fogyasztás és egy havi profil (gáznál fűtési profil) alapján készül; az attribútumokban a tavalyi év **visszamérése** is látszik (befizetve vs. számított).
+
+Gáznál a havi fűtőérték a számláról rögzíthető: `hu_rezsi.futoertek_rogzites` (hónap `ÉÉÉÉ-HH`, MJ/m³).
 
 ## Entitások (fiókonként)
 

@@ -30,12 +30,21 @@ from homeassistant.helpers.selector import (
     TextSelector,
 )
 
+from pathlib import Path
+
+from . import dijnet
 from .const import (
     CONF_BEEPITVE,
+    CONF_CSATORNADIJ,
+    CONF_DIJNET,
+    CONF_FIZETESI_MOD,
+    CONF_RESZSZAMLA_DB,
+    DIJNET_MINTA,
     CONF_DIJSZABAS,
     CONF_DIJSZABAS_TOL,
     CONF_FORRAS,
     CONF_FORRAS_TIPUS,
+    CONF_FORRAS_TOL,
     CONF_GYARI_SZAM,
     CONF_IDOSZAK_MOD,
     CONF_IDOSZAK_NAP,
@@ -49,7 +58,7 @@ from .const import (
 )
 from .tar import dijszabas_tar
 
-KOZMUVEK = ["villany", "gaz"]  # a víz a 2. lépcsőben jön
+KOZMUVEK = ["villany", "gaz", "viz"]
 
 
 class RezsiConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -147,11 +156,25 @@ class FiokFlow(ConfigSubentryFlow):
             vol.Required(CONF_FORRAS_TIPUS, default=alap(CONF_FORRAS_TIPUS, "meroallas")): SelectSelector(
                 SelectSelectorConfig(options=["meroallas", "szamlalo"], translation_key="forras_tipus")
             ),
+            vol.Optional(CONF_FORRAS_TOL, **({"description": {"suggested_value": eddigi[CONF_FORRAS_TOL]}} if eddigi.get(CONF_FORRAS_TOL) else {})): DateSelector(),
             vol.Required(CONF_SZORZO, default=alap(CONF_SZORZO, 1)): NumberSelector(
                 NumberSelectorConfig(min=0.5, max=2, step="any", mode=NumberSelectorMode.BOX)
             ),
-            vol.Required(CONF_KERET_AKTIV, default=alap(CONF_KERET_AKTIV, True)): BooleanSelector(),
+            vol.Required(CONF_KERET_AKTIV, default=alap(CONF_KERET_AKTIV, kozmu != "viz")): BooleanSelector(),
+            vol.Required(CONF_FIZETESI_MOD, default=alap(CONF_FIZETESI_MOD, "fogyasztas_szerint")): SelectSelector(
+                SelectSelectorConfig(options=["fogyasztas_szerint", "reszszamla"], translation_key="fizetesi_mod")
+            ),
+            vol.Required(CONF_RESZSZAMLA_DB, default=alap(CONF_RESZSZAMLA_DB, 11)): NumberSelector(
+                NumberSelectorConfig(min=1, max=12, step=1, mode=NumberSelectorMode.BOX)
+            ),
         }
+        dn = await self.hass.async_add_executor_job(dijnet.szolgaltatok, Path(self.hass.config.config_dir), DIJNET_MINTA)
+        if dn:
+            mezok[vol.Optional(CONF_DIJNET, **({"description": {"suggested_value": eddigi[CONF_DIJNET]}} if eddigi.get(CONF_DIJNET) else {}))] = SelectSelector(
+                SelectSelectorConfig(options=dn, custom_value=True)
+            )
+        if kozmu == "viz":
+            mezok[vol.Required(CONF_CSATORNADIJ, default=alap(CONF_CSATORNADIJ, True))] = BooleanSelector()
         if uj:
             mezok |= {
                 vol.Optional(CONF_GYARI_SZAM, default=""): TextSelector(),

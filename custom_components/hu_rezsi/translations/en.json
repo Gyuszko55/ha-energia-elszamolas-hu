@@ -36,14 +36,24 @@
             "gyari_szam": "Meter serial",
             "beepitve": "Meter installed / start date",
             "kezdo_allas": "Meter reading on that date",
-            "forras_tipus": "Sensor value meaning"
+            "forras_tipus": "Sensor value meaning",
+            "fizetesi_mod": "Payment mode",
+            "reszszamla_db_ev": "Partial bills per year",
+            "dijnet_szolgaltato": "Díjnet provider (for partial bills)",
+            "csatornadij_aktiv": "Sewage fee",
+            "forras_tol": "Sensor valid from"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
             "forras_szorzo": "If the sensor consistently deviates from the meter (e.g. 1.0412).",
             "idoszak_nap": "Only used in custom-day mode.",
             "kezdo_allas": "Calculation starts here; record later readings with the service.",
-            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings."
+            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings.",
+            "fizetesi_mod": "Partial billing (flat): fixed monthly partial bills, yearly settlement with extra payment or refund. The expected yearly balance is calculated too.",
+            "reszszamla_db_ev": "Excluding the settlement bill (MVM gas: 11).",
+            "dijnet_szolgaltato": "Payments are read from the Díjnet integration's paid invoices.",
+            "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
+            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored."
           }
         },
         "reconfigure": {
@@ -61,14 +71,24 @@
             "gyari_szam": "Meter serial",
             "beepitve": "Meter installed / start date",
             "kezdo_allas": "Meter reading on that date",
-            "forras_tipus": "Sensor value meaning"
+            "forras_tipus": "Sensor value meaning",
+            "fizetesi_mod": "Payment mode",
+            "reszszamla_db_ev": "Partial bills per year",
+            "dijnet_szolgaltato": "Díjnet provider (for partial bills)",
+            "csatornadij_aktiv": "Sewage fee",
+            "forras_tol": "Sensor valid from"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
             "forras_szorzo": "If the sensor consistently deviates from the meter (e.g. 1.0412).",
             "idoszak_nap": "Only used in custom-day mode.",
             "kezdo_allas": "Calculation starts here; record later readings with the service.",
-            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings."
+            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings.",
+            "fizetesi_mod": "Partial billing (flat): fixed monthly partial bills, yearly settlement with extra payment or refund. The expected yearly balance is calculated too.",
+            "reszszamla_db_ev": "Excluding the settlement bill (MVM gas: 11).",
+            "dijnet_szolgaltato": "Payments are read from the Díjnet integration's paid invoices.",
+            "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
+            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored."
           }
         }
       },
@@ -109,6 +129,15 @@
       },
       "osszesen_varhato": {
         "name": "Utilities projected total"
+      },
+      "befizetve": {
+        "name": "Paid (partial bills)"
+      },
+      "varhato_eves_koltseg": {
+        "name": "Expected yearly cost"
+      },
+      "varhato_egyenleg": {
+        "name": "Expected yearly balance"
       }
     }
   },
@@ -116,7 +145,8 @@
     "kozmu": {
       "options": {
         "villany": "Electricity",
-        "gaz": "Gas"
+        "gaz": "Gas",
+        "viz": "Water"
       }
     },
     "idoszak_mod": {
@@ -135,6 +165,12 @@
       "options": {
         "meroallas": "Meter reading (e.g. sensor.meroora_allas)",
         "szamlalo": "Increasing counter only (e.g. Shelly total energy)"
+      }
+    },
+    "fizetesi_mod": {
+      "options": {
+        "fogyasztas_szerint": "By consumption",
+        "reszszamla": "Partial billing (flat)"
       }
     }
   },
@@ -270,6 +306,60 @@
         "probafuttatas": {
           "name": "Dry run only",
           "description": "Turn off to save."
+        }
+      }
+    },
+    "futoertek_rogzites": {
+      "name": "Record calorific value",
+      "description": "Monthly calorific value from the gas bill (MJ/m³). Without value it is removed.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "honap": {
+          "name": "Month",
+          "description": "YYYY-MM"
+        },
+        "ertek": {
+          "name": "Calorific value",
+          "description": "MJ/m³"
+        }
+      }
+    },
+    "reszszamla_rogzites": {
+      "name": "Record partial bill",
+      "description": "Manually recorded paid partial bill (without Díjnet).",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "datum": {
+          "name": "Date",
+          "description": ""
+        },
+        "osszeg": {
+          "name": "Amount",
+          "description": "Gross HUF"
+        },
+        "megjegyzes": {
+          "name": "Note",
+          "description": ""
+        }
+      }
+    },
+    "reszszamla_torles": {
+      "name": "Delete partial bill",
+      "description": "Delete a manually recorded partial bill of a day.",
+      "fields": {
+        "device_id": {
+          "name": "Account",
+          "description": "The utility tracker account device."
+        },
+        "datum": {
+          "name": "Date",
+          "description": ""
         }
       }
     }

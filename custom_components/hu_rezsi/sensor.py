@@ -14,11 +14,47 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, PENZNEM
+from .const import CONF_FIZETESI_MOD, DOMAIN, PENZNEM
 from .koordinator import FiokAllapot, RezsiKoordinator
 from .modell import szelet_dict
 
 MAX_NAPLO = 24
+EGYENLEG_KULCSOK = {"befizetve", "varhato_eves_koltseg", "varhato_egyenleg"}
+EGYSEG_MEGJELENES = {"m3": "m³"}
+
+
+def _keret_egyseg(a: FiokAllapot) -> str | None:
+    sz = a.nyitott.eddig.szeletek if a.nyitott else []
+    return EGYSEG_MEGJELENES.get(sz[0].egyseg, sz[0].egyseg) if sz and sz[0].egyseg else a.egyseg
+
+
+def _egyenleg_attr(a: FiokAllapot) -> dict[str, Any]:
+    e = a.egyenleg
+    return {
+        "ev_kezdete": e.ev_tol.isoformat(),
+        "ev_vege": e.ev_ig.isoformat(),
+        "befizetve": int(e.befizetve),
+        "befizetett_reszszamlak": e.befizetett_db,
+        "hatralevo_reszszamlak": e.hatralevo_db,
+        "hatralevo_reszszamla_ft": int(e.hatralevo_reszszamla),
+        "teny_eddig": int(e.teny_eddig),
+        "varhato_eves": int(e.varhato_eves),
+        "varhato_fogyasztas": _f(e.varhato_fogyasztas, 1),
+        "elozo_ev_fogyasztas": _f(e.elozo_ev_fogyasztas, 1),
+        "modszer": e.modszer,
+        "elozo_ev_visszameres": None
+        if not e.elozo_ev
+        else {
+            "idoszak": f"{e.elozo_ev['tol'].isoformat()} – {e.elozo_ev['ig'].isoformat()}",
+            "fizetve": int(e.elozo_ev["fizetve"]),
+            "szamitott": int(e.elozo_ev["szamitott"]),
+            "elteres_szazalek": round(float((e.elozo_ev["szamitott"] - e.elozo_ev["fizetve"]) / e.elozo_ev["fizetve"] * 100), 1)
+            if e.elozo_ev["fizetve"]
+            else None,
+        },
+        "jelentes": "pozitív: várható visszatérítés, negatív: várható ráfizetés",
+        "tajekoztato": "Tájékoztató jellegű becslés, a hivatalos elszámolást nem helyettesíti.",
+    }
 
 
 def _f(x: Decimal | None, jegy: int = 2) -> float | None:
@@ -91,7 +127,7 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         translation_key="hatralevo_keret",
         suggested_display_precision=1,
         ertek=lambda a: _f(a.nyitott.hatralevo_keret, 3),
-        egyseg=lambda a: a.egyseg,
+        egyseg=_keret_egyseg,
         attr=lambda a: {
             "varhato_keretatlepes": a.nyitott.varhato_keretatlepes.isoformat()
             if a.nyitott.varhato_keretatlepes
@@ -117,6 +153,36 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         elerheto=lambda a: a.eves_fogyasztas is not None,
     ),
     FiokLeiras(
+        key="befizetve",
+        translation_key="befizetve",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: int(a.egyenleg.befizetve),
+        attr=_egyenleg_attr,
+        elerheto=lambda a: a.egyenleg is not None,
+    ),
+    FiokLeiras(
+        key="varhato_eves_koltseg",
+        translation_key="varhato_eves_koltseg",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: int(a.egyenleg.varhato_eves),
+        attr=_egyenleg_attr,
+        elerheto=lambda a: a.egyenleg is not None,
+    ),
+    FiokLeiras(
+        key="varhato_egyenleg",
+        translation_key="varhato_egyenleg",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: int(a.egyenleg.varhato_egyenleg),
+        attr=_egyenleg_attr,
+        elerheto=lambda a: a.egyenleg is not None,
+    ),
+    FiokLeiras(
         key="utolso_lezart",
         translation_key="utolso_lezart",
         device_class=SensorDeviceClass.MONETARY,
@@ -134,7 +200,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities([HaztartasOsszesen(koord, entry, "eddig"), HaztartasOsszesen(koord, entry, "varhato")])
     for sid, sub in koord.fiokok().items():
         async_add_entities(
-            [FiokSzenzor(koord, entry, sid, sub.title, leiras) for leiras in FIOK_LEIRASOK],
+            [
+                FiokSzenzor(koord, entry, sid, sub.title, leiras)
+                for leiras in FIOK_LEIRASOK
+                if leiras.key not in EGYENLEG_KULCSOK or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla"
+            ],
             config_subentry_id=sid,
         )
 

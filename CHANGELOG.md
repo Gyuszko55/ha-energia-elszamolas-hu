@@ -1,5 +1,13 @@
 # Változások
 
+## [Fejlesztés] Rezsikövető 0.2.0-dev (2026-10-01)
+
+- Nettó tételsoros számlázás ÁFÁ-val: mindkét valódi számla forintra pontos.
+- Gáz MJ-ban (havi fűtőérték, `futoertek_rogzites`), éves keret MJ-ban.
+- Víz: vízdíj + csatornadíj (kikapcsolható), `viz/egyedi` sablon.
+- Részszámlás (átalány) fiók: befizetve, várható éves költség és egyenleg, Díjnet-forrás, tavalyi visszamérés.
+- A forrás-szenzor érvényességi dátuma, ellentmondásszűrés.
+
 ## [Fejlesztés] Rezsikövető integráció 0.1.0-dev (2026-10-01)
 
 - Új: `custom_components/hu_rezsi` HA-integráció (1. lépcső): fiókok felületről, verziózott díjfájlok, elszámoló motor (HA nélkül tesztelhető), leolvasás/mérőcsere/felülírás/napló/CSV szolgáltatások, automatikus hónapzárás, v1-importáló, diagnosztika.
