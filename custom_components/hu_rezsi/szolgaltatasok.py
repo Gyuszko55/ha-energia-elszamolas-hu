@@ -54,8 +54,14 @@ async def leolvasas_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
     tarolt = koord.tarolo.fiok(sid)
     nap: date = call.data["datum"]
     allas = Decimal(str(call.data["allas"]))
-    mero = _aktiv_mero(tarolt, nap)
     csatorna = call.data.get("csatorna", "vetelezes")
+    if csatorna == "almero":
+        if not tarolt.get("almero_merok"):
+            raise ServiceValidationError("Ennek a fióknak nincs almérője.")
+        mero = _aktiv_mero({"merok": tarolt["almero_merok"]}, nap)
+        csatorna = "vetelezes"  # az almérő saját mérője: a fő regiszterébe kerül
+    else:
+        mero = _aktiv_mero(tarolt, nap)
     kezdo = mero.get("kezdo_betaplalas" if csatorna == "betaplalas" else "kezdo_allas") or 0
     if allas < Decimal(str(kezdo)):
         raise ServiceValidationError("Az állás kisebb, mint a mérő kezdőállása.")
@@ -103,6 +109,10 @@ async def merocsere(hass: HomeAssistant, call: ServiceCall) -> None:
     koord, sid = _celpont(hass, call.data["device_id"])
     tarolt = koord.tarolo.fiok(sid)
     nap: date = call.data["datum"]
+    if call.data.get("csatorna") == "almero":
+        if not tarolt.get("almero_merok"):
+            raise ServiceValidationError("Ennek a fióknak nincs almérője.")
+        tarolt = {"merok": tarolt["almero_merok"]}  # ugyanaz a lista, helyben módosul
     regi = _aktiv_mero(tarolt, nap)
     if regi.get("kiszerelve") is not None or d(regi["beepitve"]) >= nap:
         raise ServiceValidationError("A mérőcsere napja a mostani mérő beépítése utáni nap kell legyen.")
@@ -252,7 +262,7 @@ def regisztral(hass: HomeAssistant) -> None:
                 vol.Optional("tipus", default="kezi"): vol.In(TIPUSOK),
                 vol.Optional("elszamolasi", default=False): cv.boolean,
                 vol.Optional("megjegyzes", default=""): cv.string,
-                vol.Optional("csatorna", default="vetelezes"): vol.In(["vetelezes", "betaplalas"]),
+                vol.Optional("csatorna", default="vetelezes"): vol.In(["vetelezes", "betaplalas", "almero"]),
             }
         ),
     )
@@ -268,6 +278,7 @@ def regisztral(hass: HomeAssistant) -> None:
                 vol.Required("regi_zaro_allas"): vol.Coerce(float),
                 vol.Optional("uj_kezdo_allas", default=0): vol.Coerce(float),
                 vol.Optional("uj_gyari_szam", default=""): cv.string,
+                vol.Optional("csatorna", default="vetelezes"): vol.In(["vetelezes", "almero"]),
             }
         ),
     )

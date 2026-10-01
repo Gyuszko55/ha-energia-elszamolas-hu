@@ -43,7 +43,13 @@
             "csatornadij_aktiv": "Sewage fee",
             "forras_tol": "Sensor valid from",
             "napelem_mod": "Solar (experimental)",
-            "betaplalas_entitas": "Feed-in sensor (2.8.0)"
+            "betaplalas_entitas": "Feed-in sensor (2.8.0)",
+            "almero": "Irrigation sub-meter behind the main meter",
+            "almero_forras": "Sub-meter sensor (optional)",
+            "almero_beepitve": "Sub-meter start date",
+            "almero_kezdo_allas": "Sub-meter reading on that date",
+            "reszszamla_osszeg": "Partial bill amount (optional)",
+            "elozo_ev_mennyiseg": "Previous year's consumption (optional)"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -57,7 +63,10 @@
             "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
             "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored.",
             "napelem_mod": "Gross: monthly billing, feed-in credited at the purchase price. Net (szaldó): yearly netting (10 years from commissioning).",
-            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured."
+            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured.",
+            "almero": "Its volume is deducted from the sewage fee (its water is already on the main meter).",
+            "reszszamla_osszeg": "HUF; if empty, this or last year's last partial bill.",
+            "elozo_ev_mennyiseg": "If there are no two settlement readings."
           }
         },
         "reconfigure": {
@@ -82,7 +91,13 @@
             "csatornadij_aktiv": "Sewage fee",
             "forras_tol": "Sensor valid from",
             "napelem_mod": "Solar (experimental)",
-            "betaplalas_entitas": "Feed-in sensor (2.8.0)"
+            "betaplalas_entitas": "Feed-in sensor (2.8.0)",
+            "almero": "Irrigation sub-meter behind the main meter",
+            "almero_forras": "Sub-meter sensor (optional)",
+            "almero_beepitve": "Sub-meter start date",
+            "almero_kezdo_allas": "Sub-meter reading on that date",
+            "reszszamla_osszeg": "Partial bill amount (optional)",
+            "elozo_ev_mennyiseg": "Previous year's consumption (optional)"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -96,7 +111,10 @@
             "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
             "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored.",
             "napelem_mod": "Gross: monthly billing, feed-in credited at the purchase price. Net (szaldó): yearly netting (10 years from commissioning).",
-            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured."
+            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured.",
+            "almero": "Its volume is deducted from the sewage fee (its water is already on the main meter).",
+            "reszszamla_osszeg": "HUF; if empty, this or last year's last partial bill.",
+            "elozo_ev_mennyiseg": "If there are no two settlement readings."
           }
         }
       },
@@ -200,7 +218,8 @@
     "csatorna": {
       "options": {
         "vetelezes": "Import (1.8.0)",
-        "betaplalas": "Export (2.8.0)"
+        "betaplalas": "Export (2.8.0)",
+        "almero": "Sub-meter (water)"
       }
     }
   },
@@ -276,6 +295,10 @@
         "uj_gyari_szam": {
           "name": "New meter serial",
           "description": ""
+        },
+        "csatorna": {
+          "name": "Meter register",
+          "description": "For a bidirectional meter: import or export."
         }
       }
     },

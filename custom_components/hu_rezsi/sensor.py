@@ -62,6 +62,7 @@ def _egyenleg_attr(a: FiokAllapot) -> dict[str, Any]:
         "varhato_fogyasztas": _f(e.varhato_fogyasztas, 1),
         "elozo_ev_fogyasztas": _f(e.elozo_ev_fogyasztas, 1),
         "modszer": e.modszer,
+        "megbizhatosag": "rendben" if e.megbizhato else "alacsony – nincs előző évi fogyasztás vagy részszámla-összeg",
         "elozo_ev_visszameres": None
         if not e.elozo_ev
         else {

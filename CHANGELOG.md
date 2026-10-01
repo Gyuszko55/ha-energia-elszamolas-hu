@@ -3,7 +3,8 @@
 ## [Fejlesztés] Rezsikövető 0.3.0-dev (2026-10-01)
 
 - Napelem (kísérleti): bruttó és szaldó elszámolás, betáplálás-szenzor (Energia-beállításból ajánlva), 2.8.0-s leolvasás; `villany/hmke` forrásokkal; `docs/terv/05_NAPELEM.md`.
-- Víz: `viz/dakov` (DAKÖV-számlán forintra pontos), végösszeg-kerekítési mód.
+- Víz: `viz/dakov` (két DAKÖV-számlán forintra pontos: 8 013 és 11 202 Ft), végösszeg-kerekítési mód, locsolási **almérő** a főmérő mögött (levonás a csatornadíjból), naptári havi alapdíj; HA-ban almérő kezdőállással, leolvasással és mérőcserével (`csatorna: almero`).
+- Részszámlás fiók: opcionális részszámla-összeg és előző évi fogyasztás; a hátralévő részszámlákhoz nem az elszámoló számla összege számít; megbízhatósági jelzés; az almérő arányos előrejelzése.
 - Javítás: új fiók felvételekor az entitásai azonnal elérhetők (újraszámolás, ha a fiók még hiányzik).
 
 ## [Fejlesztés] Rezsikövető 0.2.0-dev (2026-10-01)

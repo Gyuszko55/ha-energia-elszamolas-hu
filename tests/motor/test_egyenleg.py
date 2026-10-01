@@ -37,3 +37,29 @@ def test_gaz_egyenleg():
     # visszamérés: a tavalyi év számítva vs. befizetve (a 07-27-i elszámolóval együtt)
     assert e.elozo_ev["fizetve"] == D(500)
     assert e.elozo_ev["szamitott"] > 0
+
+
+def test_hatralevo_nem_az_elszamolobol():
+    # új év, még nincs idei részszámla: a tavalyi utolsó RÉSZszámla számít, nem a bázis utáni elszámoló
+    s = Szamlalo([Pont(datetime(2026, 7, 15), D(0), True), Pont(datetime(2026, 10, 1), D(30), True)])
+    f = Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))], [Csatorna()], eves_bazis=date(2026, 7, 15))
+    reszek = [(date(2026, 3, 3), D(8013)), (date(2026, 8, 4), D(11202))]
+    e = eves_egyenleg(f, TAR, s, datetime(2026, 10, 1), reszek, reszszamla_db_ev=5, elozo_ev_mennyiseg=D(132))
+    assert (e.befizetve, e.hatralevo_reszszamla) == (D(0), D(8013) * 5)
+    assert e.modszer.startswith("beállított") and e.megbizhato
+    e2 = eves_egyenleg(f, TAR, s, datetime(2026, 10, 1), reszek, reszszamla_db_ev=5, reszszamla_osszeg=D(9000))
+    assert e2.hatralevo_reszszamla == D(45000) and not e2.megbizhato
+
+
+def test_almero_elorejelzes_aranyosan():
+    # eddig 20 m³ a főmérőn, ebből 10 m³ az almérőn (50%): a várható csatornadíj is fele
+    from motor.tipusok import Csatorna as Cs
+    f = Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))],
+             [Cs(szerep="fo"), Cs(szerep="almero", csatornadij_aktiv=False, levonas_fobol=True)], eves_bazis=date(2026, 7, 15))
+    fo = Szamlalo([Pont(datetime(2026, 7, 15), D(0), True), Pont(datetime(2026, 10, 1), D(20), True)])
+    al = Szamlalo([Pont(datetime(2026, 7, 15), D(117), True), Pont(datetime(2026, 10, 1), D(127), True)])
+    e = eves_egyenleg(f, TAR, fo, datetime(2026, 10, 1), [], reszszamla_db_ev=5, elozo_ev_mennyiseg=D(100), tovabbi=[al])
+    import dataclasses
+    f0 = dataclasses.replace(f, csatornak=f.csatornak[:1])  # ugyanaz almérő nélkül
+    e0 = eves_egyenleg(f0, TAR, fo, datetime(2026, 10, 1), [], reszszamla_db_ev=5, elozo_ev_mennyiseg=D(100))
+    assert e.varhato_eves < e0.varhato_eves  # az almérő levonása csökkenti

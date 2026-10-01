@@ -35,12 +35,18 @@ from pathlib import Path
 from . import dijnet
 from .const import (
     CONF_BEEPITVE,
+    CONF_ALMERO,
+    CONF_ALMERO_BEEPITVE,
+    CONF_ALMERO_FORRAS,
+    CONF_ALMERO_KEZDO,
     CONF_BETAPLALAS,
     CONF_CSATORNADIJ,
     CONF_NAPELEM,
     CONF_DIJNET,
     CONF_FIZETESI_MOD,
+    CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
+    CONF_RESZSZAMLA_OSSZEG,
     DIJNET_MINTA,
     CONF_DIJSZABAS,
     CONF_DIJSZABAS_TOL,
@@ -186,6 +192,10 @@ class FiokFlow(ConfigSubentryFlow):
                 NumberSelectorConfig(min=1, max=12, step=1, mode=NumberSelectorMode.BOX)
             ),
         }
+        for kulcs in (CONF_RESZSZAMLA_OSSZEG, CONF_ELOZO_EV):
+            mezok[vol.Optional(kulcs, **({"description": {"suggested_value": eddigi[kulcs]}} if eddigi.get(kulcs) else {}))] = NumberSelector(
+                NumberSelectorConfig(min=0, max=10000000, step="any", mode=NumberSelectorMode.BOX)
+            )
         dn = await self.hass.async_add_executor_job(dijnet.szolgaltatok, Path(self.hass.config.config_dir), DIJNET_MINTA)
         if dn:
             mezok[vol.Optional(CONF_DIJNET, **({"description": {"suggested_value": eddigi[CONF_DIJNET]}} if eddigi.get(CONF_DIJNET) else {}))] = SelectSelector(
@@ -201,6 +211,15 @@ class FiokFlow(ConfigSubentryFlow):
             )
         if kozmu == "viz":
             mezok[vol.Required(CONF_CSATORNADIJ, default=alap(CONF_CSATORNADIJ, True))] = BooleanSelector()
+            mezok[vol.Required(CONF_ALMERO, default=alap(CONF_ALMERO, False))] = BooleanSelector()
+            mezok[vol.Optional(CONF_ALMERO_FORRAS, **({"description": {"suggested_value": eddigi[CONF_ALMERO_FORRAS]}} if eddigi.get(CONF_ALMERO_FORRAS) else {}))] = EntitySelector(
+                EntitySelectorConfig(domain="sensor")
+            )
+            if uj:
+                mezok[vol.Optional(CONF_ALMERO_BEEPITVE)] = DateSelector()
+                mezok[vol.Optional(CONF_ALMERO_KEZDO, default=0)] = NumberSelector(
+                    NumberSelectorConfig(min=0, max=99999999, step=0.001, mode=NumberSelectorMode.BOX)
+                )
         if uj:
             mezok |= {
                 vol.Optional(CONF_GYARI_SZAM, default=""): TextSelector(),

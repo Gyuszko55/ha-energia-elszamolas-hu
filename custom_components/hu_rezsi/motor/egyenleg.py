@@ -64,14 +64,14 @@ def havi_alapdij_brutto(fiok: Fiok, tar: DijszabasTar, nap: date) -> Decimal:
     return havi
 
 
-def _energia(fiok: Fiok, tar: DijszabasTar, szamlalo: Szamlalo, tol: date, ig: date, meres_vege: datetime | None) -> Decimal:
+def _energia(fiok: Fiok, tar: DijszabasTar, szamlalo: Szamlalo, tol: date, ig: date, meres_vege: datetime | None, tovabbi: list[Szamlalo] | None = None) -> Decimal:
     """Energia-(és csatorna)díj [tol, ig)-ra, havi darabokban; alapdíj nélkül (azt havonta külön számoljuk)."""
     hatarok = sorted({tol, ig} | honap_kezdetek(tol, ig))
     osszeg = Decimal(0)
     for a, b in zip(hatarok, hatarok[1:]):
         if meres_vege is not None and nap_kezdete(a) >= meres_vege:
             break
-        osszeg += sum((s.energia_ft for s in szamol(fiok, tar, a, b, [szamlalo], meres_vege=meres_vege).szeletek), Decimal(0))
+        osszeg += sum((s.energia_ft for s in szamol(fiok, tar, a, b, [szamlalo, *(tovabbi or [])], meres_vege=meres_vege).szeletek), Decimal(0))
     return osszeg
 
 
@@ -89,6 +89,7 @@ class EvesEgyenleg:
     elozo_ev_fogyasztas: Decimal | None
     modszer: str
     elozo_ev: dict | None = None  # visszamérés: {"fizetve": ..., "szamitott": ...}
+    megbizhato: bool = True
 
     @property
     def varhato_egyenleg(self) -> Decimal:
@@ -96,8 +97,8 @@ class EvesEgyenleg:
         return _ft(self.befizetve + self.hatralevo_reszszamla - self.varhato_eves)
 
 
-def _ev_koltseg(fiok: Fiok, tar: DijszabasTar, szamlalo: Szamlalo, tol: date, ig: date, meres_vege: datetime | None, havi_alap: Decimal, alap_db: int) -> Decimal:
-    return _energia(fiok, tar, szamlalo, tol, ig, meres_vege) + havi_alap * alap_db
+def _ev_koltseg(fiok: Fiok, tar: DijszabasTar, szamlalo: Szamlalo, tol: date, ig: date, meres_vege: datetime | None, havi_alap: Decimal, alap_db: int, tovabbi: list[Szamlalo] | None = None) -> Decimal:
+    return _energia(fiok, tar, szamlalo, tol, ig, meres_vege, tovabbi) + havi_alap * alap_db
 
 
 def eves_egyenleg(
@@ -108,7 +109,11 @@ def eves_egyenleg(
     reszszamlak: list[tuple[date, Decimal]],
     reszszamla_db_ev: int = 11,
     elozo_bazis: date | None = None,
+    tovabbi: list[Szamlalo] | None = None,
+    reszszamla_osszeg: Decimal | None = None,
+    elozo_ev_mennyiseg: Decimal | None = None,
 ) -> EvesEgyenleg:
+    """tovabbi: a fiók további csatornáinak (pl. víz-almérő) számlálói, előrejelzés nélkül."""
     bazis = fiok.eves_bazis
     if bazis is None:
         raise ValueError("részszámlás egyenleghez éves bázis (elszámoló leolvasás) kell")
@@ -121,11 +126,19 @@ def eves_egyenleg(
     ev_szamlai = sorted((d, x) for d, x in reszszamlak if hatar < d <= ma)
     befizetve = sum((x for _, x in ev_szamlai), Decimal(0))
     hatralevo_db = max(reszszamla_db_ev - len(ev_szamlai), 0)
-    utolso = ev_szamlai[-1][1] if ev_szamlai else (sorted(reszszamlak)[-1][1] if reszszamlak else Decimal(0))
+    # A hátralévő részszámlák összege: beállított összeg > az idei utolsó > a tavalyi év utolsó részszámlája
+    # (a bázis előtti; a bázis utáni első napok elszámoló számlája nem részszámla).
+    tavalyiak = sorted((d, x) for d, x in reszszamlak if d <= bazis)
+    if reszszamla_osszeg:
+        utolso = Decimal(reszszamla_osszeg)
+    elif ev_szamlai:
+        utolso = ev_szamlai[-1][1]
+    else:
+        utolso = tavalyiak[-1][1] if tavalyiak else Decimal(0)
 
     # Tényleges eddig: mért fogyasztás + az eddig esedékes havi alapdíjak.
     alap_eddig = len([d for d in honap_kezdetek(bazis, ma + timedelta(days=1))])
-    teny = _ev_koltseg(fiok, tar, szamlalo, bazis, ev_ig, most, havi_alap, alap_eddig)
+    teny = _ev_koltseg(fiok, tar, szamlalo, bazis, ev_ig, most, havi_alap, alap_eddig, tovabbi)
 
     # Előrejelzés: tavalyi éves fogyasztás × a hátralévő idő profil szerinti része.
     elozo = None
@@ -136,6 +149,9 @@ def eves_egyenleg(
     pontok = [p for p in szamlalo.pontok if p.ido <= most] + [Pont(most, most_ertek, False)]
     if elozo is not None and elozo > 0:
         alap_q, modszer = elozo, "tavalyi éves fogyasztás × havi profil"
+    elif elozo_ev_mennyiseg:
+        elozo = Decimal(elozo_ev_mennyiseg)
+        alap_q, modszer = elozo, "beállított éves fogyasztás × havi profil"
     else:
         eltelt = _profil_resz(bazis, ma, kozmu) or Decimal(1)
         alap_q = (most_ertek - szamlalo.ertek(nap_kezdete(bazis))[0]) / eltelt
@@ -146,14 +162,26 @@ def eves_egyenleg(
         pontok.append(Pont(nap_kezdete(d), ertek, False))
         elozo_nap = d
     elorejelzett = Szamlalo(pontok)
+
+    # A további csatornák (víz-almérő) előrejelzése a főmérőhöz mért idei arányukkal.
+    fo_eddig = most_ertek - szamlalo.ertek(nap_kezdete(bazis))[0]
+    tovabbi_elore: list[Szamlalo] = []
+    for t in tovabbi or []:
+        t_most, _ = t.ertek(most)
+        arany = (t_most - t.ertek(nap_kezdete(bazis))[0]) / fo_eddig if fo_eddig > 0 else Decimal(0)
+        t_pontok = [p for p in t.pontok if p.ido <= most] + [Pont(most, t_most, False)]
+        for p in pontok:
+            if p.ido > most:
+                t_pontok.append(Pont(p.ido, t_most + (p.ertek - most_ertek) * arany, False))
+        tovabbi_elore.append(Szamlalo(t_pontok))
     varhato_q = ertek - szamlalo.ertek(nap_kezdete(bazis))[0]
-    varhato = _ev_koltseg(fiok, tar, elorejelzett, bazis, ev_ig, None, havi_alap, len(honap_kezdetek(bazis, ev_ig + timedelta(days=1))))
+    varhato = _ev_koltseg(fiok, tar, elorejelzett, bazis, ev_ig, None, havi_alap, len(honap_kezdetek(bazis, ev_ig + timedelta(days=1))), tovabbi_elore)
 
     visszameres = None
     if elozo_bazis is not None:
         elozo_fiok = dataclasses.replace(fiok, eves_bazis=elozo_bazis)
         szamitott = _ev_koltseg(
-            elozo_fiok, tar, szamlalo, elozo_bazis, bazis, None, havi_alap, len(honap_kezdetek(elozo_bazis, bazis + timedelta(days=1)))
+            elozo_fiok, tar, szamlalo, elozo_bazis, bazis, None, havi_alap, len(honap_kezdetek(elozo_bazis, bazis + timedelta(days=1))), tovabbi
         )
         e_hatar = elozo_bazis + timedelta(days=ELSZAMOLO_NAPON_BELUL)
         fizetve = sum((x for d, x in reszszamlak if e_hatar < d <= hatar), Decimal(0))
@@ -172,4 +200,5 @@ def eves_egyenleg(
         elozo_ev_fogyasztas=elozo,
         modszer=modszer,
         elozo_ev=visszameres,
+        megbizhato=elozo is not None and elozo > 0 and utolso > 0,
     )

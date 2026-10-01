@@ -68,7 +68,7 @@ tests/
 - [x] **G1** `atvaltas: gaz_mj`: havi fűtőérték kézzel vagy entitásból, korrekciós tényező, „becsült” jelzés
 - [x] **G2** Gázkeret MJ-ban, éves bázisdátumtól
 - [x] **V1** Víz modul: vízdíj, csatornadíj (csatornánként kikapcsolható), alapdíj; `viz/egyedi` sablon
-- [x] **V2** Locsolási mérő: külön mérő vagy csatorna, csatornadíj nélkül (a DAKÖV-számla szerint nem levonás, hanem külön mérő) – számlateszttel
+- [x] **V2** Locsolási almérő a főmérő mögött: a mennyisége a csatornadíjból levonódik (DAKÖV elszámoló számla, 2026-08) – két számlateszttel, HA-ban is
 - [~] **P1** `egyedi_nap` kész; `leolvasas_alapu` még hátra
 - [x] **R1** Részszámlás (átalány) fiók: részszámlák rögzítése (kézzel, éves tervből, vagy entitásból – pl. Díjnet), befizetve / tényleges / várható éves költség, **várható éves egyenleg** (ráfizetés vagy visszatérítés), figyelmeztetés küszöb felett. A szezonális gáz-előrejelzés (E1) ehhez szükséges, ezért a kettő együtt készül.
 

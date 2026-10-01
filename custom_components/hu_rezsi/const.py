@@ -25,6 +25,12 @@ CONF_DIJNET = "dijnet_szolgaltato"  # a Díjnet-integráció számláinak „pro
 CONF_CSATORNADIJ = "csatornadij_aktiv"
 CONF_NAPELEM = "napelem_mod"  # nincs | brutto | szaldo
 CONF_BETAPLALAS = "betaplalas_entitas"
+CONF_ALMERO = "almero"  # víz: locsolási almérő a főmérő mögött
+CONF_ALMERO_KEZDO = "almero_kezdo_allas"
+CONF_ALMERO_BEEPITVE = "almero_beepitve"
+CONF_ALMERO_FORRAS = "almero_forras"
+CONF_RESZSZAMLA_OSSZEG = "reszszamla_osszeg"
+CONF_ELOZO_EV = "elozo_ev_mennyiseg"
 
 EGYSEG = {"villany": "kWh", "gaz": "m³", "viz": "m³"}  # a mért (óra) egység
 DIJNET_MINTA = ".dijnet_paid_invoices_*.yaml"

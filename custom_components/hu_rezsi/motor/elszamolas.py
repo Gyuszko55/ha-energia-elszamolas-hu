@@ -204,6 +204,11 @@ def szamol(
 
             # Víz: csatornadíj a mért mennyiség után (csatornánként kikapcsolható, pl. locsolási almérő).
             csat_ar = arak.get("csatorna_m3") if sajat.szabalyok.get("csatornadij") and csatorna.csatornadij_aktiv else None
+            if csatorna.levonas_fobol:
+                # A főmérő mögötti almérő: a vize már a főmérőn szerepel, a csatornadíjból viszont levonódik
+                # (DAKÖV: „Főmérő(k)ből almérő(kö)n mért vízhasználat levonása”).
+                kedv = piaci = elsz = Decimal(0)
+                csat_ar = -arak["csatorna_m3"] if sajat.szabalyok.get("csatornadij") else None
             rhd = arak.get("rendszerhasznalati") or Decimal(0)
 
             alapdij = Decimal(0)

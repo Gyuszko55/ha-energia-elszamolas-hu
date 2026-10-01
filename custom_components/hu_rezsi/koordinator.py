@@ -16,11 +16,15 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_ALMERO,
+    CONF_ALMERO_FORRAS,
     CONF_BETAPLALAS,
     CONF_DIJNET,
     CONF_NAPELEM,
     CONF_FIZETESI_MOD,
+    CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
+    CONF_RESZSZAMLA_OSSZEG,
     DIJNET_MINTA,
     CONF_FORRAS,
     CONF_FORRAS_TIPUS,
@@ -38,7 +42,7 @@ from .const import (
 from pathlib import Path
 
 from . import dijnet
-from .modell import betaplalas_csatorna, d, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
+from .modell import betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
 from .motor.egyenleg import EvesEgyenleg, egy_ev_mulva, eves_egyenleg
 from .motor.elszamolas import _hozzarendeles, futoertek
@@ -148,6 +152,9 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             if not tarolt["merok"]:
                 tarolt["merok"].append(kezdo_mero(dict(sub.data)))
                 valtozott = True
+            if sub.data.get(CONF_ALMERO) and not tarolt.get("almero_merok"):
+                tarolt["almero_merok"] = [kezdo_almero(dict(sub.data))]
+                valtozott = True
             egyseg = EGYSEG[sub.data[CONF_KOZMU]]
             try:
                 allapot, lezart = await self._fiok(sid, sub, tarolt, most, egyseg)
@@ -174,6 +181,13 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         szamlalo = await self.szamlalo(sid, fiok, datetime.combine(tol, datetime.min.time()) - timedelta(days=ELOZMENY_NAPOK), most)
         self.utolso_szamlalok[sid] = szamlalo.pontok[-15:]
         hatarok = elszamolasi_napok(tarolt)
+        tovabbi: list[Szamlalo] = []
+        for csat in fiok.csatornak[1:]:  # víz-almérő
+            sorozat = None
+            if csat.szerep == "almero" and sub.data.get(CONF_ALMERO_FORRAS):
+                sorozat = await self._sorozat(sub.data[CONF_ALMERO_FORRAS], datetime.combine(tol, datetime.min.time()) - timedelta(days=ELOZMENY_NAPOK), most)
+            tovabbi.append(Szamlalo.csatornabol(csat, sorozat, meroallas=True))
+        szamlalok = [szamlalo, *tovabbi]
 
         # Lezárás: ha a tárolt nyitott időszak már véget ért (és eltelt a késleltetés).
         lezart_valt = False
@@ -186,7 +200,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             while ptol < tol:
                 _, pig = idoszak(ptol, mod, nap)
                 try:
-                    e = szamol(fiok, self.tar, ptol, pig, [szamlalo], extra_hatarok=hatarok)
+                    e = szamol(fiok, self.tar, ptol, pig, szamlalok, extra_hatarok=hatarok)
                     bejegyzes = eredmeny_tarolhato(e) | {"rogzitve": most.isoformat(), "forras": "automatikus"}
                     tarolt["lezart"] = [x for x in tarolt["lezart"] if x["tol"] != bejegyzes["tol"]] + [bejegyzes]
                 except NincsAdat as err:
@@ -195,7 +209,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             tarolt["nyitott_tol"] = tol.isoformat()
             lezart_valt = True
 
-        ny = nyitott(fiok, self.tar, tol, ig, [szamlalo], most, extra_hatarok=hatarok)
+        ny = nyitott(fiok, self.tar, tol, ig, szamlalok, most, extra_hatarok=hatarok)
         eves = None
         if fiok.eves_bazis:
             try:
@@ -213,7 +227,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         egyenleg, egyenleg_hiba = None, None
         if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
             try:
-                egyenleg = await self._egyenleg(sub, tarolt, fiok, szamlalo, most)
+                egyenleg = await self._egyenleg(sub, tarolt, fiok, szamlalo, most, tovabbi)
             except (NincsAdat, ValueError, DijszabasHiba) as err:
                 egyenleg_hiba = str(err)
         return (
@@ -235,7 +249,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         )
 
 
-    async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime) -> EvesEgyenleg:
+    async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime, tovabbi: list[Szamlalo] | None = None) -> EvesEgyenleg:
         """Részszámlás fiók: kézzel rögzített + Díjnet-számlák, éves egyenleg."""
         reszek = {r["datum"]: Decimal(str(r["osszeg"])) for r in tarolt.get("reszszamlak", [])}
         if sub.data.get(CONF_DIJNET):
@@ -249,6 +263,9 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             fiok, self.tar, szamlalo, most, lista,
             reszszamla_db_ev=int(sub.data.get(CONF_RESZSZAMLA_DB) or 11),
             elozo_bazis=elozo_bazis(tarolt),
+            tovabbi=tovabbi,
+            reszszamla_osszeg=Decimal(str(sub.data[CONF_RESZSZAMLA_OSSZEG])) if sub.data.get(CONF_RESZSZAMLA_OSSZEG) else None,
+            elozo_ev_mennyiseg=Decimal(str(sub.data[CONF_ELOZO_EV])) if sub.data.get(CONF_ELOZO_EV) else None,
         )
 
     async def _napelem(
@@ -276,7 +293,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         for s in ny.eddig.szeletek:
             if datetime.combine(s.tol, datetime.min.time()) <= most < datetime.combine(s.ig, datetime.min.time()):
                 ar = s.egysegar_kedvezmenyes if s.keret is None or (s.elszamolt or s.mennyiseg) < s.keret else s.egysegar_piaci
-                atv = self.tar.felold(_hozzarendeles(fiok, s.tol), s.tol, fiok.szolgaltato, fiok.feluliras).szabalyok.get("atvaltas")
+                erv = self.tar.felold(_hozzarendeles(fiok, s.tol), s.tol, fiok.szolgaltato, fiok.feluliras)
+                atv = erv.szabalyok.get("atvaltas")
+                if erv.szabalyok.get("csatornadij") and fiok.csatornak[0].csatornadij_aktiv and erv.dijak.get("csatorna_m3"):
+                    # Víz: a csatornadíj is a következő m³ ára (az almérő levonását itt nem vesszük figyelembe).
+                    afa = erv.dijak.get("afa")
+                    ar = ar + erv.dijak["csatorna_m3"] * (1 + Decimal(afa) / 100 if afa is not None else 1)
                 if atv:
                     fe, _ = futoertek(s.tol, atv, fiok)
                     ar = ar * fe * Decimal(atv.get("korrekcios_tenyezo_alap", 1))

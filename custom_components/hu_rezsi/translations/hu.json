@@ -43,7 +43,13 @@
             "csatornadij_aktiv": "Csatornadíj",
             "forras_tol": "A szenzor érvényes ettől",
             "napelem_mod": "Napelem (kísérleti)",
-            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)"
+            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)",
+            "almero": "Locsolási almérő a főmérő mögött",
+            "almero_forras": "Almérő-szenzor (opcionális)",
+            "almero_beepitve": "Almérő kezdőnapja",
+            "almero_kezdo_allas": "Almérő állása ezen a napon",
+            "reszszamla_osszeg": "Részszámla összege (opcionális)",
+            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -57,7 +63,10 @@
             "csatornadij_aktiv": "Locsolási almérőnél kapcsold ki.",
             "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk.",
             "napelem_mod": "Bruttó: havi elszámolás, a betáplálás átvételi áron. Szaldó: éves nettózás (az üzembe helyezéstől 10 évig). Részletek: docs/terv/05_NAPELEM.md.",
-            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk."
+            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk.",
+            "almero": "A mennyisége a csatornadíjból levonódik (a vize a főmérőn már szerepel).",
+            "reszszamla_osszeg": "Ft; ha üres, az idei, illetve a tavalyi utolsó részszámla.",
+            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132)."
           }
         },
         "reconfigure": {
@@ -82,7 +91,13 @@
             "csatornadij_aktiv": "Csatornadíj",
             "forras_tol": "A szenzor érvényes ettől",
             "napelem_mod": "Napelem (kísérleti)",
-            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)"
+            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)",
+            "almero": "Locsolási almérő a főmérő mögött",
+            "almero_forras": "Almérő-szenzor (opcionális)",
+            "almero_beepitve": "Almérő kezdőnapja",
+            "almero_kezdo_allas": "Almérő állása ezen a napon",
+            "reszszamla_osszeg": "Részszámla összege (opcionális)",
+            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -96,7 +111,10 @@
             "csatornadij_aktiv": "Locsolási almérőnél kapcsold ki.",
             "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk.",
             "napelem_mod": "Bruttó: havi elszámolás, a betáplálás átvételi áron. Szaldó: éves nettózás (az üzembe helyezéstől 10 évig). Részletek: docs/terv/05_NAPELEM.md.",
-            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk."
+            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk.",
+            "almero": "A mennyisége a csatornadíjból levonódik (a vize a főmérőn már szerepel).",
+            "reszszamla_osszeg": "Ft; ha üres, az idei, illetve a tavalyi utolsó részszámla.",
+            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132)."
           }
         }
       },
@@ -200,7 +218,8 @@
     "csatorna": {
       "options": {
         "vetelezes": "Vételezés (1.8.0)",
-        "betaplalas": "Betáplálás (2.8.0)"
+        "betaplalas": "Betáplálás (2.8.0)",
+        "almero": "Almérő (víz)"
       }
     }
   },
@@ -276,6 +295,10 @@
         "uj_gyari_szam": {
           "name": "Új mérő gyári száma",
           "description": ""
+        },
+        "csatorna": {
+          "name": "Mérőregiszter",
+          "description": "Napelemes ad-vesz mérőnél: vételezés vagy betáplálás."
         }
       }
     },

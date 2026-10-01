@@ -10,7 +10,7 @@ from tests.conftest import DIJSZABASOK
 from motor.dijszabas import DijszabasTar
 from motor.elszamolas import szamol
 from motor.szamlalo import Pont, Szamlalo
-from motor.tipusok import Csatorna, DijszabasHozzarendeles, Fiok, Kozmu
+from motor.tipusok import Csatorna, DijszabasHozzarendeles, Fiok, Kozmu, Leolvasas, Mero
 
 TAR = DijszabasTar.mappabol(DIJSZABASOK)
 
@@ -51,19 +51,48 @@ def test_gaz_reszszamla_2026_08():
     assert r.osszesen_ft == D(11185)
 
 
-def test_viz_dakov_2026_03():
-    """DAKÖV víz 1. részszámla, 2026.01.24–03.02, két mérő (becsült fogyasztás):
+def _viz_fiok(levonas: bool):
+    return Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))],
+                [Csatorna(szerep="fo"), Csatorna(szerep="almero", csatornadij_aktiv=False, levonas_fobol=levonas)])
 
-    fővízmérő 741 → 749 (8 m³: ivóvíz + szennyvíz), locsolási mérő 89 → 92 (3 m³: csak ivóvíz).
-    Tételek (bruttó): 1 026,87 + 2 738,32 + 225,06 + 3 798,01 + 225,06 = 8 013,32 → 8 013 Ft.
+
+def _alapdij(honap: int) -> D:
+    """A DAKÖV-számla alapdíj-tételei: 2 × 177,21 Ft/hó nettó × hónapok, fillérre (a számla saját ütemezése szerint)."""
+    return (D("354.42") * honap * D("1.27")).quantize(D("0.01"))
+
+
+def test_viz_dakov_2026_03():
+    """DAKÖV víz 1. részszámla, 2026.01.24–03.02 (becsült): fővízmérő 741 → 749 (8 m³), locsolási mérő 89 → 92 (3 m³).
+
+    Ezen a számlán még nincs almérő-levonás: ivóvíz 11 m³, csatorna 8 m³, alapdíj 1 hónap → 8 013 Ft.
     """
-    fiok = Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))],
-                [Csatorna(szerep="fo"), Csatorna(szerep="locsolo", csatornadij_aktiv=False)])
     tol, ig = date(2026, 1, 24), date(2026, 3, 3)
     fo = Szamlalo([Pont(datetime(2026, 1, 24), D(741), True), Pont(datetime(2026, 3, 3), D(749), True)])
-    locsolo = Szamlalo([Pont(datetime(2026, 1, 24), D(89), True), Pont(datetime(2026, 3, 3), D(92), True)])
-    r = szamol(fiok, TAR, tol, ig, [fo, locsolo])
+    almero = Szamlalo([Pont(datetime(2026, 1, 24), D(89), True), Pont(datetime(2026, 3, 3), D(92), True)])
+    r = szamol(_viz_fiok(levonas=False), TAR, tol, ig, [fo, almero])
+    energia = sum(s.energia_ft for s in r.szeletek)
+    assert sum(s.csatorna_ft for s in r.szeletek) == D("3798.01")
+    assert (energia + _alapdij(1)).quantize(D(1)) == D(8013)
+
+
+def test_viz_dakov_2026_07_almero_levonas_es_merocsere():
+    """DAKÖV víz, 2026.05.31–07.15: fővízmérő 793 → 812 (19 m³), aztán mérőcsere (új óra 0-ról),
+    locsolási ALMÉRŐ 106 → 117 (11 m³), levonva a főmérő csatornadíjából.
+
+    Számla: ivóvíz 19 m³ (5 120,88 nettó), csatorna 19 − 11 = 8 m³ (7 102,58 − 4 112,02), alapdíj 2 hónap → 11 202 Ft.
+    """
+    fiok = _viz_fiok(levonas=True)
+    fo = Szamlalo.csatornabol(Csatorna(merok=[
+        Mero("1106871", date(2020, 1, 1), D(0), kiszerelve=date(2026, 7, 15), zaro_allas=D(812),
+             leolvasasok=[Leolvasas(date(2026, 5, 31), D(793))]),
+        Mero("234626HB", date(2026, 7, 15), D(0)),
+    ]))
+    almero = Szamlalo([Pont(datetime(2026, 5, 31), D(106), True), Pont(datetime(2026, 7, 15), D(117), True)])
+    r = szamol(fiok, TAR, date(2026, 5, 31), date(2026, 7, 15), [fo, almero])
     fo_sz = [s for s in r.szeletek if s.csatorna == "fo"]
-    assert sum(s.csatorna_ft for s in fo_sz) == D("3798.01")
-    assert r.osszesen_ft == D(8013)
-    assert sum(s.alapdij_ft for s in r.szeletek) == D("450.11")  # 354,42 × 1,27 (a számlán 2 × 225,06)
+    al_sz = [s for s in r.szeletek if s.csatorna == "almero"]
+    assert sum(s.mennyiseg for s in fo_sz) == D(19) and sum(s.mennyiseg for s in al_sz) == D(11)
+    assert sum(s.csatorna_ft for s in fo_sz) == D("9020.28")
+    assert sum(s.csatorna_ft for s in al_sz) == D("-5222.27")
+    energia = sum(s.energia_ft for s in r.szeletek)
+    assert (energia + _alapdij(2)).quantize(D(1)) == D(11202)

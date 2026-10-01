@@ -55,6 +55,7 @@ class Csatorna:
     merok: list[Mero] = field(default_factory=list)
     keret_aktiv: bool = True
     csatornadij_aktiv: bool = True  # víz: locsolási almérőnél kikapcsolva
+    levonas_fobol: bool = False  # víz: almérő a főmérő mögött – a mennyisége a csatornadíjból levonódik
 
 
 @dataclass(frozen=True)
