@@ -9,7 +9,7 @@ előző stabil. Méret: **K** = kicsi (néhány este), **K+** = közepes, **N** 
 |---|---|---|---|
 | 0 | Tervezés, döntések, közös tároló | – | K |
 | 1 | Integráció a v1 tudásával (villany A1+H, gáz m³, leolvasás, mérőcsere) | `0.1` | N |
-| 2 | Gáz MJ-alapon, víz és csatorna, elszámolási időszakok | `0.2` | K+ |
+| 2 | Gáz MJ-alapon, részszámlás (átalány) elszámolás éves egyenleggel, víz és csatorna, elszámolási időszakok | `0.2` | K+ |
 | 3 | Napelem: vételezés + betáplálás, szaldó / bruttó | `0.3` | K+ |
 | 4 | Előrejelzés, figyelmeztetések, rezsi-kártya | `0.4` | K+ |
 | 5 | További tarifák (A2, B, dinamikus) | `0.5+` | igény szerint |
@@ -70,6 +70,7 @@ tests/
 - [ ] **V1** Víz modul: vízdíj, csatornadíj (csatornánként kikapcsolható), alapdíj; `viz/egyedi` sablon
 - [ ] **V2** Locsolási almérő: a fővízmérőből levonva, csatornadíj nélkül
 - [ ] **P1** `egyedi_nap` és `leolvasas_alapu` időszakmód
+- [ ] **R1** Részszámlás (átalány) fiók: részszámlák rögzítése (kézzel, éves tervből, vagy entitásból – pl. Díjnet), befizetve / tényleges / várható éves költség, **várható éves egyenleg** (ráfizetés vagy visszatérítés), figyelmeztetés küszöb felett. A szezonális gáz-előrejelzés (E1) ehhez szükséges, ezért a kettő együtt készül.
 
 ## 3. lépcső – Napelem
 

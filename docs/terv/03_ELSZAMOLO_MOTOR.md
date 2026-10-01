@@ -113,6 +113,25 @@ A kerekítési szabály (szeletenként vagy összesítve) díjszabás-paraméter
 
 A módszer fiókonként választható, és az eredmény mellett megjelenik, melyik készítette.
 
+## Részszámlás fiók: éves egyenleg
+
+Az elszámolási év az éves bázisdátumtól (utolsó elszámoló leolvasás) a következő várható leolvasásig tart.
+
+```
+befizetve        = az év eddigi részszámláinak összege
+hátralévő        = az év még hátralévő részszámlái (rögzített terv vagy az utolsó összeg × hátralévő hónapok)
+tényleges eddig  = a mért fogyasztás költsége az év elejétől (szeletek, éves keret, alapdíjak)
+várható éves     = tényleges eddig + előrejelzés a következő éves leolvasásig
+várható egyenleg = befizetve + hátralévő − várható éves     (> 0: visszatérítés, < 0: ráfizetés)
+```
+
+- A gáz előrejelzésénél a 7 napos átlag félrevezető (nyáron közel nulla, télen sokszoros), ezért ide a
+  szezonális módszer kell: a tavalyi azonos időszak, illetve a fűtési napfok (4. lépcső).
+- Figyelmeztetés, ha a várható ráfizetés meghalad egy küszöböt: ilyenkor érdemes a szolgáltatónál
+  részszámla-módosítást kérni, vagy félretenni.
+- A részszámla mennyisége a mért fogyasztástól függetlenül becsült lehet (pl. 103 m³ számlázva, ~20 m³ mérve);
+  a Rezsikövető ezért nem a részszámla mennyiségét, hanem az összegét használja.
+
 ## Figyelmeztetések (példák)
 
 | Kód | Mikor |
@@ -123,6 +142,7 @@ A módszer fiókonként választható, és az eredmény mellett megjelenik, mely
 | `forras_elakadt` | A forrás-entitás 24 órája nem változott, vagy nem elérhető |
 | `felulirt_dij_elavult` | Új hivatalos díj jött, de a felhasználó felülírt értéke van érvényben |
 | `futoertek_hianyzik` | Gáznál nincs megadva az adott havi fűtőérték |
+| `varhato_rafizetes` | Részszámlás fióknál a várható éves ráfizetés meghaladja a beállított küszöböt |
 
 ## Tesztelés
 
