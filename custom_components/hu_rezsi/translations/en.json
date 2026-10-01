@@ -35,13 +35,15 @@
             "keret_aktiv": "Discounted allowance applies",
             "gyari_szam": "Meter serial",
             "beepitve": "Meter installed / start date",
-            "kezdo_allas": "Meter reading on that date"
+            "kezdo_allas": "Meter reading on that date",
+            "forras_tipus": "Sensor value meaning"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
             "forras_szorzo": "If the sensor consistently deviates from the meter (e.g. 1.0412).",
             "idoszak_nap": "Only used in custom-day mode.",
-            "kezdo_allas": "Calculation starts here; record later readings with the service."
+            "kezdo_allas": "Calculation starts here; record later readings with the service.",
+            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings."
           }
         },
         "reconfigure": {
@@ -58,13 +60,15 @@
             "keret_aktiv": "Discounted allowance applies",
             "gyari_szam": "Meter serial",
             "beepitve": "Meter installed / start date",
-            "kezdo_allas": "Meter reading on that date"
+            "kezdo_allas": "Meter reading on that date",
+            "forras_tipus": "Sensor value meaning"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
             "forras_szorzo": "If the sensor consistently deviates from the meter (e.g. 1.0412).",
             "idoszak_nap": "Only used in custom-day mode.",
-            "kezdo_allas": "Calculation starts here; record later readings with the service."
+            "kezdo_allas": "Calculation starts here; record later readings with the service.",
+            "forras_tipus": "With meter reading the sensor value is the meter itself. With counter only its change is used, aligned to manual readings."
           }
         }
       },
@@ -125,6 +129,12 @@
       "options": {
         "kezi": "Own (manual)",
         "szolgaltatoi": "Provider"
+      }
+    },
+    "forras_tipus": {
+      "options": {
+        "meroallas": "Meter reading (e.g. sensor.meroora_allas)",
+        "szamlalo": "Increasing counter only (e.g. Shelly total energy)"
       }
     }
   },

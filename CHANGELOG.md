@@ -1,5 +1,10 @@
 # Változások
 
+## [Fejlesztés] Rezsikövető integráció 0.1.0-dev (2026-10-01)
+
+- Új: `custom_components/hu_rezsi` HA-integráció (1. lépcső): fiókok felületről, verziózott díjfájlok, elszámoló motor (HA nélkül tesztelhető), leolvasás/mérőcsere/felülírás/napló/CSV szolgáltatások, automatikus hónapzárás, v1-importáló, diagnosztika.
+- A v1 YAML-csomag változatlan.
+
 ## 1.0.0 – 2026-09-30
 
 Első kiadás:

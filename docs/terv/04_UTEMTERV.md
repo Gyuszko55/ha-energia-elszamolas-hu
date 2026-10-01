@@ -17,11 +17,11 @@ előző stabil. Méret: **K** = kicsi (néhány este), **K+** = közepes, **N** 
 
 ## 0. lépcső – Tervezés
 
-- [ ] **T1** A nyitott kérdések (00, K1–K7) eldöntése a javaslattevővel
+- [~] **T1** A nyitott kérdések (00, K1–K7) eldöntése a javaslattevővel
 - [ ] **T2** Tároló előkészítése (eldöntve: ez a tároló), közreműködői jog a javaslattevőnek, licenc (MIT), jegysablonok
-- [ ] **T3** Ezek a tervdokumentumok átnézve, a megjegyzések beépítve
+- [~] **T3** Ezek a tervdokumentumok átnézve, a megjegyzések beépítve
 - [ ] **T4** Legalább 3 anonimizált valódi számla összegyűjtése tesztadatnak (villany A1, H, gáz)
-- [ ] **T5** Díjfájl-séma (`schema.json`) és az első díjfájlok: `villany/a1`, `villany/h`, `gaz/lakossagi` a mostani díjtáblázatból
+- [x] **T5** Díjfájl-séma (`schema.json`) és az első díjfájlok: `villany/a1`, `villany/h`, `gaz/lakossagi` a mostani díjtáblázatból
 
 **Kész, ha:** a T1 döntései le vannak írva a `00_ATTEKINTES.md`-ben, és a tároló készen áll az első kódra.
 
@@ -45,18 +45,20 @@ tests/
 
 **Jegyek:**
 
-- [ ] **I1** Alapváz: manifest, beállítási folyamat (háztartás → fiókok → mérők → csatornák), fordítások
-- [ ] **I2** Díjfájl-betöltő és séma-ellenőrzés, felülírási rétegek
-- [ ] **I3** Motor: időszak, szeletelés, napi arányos és éves keret, alapdíj, Decimal-kerekítés
-- [ ] **I4** Villany modul: A1, H idényes bontással, csatornánkénti keret
-- [ ] **I5** Gáz modul m³-ben (az MJ a 2. lépcsőben jön)
-- [ ] **I6** Tároló: leolvasás, korrekció, mérőcsere (mérő lezárása + új nyitása), HA-statisztikából vett állás
-- [ ] **I7** Szolgáltatások: leolvasás rögzítése, mérőcsere, időszak lezárása, CSV-export
-- [ ] **I8** Entitások: havi eddigi és várható költség, hátralévő keret, aktuális ár (a HA Energia irányítópulthoz is)
-- [ ] **I9** Automatikus havi lezárás (1-jén 00:00:30, mint a v1-ben)
-- [ ] **I10** v1-importáló: a leolvasási napló, a havi napló és a beállított díjak átvétele
-- [ ] **I11** Tesztek: egység + v1-paritás (16 hónap) + számlatesztek
-- [ ] **I12** Dokumentáció: telepítés, átállás v1-ről, „tájékoztató jellegű” figyelmeztetés
+- [x] **I1** Alapváz: manifest, beállítási folyamat (háztartás → fiókok → mérők → csatornák), fordítások
+- [x] **I2** Díjfájl-betöltő és séma-ellenőrzés, felülírási rétegek
+- [x] **I3** Motor: időszak, szeletelés, napi arányos és éves keret, alapdíj, Decimal-kerekítés
+- [x] **I4** Villany modul: A1, H idényes bontással, csatornánkénti keret
+- [x] **I5** Gáz modul m³-ben (az MJ a 2. lépcsőben jön)
+- [x] **I6** Tároló: leolvasás, korrekció, mérőcsere (mérő lezárása + új nyitása), HA-statisztikából vett állás
+- [x] **I7** Szolgáltatások: leolvasás rögzítése, mérőcsere, időszak lezárása, CSV-export
+- [x] **I8** Entitások: havi eddigi és várható költség, hátralévő keret, aktuális ár (a HA Energia irányítópulthoz is)
+- [x] **I9** Automatikus havi lezárás (1-jén 00:00:30, mint a v1-ben)
+- [x] **I10** v1-importáló: a leolvasási napló, a havi napló és a beállított díjak átvétele
+- [~] **I11** Tesztek: egység + v1-paritás (18 hónap) kész; számlatesztek a T4 számláira várnak
+- [x] **I12** Dokumentáció: telepítés, átállás v1-ről, „tájékoztató jellegű” figyelmeztetés
+
+**Állapot (2026-10-01):** az élő HA-n fut a v1 mellett; az október 31-i hónapzárás a párhuzamos futás első próbája.
 
 **Kész, ha:** egy tiszta HA-ra telepítve beállítható felületről, és a mi éles adatainkon ugyanazt adja, mint a v1.
 **Átállás az éles rendszeren:** csak ezután, mentéssel, a két változat egy hónapig párhuzamosan fut.

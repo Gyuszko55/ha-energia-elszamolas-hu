@@ -35,6 +35,7 @@ from .const import (
     CONF_DIJSZABAS,
     CONF_DIJSZABAS_TOL,
     CONF_FORRAS,
+    CONF_FORRAS_TIPUS,
     CONF_GYARI_SZAM,
     CONF_IDOSZAK_MOD,
     CONF_IDOSZAK_NAP,
@@ -71,6 +72,7 @@ class FiokFlow(ConfigSubentryFlow):
     """Szolgáltatói fiók felvétele és szerkesztése."""
 
     def __init__(self) -> None:
+        super().__init__()
         self._alap: dict[str, Any] = {}
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
@@ -142,8 +144,11 @@ class FiokFlow(ConfigSubentryFlow):
             vol.Optional(CONF_FORRAS, **({"description": {"suggested_value": eddigi[CONF_FORRAS]}} if eddigi.get(CONF_FORRAS) else {})): EntitySelector(
                 EntitySelectorConfig(domain="sensor")
             ),
+            vol.Required(CONF_FORRAS_TIPUS, default=alap(CONF_FORRAS_TIPUS, "meroallas")): SelectSelector(
+                SelectSelectorConfig(options=["meroallas", "szamlalo"], translation_key="forras_tipus")
+            ),
             vol.Required(CONF_SZORZO, default=alap(CONF_SZORZO, 1)): NumberSelector(
-                NumberSelectorConfig(min=0.5, max=2, step=0.0001, mode=NumberSelectorMode.BOX)
+                NumberSelectorConfig(min=0.5, max=2, step="any", mode=NumberSelectorMode.BOX)
             ),
             vol.Required(CONF_KERET_AKTIV, default=alap(CONF_KERET_AKTIV, True)): BooleanSelector(),
         }

@@ -91,22 +91,25 @@ def v1_import(hass: HomeAssistant, celok: dict[str, tuple[Any, str]], probafutta
     havi = hass.states.get(HAVI_NAPLO)
     for h in (havi.attributes.get("honapok") or []) if havi else []:
         tol, ig = _hatarok(h)
-        arak = h.get("arak") or {}
-        alap_ossz = float(arak.get("alapdij") or 0)
+        # A v1 egy összegben tárolta az A1 és a H alapdíját (megosztott hónapnál már arányosítva),
+        # ezért a szétosztás aránya a díjfájlokból jön: A1 : H = alapdíj_A1 : alapdíj_H.
+        tar = next(iter(celok.values()))[0].tar
+        a1_alap = float(tar.felold("villany/a1", tol, "mvm_demasz").dijak["alapdij_ho"])
+        h_alap = float(tar.felold("villany/h", tol, "mvm_demasz").dijak["alapdij_ho"])
+        h_jar = "H" in munka and ig > d(munka["H"]["merok"][0]["beepitve"])
+        a_resz = a1_alap / (a1_alap + h_alap) if h_jar else 1.0
         for mero, kwh, energia in (
             ("A", h["a_kwh"], h["energia_ft"]),
             ("H", h["h_teli_kwh"] + h["h_nyari_kwh"], h["h_teli_ft"] + h["h_nyari_ft"]),
         ):
             if mero not in munka:
                 continue
-            koord, sid = celok[mero]
             nyitott_tol = d(munka[mero].get("nyitott_tol"))
             if nyitott_tol and tol >= nyitott_tol:
                 jelentes["kihagyva"].append(f"{mero} {h['honap']}: a nyitott időszakba esik")
                 continue
-            a1_alap = float(koord.tar.felold("villany/a1", tol, "mvm_demasz").dijak["alapdij_ho"])
-            resz = a1_alap / alap_ossz if alap_ossz else 1
-            alapdij = round(h["alapdij_ft"] * (resz if mero == "A" else 1 - resz))
+            a_alapdij = round(h["alapdij_ft"] * a_resz)
+            alapdij = a_alapdij if mero == "A" else h["alapdij_ft"] - a_alapdij
             if mero == "H" and kwh == 0 and alapdij == 0:
                 continue
             bejegyzes = {

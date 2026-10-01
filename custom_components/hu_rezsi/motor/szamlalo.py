@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from .tipusok import LEOLVASAS_ELSOBBSEG, Csatorna
+from .tipusok import LEOLVASAS_ELSOBBSEG, Csatorna, Mero
 
 # Ennél nagyobb hézagban interpolált érték „becsült”.
 BECSLESI_HEZAG = timedelta(hours=36)
@@ -44,11 +44,14 @@ class Szamlalo:
         csatorna: Csatorna,
         sorozat: list[tuple[datetime, Decimal]] | None = None,
         szorzo: Decimal = Decimal(1),
+        meroallas: bool = False,
     ) -> Szamlalo:
         """Számláló a mérők leolvasásaiból, opcionálisan egy automatikus (HA) sorozattal kiegészítve.
 
-        A sorozat nyers értékei nem a mérőóra állásai: minden sorozatpontot a megelőző horgonyhoz
-        igazítunk, és csak a változását (× szorzó) adjuk hozzá. A leolvasás mindig felülbírálja.
+        meroallas=True: a sorozat értéke (× szorzó) maga az éppen beépített mérő állása.
+        meroallas=False: a sorozat csak egy növekvő számláló; minden pontját a megelőző horgonyhoz
+        igazítjuk, és csak a változását (× szorzó) adjuk hozzá.
+        A leolvasás mindkét esetben felülbírálja a sorozatot.
         """
         horgonyok: dict[datetime, tuple[int, Pont]] = {}
 
@@ -58,7 +61,9 @@ class Szamlalo:
                 horgonyok[ido] = (elsobbseg, Pont(ido, ertek, True))
 
         eltolas = Decimal(0)
+        merok: list[tuple[Mero, Decimal]] = []
         for mero in sorted(csatorna.merok, key=lambda m: m.beepitve):
+            merok.append((mero, eltolas))
             tesz(nap_kezdete(mero.beepitve), eltolas, 10)
             for lo in mero.leolvasasok:
                 tesz(nap_kezdete(lo.datum), eltolas + lo.allas - mero.kezdo_allas, LEOLVASAS_ELSOBBSEG[lo.tipus])
@@ -72,6 +77,17 @@ class Szamlalo:
             return alap
 
         sor = sorted(sorozat)
+        if meroallas:
+            pontok = list(alap.pontok)
+            for t, v in sor:
+                if t in horgonyok:
+                    continue
+                for mero, elt in reversed(merok):
+                    if nap_kezdete(mero.beepitve) <= t and (mero.kiszerelve is None or t < nap_kezdete(mero.kiszerelve)):
+                        pontok.append(Pont(t, elt + v * szorzo - mero.kezdo_allas, False))
+                        break
+            return cls(pontok)
+
         sor_idok = [t for t, _ in sor]
 
         def sor_ertek(t: datetime) -> Decimal | None:

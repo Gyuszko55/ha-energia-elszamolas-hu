@@ -153,7 +153,6 @@ class FiokSzenzor(CoordinatorEntity[RezsiKoordinator], SensorEntity):
             name=nev,
             manufacturer="Rezsikövető",
             entry_type=DeviceEntryType.SERVICE,
-            via_device=(DOMAIN, entry.entry_id),
         )
 
     @property

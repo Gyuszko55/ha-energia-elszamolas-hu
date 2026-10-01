@@ -35,13 +35,15 @@
             "keret_aktiv": "Kedvezményes (rezsicsökkentett) keret jár",
             "gyari_szam": "Mérő gyári száma",
             "beepitve": "Mérő beépítése / kezdőnap",
-            "kezdo_allas": "Mérő állása ezen a napon"
+            "kezdo_allas": "Mérő állása ezen a napon",
+            "forras_tipus": "A szenzor értéke"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
             "forras_szorzo": "Ha a szenzor rendszeresen eltér az órától (pl. 1,0412).",
             "idoszak_nap": "Csak az „egyedi nap” módnál számít.",
-            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted."
+            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted.",
+            "forras_tipus": "Mérőóra-állásnál a szenzor értéke maga az óraállás. Számlálónál csak a változását vesszük át, a kézi leolvasásokhoz igazítva."
           }
         },
         "reconfigure": {
@@ -58,13 +60,15 @@
             "keret_aktiv": "Kedvezményes (rezsicsökkentett) keret jár",
             "gyari_szam": "Mérő gyári száma",
             "beepitve": "Mérő beépítése / kezdőnap",
-            "kezdo_allas": "Mérő állása ezen a napon"
+            "kezdo_allas": "Mérő állása ezen a napon",
+            "forras_tipus": "A szenzor értéke"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
             "forras_szorzo": "Ha a szenzor rendszeresen eltér az órától (pl. 1,0412).",
             "idoszak_nap": "Csak az „egyedi nap” módnál számít.",
-            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted."
+            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted.",
+            "forras_tipus": "Mérőóra-állásnál a szenzor értéke maga az óraállás. Számlálónál csak a változását vesszük át, a kézi leolvasásokhoz igazítva."
           }
         }
       },
@@ -125,6 +129,12 @@
       "options": {
         "kezi": "Saját (kézi)",
         "szolgaltatoi": "Szolgáltatói"
+      }
+    },
+    "forras_tipus": {
+      "options": {
+        "meroallas": "Mérőóra-állás (pl. sensor.meroora_allas)",
+        "szamlalo": "Csak növekvő számláló (pl. Shelly összes energia)"
       }
     }
   },

@@ -13,6 +13,7 @@ CONF_IDOSZAK_MOD = "idoszak_mod"
 CONF_IDOSZAK_NAP = "idoszak_nap"
 CONF_FORRAS = "forras_entitas"
 CONF_SZORZO = "forras_szorzo"
+CONF_FORRAS_TIPUS = "forras_tipus"  # meroallas | szamlalo
 CONF_KERET_AKTIV = "keret_aktiv"
 CONF_GYARI_SZAM = "gyari_szam"
 CONF_BEEPITVE = "beepitve"

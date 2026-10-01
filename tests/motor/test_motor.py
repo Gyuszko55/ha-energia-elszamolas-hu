@@ -137,6 +137,16 @@ def test_sorozat_a_leolvasashoz_igazodik():
     assert s.ertek(dt(2025, 1, 11)) == (D(120), False)
 
 
+def test_sorozat_meroallas_modban():
+    # A statisztika később indul, mint az utolsó leolvasás – óraállás-módban ez nem gond.
+    regi = Mero("R", date(2025, 1, 1), D(100), kiszerelve=date(2025, 6, 1), zaro_allas=D(300))
+    uj = Mero("U", date(2025, 6, 1), D(10))
+    sorozat = [(dt(2025, 5, 1), D(250)), (dt(2025, 7, 1), D(60))]
+    s = Szamlalo.csatornabol(Csatorna(merok=[regi, uj]), sorozat, meroallas=True)
+    assert s.ertek(dt(2025, 5, 1))[0] == D(150)
+    assert s.ertek(dt(2025, 7, 1))[0] == D(200) + D(50)
+
+
 # --- Elszámolás ----------------------------------------------------------------------------------
 
 

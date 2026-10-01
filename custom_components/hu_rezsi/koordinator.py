@@ -17,6 +17,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_FORRAS,
+    CONF_FORRAS_TIPUS,
     CONF_IDOSZAK_MOD,
     CONF_IDOSZAK_NAP,
     CONF_KOZMU,
@@ -67,6 +68,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         )
         self.tar = tar
         self.tarolo = tarolo
+        self.utolso_szamlalok: dict[str, list] = {}  # diagnosztikához: a számláló utolsó pontjai
 
     def fiokok(self) -> dict[str, ConfigSubentry]:
         return {sid: s for sid, s in self.config_entry.subentries.items() if s.subentry_type == FIOK}
@@ -90,7 +92,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         kezdet = max(korabbiak) if korabbiak else kell
         sorozat = await self._sorozat(forras, datetime.combine(kezdet, datetime.min.time()) - timedelta(days=1), most)
         szorzo = Decimal(str(beall.get(CONF_SZORZO) or 1))
-        return Szamlalo.csatornabol(csatorna, sorozat, szorzo)
+        meroallas = beall.get(CONF_FORRAS_TIPUS, "meroallas") == "meroallas"
+        return Szamlalo.csatornabol(csatorna, sorozat, szorzo, meroallas=meroallas)
 
     async def _sorozat(self, entity_id: str, tol: datetime, most: datetime) -> list[tuple[datetime, Decimal]]:
         tz = dt_util.get_default_time_zone()
@@ -130,6 +133,9 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 _LOGGER.warning("%s: nem számolható: %s", sub.title, err)
                 allapot = FiokAllapot(egyseg=egyseg, hiba=str(err))
             kimenet[sid] = allapot
+        for sid in set(self.tarolo.adat["fiokok"]) - set(self.fiokok()):
+            self.tarolo.torol_fiok(sid)  # törölt fiók adatai
+            valtozott = True
         if valtozott:
             await self.tarolo.ment()
         return kimenet
@@ -142,6 +148,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         nap = int(sub.data.get(CONF_IDOSZAK_NAP) or 1)
         tol, ig = idoszak(most.date(), mod, nap)
         szamlalo = await self.szamlalo(sid, fiok, datetime.combine(tol, datetime.min.time()) - timedelta(days=ELOZMENY_NAPOK), most)
+        self.utolso_szamlalok[sid] = szamlalo.pontok[-15:]
         hatarok = elszamolasi_napok(tarolt)
 
         # Lezárás: ha a tárolt nyitott időszak már véget ért (és eltelt a késleltetés).
