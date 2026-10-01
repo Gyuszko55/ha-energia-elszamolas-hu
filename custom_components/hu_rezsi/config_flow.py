@@ -32,7 +32,7 @@ from homeassistant.helpers.selector import (
 
 from pathlib import Path
 
-from . import dijnet
+from . import dijnet, szamlak
 from .const import (
     CONF_BEEPITVE,
     CONF_ALMERO,
@@ -47,6 +47,8 @@ from .const import (
     CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
     CONF_RESZSZAMLA_OSSZEG,
+    CONF_SZAMLA_MAPPA,
+    CONF_SZAMLA_MEROK,
     DIJNET_MINTA,
     CONF_DIJSZABAS,
     CONF_DIJSZABAS_TOL,
@@ -196,6 +198,11 @@ class FiokFlow(ConfigSubentryFlow):
             mezok[vol.Optional(kulcs, **({"description": {"suggested_value": eddigi[kulcs]}} if eddigi.get(kulcs) else {}))] = NumberSelector(
                 NumberSelectorConfig(min=0, max=10000000, step="any", mode=NumberSelectorMode.BOX)
             )
+        mappak = await self.hass.async_add_executor_job(szamlak.jelolt_mappak, Path(self.hass.config.config_dir))
+        mezok[vol.Optional(CONF_SZAMLA_MAPPA, **({"description": {"suggested_value": eddigi[CONF_SZAMLA_MAPPA]}} if eddigi.get(CONF_SZAMLA_MAPPA) else {}))] = SelectSelector(
+            SelectSelectorConfig(options=mappak, custom_value=True)
+        )
+        mezok[vol.Optional(CONF_SZAMLA_MEROK, **({"description": {"suggested_value": eddigi[CONF_SZAMLA_MEROK]}} if eddigi.get(CONF_SZAMLA_MEROK) else {}))] = TextSelector()
         dn = await self.hass.async_add_executor_job(dijnet.szolgaltatok, Path(self.hass.config.config_dir), DIJNET_MINTA)
         if dn:
             mezok[vol.Optional(CONF_DIJNET, **({"description": {"suggested_value": eddigi[CONF_DIJNET]}} if eddigi.get(CONF_DIJNET) else {}))] = SelectSelector(

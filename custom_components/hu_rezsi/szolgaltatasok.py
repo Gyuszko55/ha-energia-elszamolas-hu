@@ -189,6 +189,8 @@ async def naplo(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
         "feluliras": tarolt["feluliras"],
         "futoertekek": tarolt.get("futoertekek", {}),
         "reszszamlak": tarolt.get("reszszamlak", []),
+        "almero_merok": tarolt.get("almero_merok", []),
+        "szamlak": tarolt.get("szamlak", {}),
     }
 
 

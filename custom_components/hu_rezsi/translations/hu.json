@@ -49,7 +49,9 @@
             "almero_beepitve": "Almérő kezdőnapja",
             "almero_kezdo_allas": "Almérő állása ezen a napon",
             "reszszamla_osszeg": "Részszámla összege (opcionális)",
-            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)"
+            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)",
+            "szamla_mappa": "Számlamappa (opcionális)",
+            "szamla_merok": "Számla-mérők (opcionális)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -66,7 +68,9 @@
             "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk.",
             "almero": "A mennyisége a csatornadíjból levonódik (a vize a főmérőn már szerepel).",
             "reszszamla_osszeg": "Ft; ha üres, az idei, illetve a tavalyi utolsó részszámla.",
-            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132)."
+            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132).",
+            "szamla_mappa": "A config mappán belül, pl. a Díjnet letöltési mappája. Az új számlákból a befizetés, a valódi (diktált/leolvasott) mérőállás és gáznál a havi fűtőérték magától rögzül.",
+            "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik."
           }
         },
         "reconfigure": {
@@ -97,7 +101,9 @@
             "almero_beepitve": "Almérő kezdőnapja",
             "almero_kezdo_allas": "Almérő állása ezen a napon",
             "reszszamla_osszeg": "Részszámla összege (opcionális)",
-            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)"
+            "elozo_ev_mennyiseg": "Előző évi fogyasztás (opcionális)",
+            "szamla_mappa": "Számlamappa (opcionális)",
+            "szamla_merok": "Számla-mérők (opcionális)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -114,7 +120,9 @@
             "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk.",
             "almero": "A mennyisége a csatornadíjból levonódik (a vize a főmérőn már szerepel).",
             "reszszamla_osszeg": "Ft; ha üres, az idei, illetve a tavalyi utolsó részszámla.",
-            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132)."
+            "elozo_ev_mennyiseg": "Ha nincs két elszámoló leolvasás: pl. víznél a számlán szereplő átlagmennyiségből (2 havonta 22 m³ → 132).",
+            "szamla_mappa": "A config mappán belül, pl. a Díjnet letöltési mappája. Az új számlákból a befizetés, a valódi (diktált/leolvasott) mérőállás és gáznál a havi fűtőérték magától rögzül.",
+            "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik."
           }
         }
       },
@@ -173,6 +181,9 @@
       },
       "napelem_egyenleg": {
         "name": "Napelemes egyenleg"
+      },
+      "utolso_szamla": {
+        "name": "Utolsó számla"
       }
     }
   },

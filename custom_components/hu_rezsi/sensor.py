@@ -14,7 +14,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FIZETESI_MOD, CONF_NAPELEM, DOMAIN, PENZNEM
+from .const import CONF_FIZETESI_MOD, CONF_NAPELEM, CONF_SZAMLA_MAPPA, DOMAIN, PENZNEM
 from .koordinator import FiokAllapot, RezsiKoordinator
 from .modell import szelet_dict
 
@@ -233,6 +233,16 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         elerheto=lambda a: a.napelem is not None,
     ),
     FiokLeiras(
+        key="utolso_szamla",
+        translation_key="utolso_szamla",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: int(float(a.utolso_szamla["osszeg"])) if a.utolso_szamla.get("osszeg") is not None else None,
+        attr=lambda a: a.utolso_szamla,
+        elerheto=lambda a: a.utolso_szamla is not None,
+    ),
+    FiokLeiras(
         key="utolso_lezart",
         translation_key="utolso_lezart",
         device_class=SensorDeviceClass.MONETARY,
@@ -255,6 +265,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 for leiras in FIOK_LEIRASOK
                 if (leiras.key not in EGYENLEG_KULCSOK or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla")
                 and (leiras.key not in NAPELEM_KULCSOK or sub.data.get(CONF_NAPELEM, "nincs") != "nincs")
+                and (leiras.key != "utolso_szamla" or sub.data.get(CONF_SZAMLA_MAPPA))
             ],
             config_subentry_id=sid,
         )

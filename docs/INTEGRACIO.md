@@ -56,6 +56,21 @@ Villanyfióknál a „Napelem” mező: **bruttó** (havi; a vételezés a rende
 
 A `viz/dakov` díjszabás a DAKÖV lakossági díjaival (számlán ellenőrizve: 8 013 Ft forintra pontos); más vízműnél a `viz/egyedi` sablon díjait felülírással kell megadni. A locsolási mérő külön fiók vagy csatorna, csatornadíj nélkül.
 
+## Automatikus számlafeldolgozás
+
+A fiók „Számlamappa” mezőjében megadott mappa (a config mappán belül; a felület felajánlja a számlát tartalmazó mappákat, pl. a Díjnet-integráció `Dijnet /<szolgáltató>` mappáit) új fájljait a Rezsikövető minden frissítéskor feldolgozza:
+
+| Forrás | Fájl | Mit vesz át |
+|---|---|---|
+| MVM Next áram, gáz | `*_szamla.xml` (Díjnet) | befizetés, diktált/leolvasott mérőállás, gáznál a havi fűtőérték |
+| DAKÖV víz | PDF | befizetés, mérőállások (fő- és almérő) |
+| MOHU | XML | befizetés |
+
+- Becsült állás nem kerül be; a számla időszakán belüli, a szolgáltató által számított bontás (pl. az éves gázszámla jan. 1-je) sem. Elszámoló leolvasás csak egy elszámoló számla időszakának végén.
+- A kézzel rögzített adat mindig erősebb: azonos napra nem ír felül leolvasást, és a kézzel megadott fűtőértéket sem.
+- Közös mappánál (pl. A1 és H egy szerződésen) a „Számla-mérők” mezőben a mérő gyári számával választható szét.
+- Az új számlákról értesítés jön; az „Utolsó számla” entitás mutatja a legutóbbit.
+
 ## Entitások (fiókonként)
 
 | Entitás | Tartalom |

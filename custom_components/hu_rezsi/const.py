@@ -31,6 +31,8 @@ CONF_ALMERO_BEEPITVE = "almero_beepitve"
 CONF_ALMERO_FORRAS = "almero_forras"
 CONF_RESZSZAMLA_OSSZEG = "reszszamla_osszeg"
 CONF_ELOZO_EV = "elozo_ev_mennyiseg"
+CONF_SZAMLA_MAPPA = "szamla_mappa"  # a config mappához képest, pl. "Dijnet /mvm_next_foldgaz"
+CONF_SZAMLA_MEROK = "szamla_merok"  # vesszővel elválasztott gyári számok; üres: a mappa minden számlája
 
 EGYSEG = {"villany": "kWh", "gaz": "m³", "viz": "m³"}  # a mért (óra) egység
 DIJNET_MINTA = ".dijnet_paid_invoices_*.yaml"

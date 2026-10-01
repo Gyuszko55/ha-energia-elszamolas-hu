@@ -8,6 +8,6 @@
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Gyuszko55/ha-energia-elszamolas-hu/issues",
-  "requirements": [],
-  "version": "0.3.0"
+  "requirements": ["pypdf>=4.0"],
+  "version": "0.4.0"
 }

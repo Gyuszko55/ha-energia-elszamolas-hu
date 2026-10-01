@@ -25,6 +25,8 @@ from .const import (
     CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
     CONF_RESZSZAMLA_OSSZEG,
+    CONF_SZAMLA_MAPPA,
+    CONF_SZAMLA_MEROK,
     DIJNET_MINTA,
     CONF_FORRAS,
     CONF_FORRAS_TIPUS,
@@ -41,7 +43,10 @@ from .const import (
 )
 from pathlib import Path
 
-from . import dijnet
+from homeassistant.components import persistent_notification
+
+from . import dijnet, szamlak
+from .szamla_import import IMPORT_VERZIO, rogzit, ujraertekel
 from .modell import betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
 from .motor.egyenleg import EvesEgyenleg, egy_ev_mulva, eves_egyenleg
@@ -73,6 +78,7 @@ class FiokAllapot:
     utolso_lezart: dict[str, Any] | None = None
     egyenleg: EvesEgyenleg | None = None
     napelem: napelem.NapelemEredmeny | None = None
+    utolso_szamla: dict[str, Any] | None = None
     napelem_hiba: str | None = None
     egyenleg_hiba: str | None = None
     hiba: str | None = None
@@ -156,6 +162,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 tarolt["almero_merok"] = [kezdo_almero(dict(sub.data))]
                 valtozott = True
             egyseg = EGYSEG[sub.data[CONF_KOZMU]]
+            if sub.data.get(CONF_SZAMLA_MAPPA):
+                try:
+                    valtozott |= await self._szamlak_feldolgozasa(sid, sub, tarolt)
+                except Exception as err:  # noqa: BLE001 – a számlamappa hibája ne állítsa meg a számolást
+                    _LOGGER.warning("%s: számlamappa hiba: %s", sub.title, err)
             try:
                 allapot, lezart = await self._fiok(sid, sub, tarolt, most, egyseg)
                 valtozott |= lezart
@@ -243,22 +254,61 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 egyenleg=egyenleg,
                 egyenleg_hiba=egyenleg_hiba,
                 napelem=napelem_e,
+                utolso_szamla=_utolso_szamla(tarolt),
                 napelem_hiba=napelem_hiba,
             ),
             lezart_valt,
         )
 
 
+    async def _szamlak_feldolgozasa(self, sid: str, sub: ConfigSubentry, tarolt: dict[str, Any]) -> bool:
+        """Új számlák a fiók mappájából: befizetés, valódi mérőállások, fűtőértékek."""
+        mappa = Path(self.hass.config.config_dir) / sub.data[CONF_SZAMLA_MAPPA]
+        valtozott = False
+        if tarolt.get("szamlak") and tarolt.get("szamla_import_verzio", 1) < IMPORT_VERZIO:
+            # Régi import-verzió: a mappa összes számláját újraolvassuk, és a belőlük jött állásokat rendbe tesszük.
+            minden = await self.hass.async_add_executor_job(
+                lambda: [x for x in (szamlak.beolvas_fajl(f) for f in szamlak.uj_fajlok(mappa, set())) if x]
+            )
+            db = ujraertekel(tarolt, minden)
+            _LOGGER.info("%s: számlából jött állások újraértékelve (%s módosítás)", sub.title, db)
+            valtozott = True
+        latott = set(tarolt.get("feldolgozott_fajlok", []))
+        fajlok = await self.hass.async_add_executor_job(szamlak.uj_fajlok, mappa, latott)
+        if not fajlok:
+            return valtozott
+        beolvasott = await self.hass.async_add_executor_job(lambda: [szamlak.beolvas_fajl(f) for f in fajlok])
+        szuro = {x.strip() for x in str(sub.data.get(CONF_SZAMLA_MEROK) or "").split(",") if x.strip()}
+        j = rogzit(tarolt, [x for x in beolvasott if x], szuro)
+        tarolt["szamla_import_verzio"] = IMPORT_VERZIO
+        tarolt["feldolgozott_fajlok"] = sorted(latott | {f.name for f in fajlok})
+        if j.szamlak or j.figyelmeztetesek:
+            uzenet = (
+                f"{len(j.szamlak)} új számla ({sub.data[CONF_SZAMLA_MAPPA]}): {j.leolvasasok} mérőállás, "
+                f"{j.futoertekek} fűtőérték rögzítve"
+                + (f", {j.kihagyott_ellentmondas} ellentmondó állás kihagyva" if j.kihagyott_ellentmondas else "")
+                + "."
+                + ("\n\n" + "\n".join(j.figyelmeztetesek) if j.figyelmeztetesek else "")
+            )
+            persistent_notification.async_create(
+                self.hass, uzenet, title=f"Rezsikövető – {sub.title}", notification_id=f"{DOMAIN}_szamla_{sid}"
+            )
+        return True
+
     async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime, tovabbi: list[Szamlalo] | None = None) -> EvesEgyenleg:
         """Részszámlás fiók: kézzel rögzített + Díjnet-számlák, éves egyenleg."""
-        reszek = {r["datum"]: Decimal(str(r["osszeg"])) for r in tarolt.get("reszszamlak", [])}
+        # Számlaszám szerint egyesítve: a számlamappa és a Díjnet ugyanazt a számlát ne számolja kétszer.
+        reszek: dict[str, tuple[date, Decimal]] = {}
+        for r in tarolt.get("reszszamlak", []):
+            kulcs = r.get("sorszam") or f"{r['datum']}|{r['osszeg']}"
+            reszek[kulcs] = (d(r["datum"]), Decimal(str(r["osszeg"])))
         if sub.data.get(CONF_DIJNET):
-            for kelt, osszeg, _ in await self.hass.async_add_executor_job(
+            for kelt, osszeg, szlaszam in await self.hass.async_add_executor_job(
                 dijnet.szamlak, Path(self.hass.config.config_dir), DIJNET_MINTA, sub.data[CONF_DIJNET]
             ):
-                reszek.setdefault(kelt.isoformat(), Decimal(0))
-                reszek[kelt.isoformat()] += osszeg  # azonos napon több számla összeadódik
-        lista = [(d(k), v) for k, v in reszek.items()]
+                if szlaszam not in reszek and f"{kelt.isoformat()}|{osszeg}" not in reszek:
+                    reszek[szlaszam] = (kelt, osszeg)
+        lista = list(reszek.values())
         return eves_egyenleg(
             fiok, self.tar, szamlalo, most, lista,
             reszszamla_db_ev=int(sub.data.get(CONF_RESZSZAMLA_DB) or 11),
@@ -304,3 +354,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                     ar = ar * fe * Decimal(atv.get("korrekcios_tenyezo_alap", 1))
                 return ar
         return None
+
+
+def _utolso_szamla(tarolt: dict[str, Any]) -> dict[str, Any] | None:
+    sz = tarolt.get("szamlak") or {}
+    if not sz:
+        return None
+    sorszam, x = max(sz.items(), key=lambda kv: kv[1]["kelte"])
+    return {"sorszam": sorszam, **x, "szamlak_szama": len(sz)}
