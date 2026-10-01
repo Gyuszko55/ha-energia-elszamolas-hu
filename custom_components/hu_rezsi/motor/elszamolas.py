@@ -43,6 +43,47 @@ def honap_aranya(tol: date, ig: date) -> Decimal:
     return osszeg
 
 
+def honap_kezdetek(tol: date, ig: date) -> set[date]:
+    """Minden hónap 1-je a (tol, ig) nyílt szakaszban."""
+    napok: set[date] = set()
+    d = (tol.replace(day=1) + timedelta(days=32)).replace(day=1)
+    while d < ig:
+        napok.add(d)
+        d = (d + timedelta(days=32)).replace(day=1)
+    return napok
+
+
+def futoertek(nap: date, atv: dict[str, Any], fiok: Fiok) -> tuple[Decimal, bool]:
+    """A nap hónapjának fűtőértéke (MJ/m³) és hogy becsült-e (nincs megadva arra a hónapra)."""
+    kulcs = f"{nap.year:04d}-{nap.month:02d}"
+    if kulcs in fiok.futoertekek:
+        return Decimal(fiok.futoertekek[kulcs]), False
+    return Decimal(atv.get("futoertek_alap", 0)), True
+
+
+def atvalt(q: Decimal, nap: date, atv: dict[str, Any] | None, fiok: Fiok) -> tuple[Decimal, bool]:
+    """Mért mennyiség → elszámolási mennyiség. Gáz: m³ × korrekció × fűtőérték, egész MJ-ra kerekítve."""
+    if not atv:
+        return q, False
+    if atv.get("tipus") != "gaz_mj":
+        raise DijszabasHiba(f"ismeretlen átváltás: {atv.get('tipus')}")
+    fe, becsult = futoertek(nap, atv, fiok)
+    korr = Decimal(atv.get("korrekcios_tenyezo_alap", 1))
+    return kerekit(q * korr * fe), becsult
+
+
+def elszamolt_mennyiseg(szamlalo: Szamlalo, tol: date, ig: date, atv: dict[str, Any] | None, fiok: Fiok) -> Decimal:
+    """[tol, ig) fogyasztása elszámolási egységben, hónaponkénti fűtőértékkel."""
+    if ig <= tol:
+        return Decimal(0)
+    hatarok = sorted({tol, ig} | (honap_kezdetek(tol, ig) if atv else set()))
+    osszeg = Decimal(0)
+    for a, b in zip(hatarok, hatarok[1:]):
+        q, _ = szamlalo.fogyasztas(nap_kezdete(a), nap_kezdete(b))
+        osszeg += atvalt(max(q, Decimal(0)), a, atv, fiok)[0]
+    return osszeg
+
+
 def _md(s: str) -> tuple[int, int]:
     h, n = str(s).split("-")
     return int(h), int(n)
@@ -115,6 +156,8 @@ def szamol(
         for v in tar[h.dijszabas].verziok:
             hatarok |= _idenyhatarok(tol, ig, v.szabalyok.get("idenyszak") or [])
     hatarok |= {f.ervenyes_tol for f in fiok.feluliras}
+    if any(v.szabalyok.get("atvaltas") for h in fiok.dijszabasok for v in tar[h.dijszabas].verziok):
+        hatarok |= honap_kezdetek(tol, ig)  # a fűtőérték havonta változik: a számla is hónaponként bont
     napok = sorted(d for d in hatarok if tol <= d <= ig)
 
     szeletek: list[SzeletEredmeny] = []
@@ -130,6 +173,9 @@ def szamol(
             else:
                 q, becsult = Decimal(0), False
             q = max(q, Decimal(0))
+            atv = sajat.szabalyok.get("atvaltas")
+            elsz, becsult_fe = atvalt(q, a, atv, fiok)
+            becsult = becsult or becsult_fe
             becsult_ossz |= becsult
 
             napszam = Decimal((b - a).days)
@@ -144,17 +190,21 @@ def szamol(
             elif tipus == "eves":
                 if fiok.eves_bazis is None:
                     raise DijszabasHiba("éves kerethez meg kell adni a fiók éves bázisdátumát")
-                felhasznalt, _ = szamlalo.fogyasztas(nap_kezdete(fiok.eves_bazis), ta)
+                felhasznalt = elszamolt_mennyiseg(szamlalo, fiok.eves_bazis, a, atv, fiok)
                 keret = max(Decimal(keret_szabaly["ev_mennyiseg"]) - felhasznalt, Decimal(0))
             else:
                 keret = None
 
             if keret is None:
-                kedv, piaci = q, Decimal(0)
+                kedv, piaci = elsz, Decimal(0)
                 ar_k, ar_p = arak[ar_kulcs], arak.get("energia_piaci", Decimal(0))
             else:
-                kedv, piaci = min(q, keret), max(q - keret, Decimal(0))
+                kedv, piaci = min(elsz, keret), max(elsz - keret, Decimal(0))
                 ar_k, ar_p = arak["energia_kedvezmenyes"], arak["energia_piaci"]
+
+            # Víz: csatornadíj a mért mennyiség után (csatornánként kikapcsolható, pl. locsolási almérő).
+            csat_ar = arak.get("csatorna_m3") if sajat.szabalyok.get("csatornadij") and csatorna.csatornadij_aktiv else None
+            rhd = arak.get("rendszerhasznalati") or Decimal(0)
 
             alapdij = Decimal(0)
             if ci == 0:  # az alapdíj a fiókot terheli, nem csatornánként
@@ -164,6 +214,26 @@ def szamol(
                     alapdij = havi * napszam / Decimal((ig - tol).days)
                 else:
                     alapdij = havi * honap_aranya(a, b)
+
+            afa = arak.get("afa")
+            if afa is not None:
+                # Nettó díjak: a számla tételsoronként forintra kerekít, az ÁFA a nettóra jön.
+                szorzo = 1 + Decimal(afa) / 100
+                netto = kerekit(kedv * ar_k) + kerekit(piaci * ar_p) + kerekit(elsz * rhd)
+                csat_netto = kerekit(q * csat_ar) if csat_ar else Decimal(0)
+                energia_ft = fillerre((netto + csat_netto) * szorzo)
+                csatorna_ft = fillerre(csat_netto * szorzo)
+                # A havi alapdíj a számlán egy tétel: egyszer kerekítjük, és csak utána osztjuk szét.
+                havi_n = sajat.dijak.get("alapdij_ho") or Decimal(0)
+                arany = alapdij / havi_n if havi_n else Decimal(0)
+                alapdij_ft = fillerre(kerekit(havi_n) * arany * szorzo)
+                br_k, br_p = (ar_k + rhd) * szorzo, (ar_p + rhd) * szorzo
+            else:
+                csat = q * csat_ar if csat_ar else Decimal(0)
+                energia_ft = fillerre(kedv * ar_k + piaci * ar_p + csat)
+                csatorna_ft = fillerre(csat)
+                alapdij_ft = fillerre(alapdij)
+                br_k, br_p = ar_k, ar_p
 
             szeletek.append(
                 SzeletEredmeny(
@@ -176,12 +246,15 @@ def szamol(
                     kedvezmenyes=kedv,
                     piaci=piaci,
                     keret=keret,
-                    energia_ft=fillerre(kedv * ar_k + piaci * ar_p),
-                    alapdij_ft=fillerre(alapdij),
-                    egysegar_kedvezmenyes=ar_k,
-                    egysegar_piaci=ar_p,
+                    energia_ft=energia_ft,
+                    alapdij_ft=alapdij_ft,
+                    egysegar_kedvezmenyes=br_k,
+                    egysegar_piaci=br_p,
                     becsult=becsult,
                     csatorna=csatorna.szerep,
+                    elszamolt=elsz,
+                    egyseg=tar[sajat.azonosito].egyseg,
+                    csatorna_ft=csatorna_ft,
                 )
             )
     return IdoszakEredmeny(tol=tol, ig=ig, szeletek=szeletek, becsult=becsult_ossz)

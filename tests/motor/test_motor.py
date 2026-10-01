@@ -49,13 +49,14 @@ def test_dijfajlok_betoltodnek(tar):
 
 def test_szolgaltatoi_sor_es_oroklodes(tar):
     e = tar.felold("villany/a1", date(2026, 9, 1), "eon")
-    assert e.dijak["energia_kedvezmenyes"] == D("35.293")
-    assert e.dijak["energia_piaci"] == D("70.104")  # az alap sorból öröklődik
+    assert e.dijak["energia_kedvezmenyes"] == D("4.38976")
+    assert e.dijak["energia_piaci"] == D("31.80")  # az alap sorból öröklődik
+    assert e.dijak["afa"] == D(27)
 
 
 def test_feluliras_datumtol(tar):
     f = [Feluliras("dijak.energia_piaci", D("80"), date(2026, 6, 1))]
-    assert tar.felold("villany/a1", date(2026, 5, 31), "mvm_demasz", f).dijak["energia_piaci"] == D("70.104")
+    assert tar.felold("villany/a1", date(2026, 5, 31), "mvm_demasz", f).dijak["energia_piaci"] == D("31.80")
     assert tar.felold("villany/a1", date(2026, 6, 1), "mvm_demasz", f).dijak["energia_piaci"] == D("80")
 
 
@@ -155,8 +156,9 @@ def test_a1_keret_alatt_es_felett(tar):
     r = szamol(fiok("villany/a1"), tar, t, i, [egyenes(t, i, "300")])
     s = r.szeletek[0]
     assert s.keret == D(207) and s.kedvezmenyes == D(207) and s.piaci == D(93)  # 2523/365×30 = 207,4 → 207
-    assert r.energia_ft == (D(207) * D("36.386") + D(93) * D("70.104")).quantize(D(1))
-    assert r.alapdij_ft == D(153)
+    # nettó tételsorok: 207 × 5,25 → 1 087; 93 × 31,80 → 2 957; 300 × 23,40 → 7 020; × 1,27
+    assert r.energia_ft == ((1087 + 2957 + 7020) * D("1.27")).quantize(D(1))
+    assert r.alapdij_ft == D(154)  # 120,50 → 121 nettó × 1,27, ahogy a számlán
 
 
 def test_keret_kikapcsolva_minden_piaci(tar):
@@ -173,9 +175,10 @@ def test_h_idenyvaltas_oktober(tar):
     r = szamol(fiok("villany/h"), tar, t, i, [s])
     nyari, teli = r.szeletek
     assert (nyari.idenyszak, nyari.tol, nyari.ig, nyari.mennyiseg) == ("nyari", t, date(2025, 10, 15), D(50))
-    assert nyari.keret == D(97) and nyari.egysegar_kedvezmenyes == D("36.386")  # 2523/365×14 = 96,8 → 97
-    assert (teli.idenyszak, teli.mennyiseg, teli.keret, teli.egysegar_kedvezmenyes) == ("teli", D(200), None, D("22.962"))
-    assert r.alapdij_ft == D(50)  # a H saját alapdíja (számlánként egy hónap), nem az A1-é
+    assert nyari.keret == D(97) and nyari.egysegar_kedvezmenyes == D("36.3855")  # 2523/365×14 = 96,8 → 97
+    assert (teli.idenyszak, teli.mennyiseg, teli.keret) == ("teli", D(200), None)
+    assert abs(teli.egysegar_kedvezmenyes - D("22.962")) < D("0.0001")
+    assert r.alapdij_ft == D(51)  # a H saját alapdíja: nettó 39,50 → 40 × 1,27, egy tételként (nem az A1-é)
 
 
 def test_idenyszak_fordulo():
@@ -189,15 +192,38 @@ def test_alapdij_honaphataron_at():
     assert honap_aranya(date(2026, 1, 16), date(2026, 2, 15)) == D(16) / D(31) + D(14) / D(28)
 
 
-def test_gaz_eves_keret(tar):
+def test_gaz_eves_keret_mj(tar):
+    # 34,61 MJ/m³ (alap) → 1 800 m³ ≈ 62 298 MJ; keret 63 645 MJ.
     f = Fiok(Kozmu.GAZ, "mvm_next", [DijszabasHozzarendeles("gaz/lakossagi", date(2024, 1, 1))], [Csatorna()],
-             eves_bazis=date(2025, 7, 1))
-    s = Szamlalo([Pont(dt(2025, 7, 1), D(0), True), Pont(dt(2026, 1, 1), D(1700), True), Pont(dt(2026, 2, 1), D(1800), True)])
+             eves_bazis=date(2025, 7, 1), futoertekek={"2026-01": D("34.00")})
+    s = Szamlalo([Pont(dt(2025, 7, 1), D(0), True), Pont(dt(2026, 1, 1), D(1800), True), Pont(dt(2026, 2, 1), D(1900), True)])
     r = szamol(f, tar, date(2026, 1, 1), date(2026, 2, 1), [s])
     sz = r.szeletek[0]
-    assert sz.keret == D(29) and sz.kedvezmenyes == D(29) and sz.piaci == D(71)
-    assert r.energia_ft == (29 * D("99.163") + 71 * D("761.47")).quantize(D(1))
+    felhasznalt = sum(round(q * D("34.61")) for q in [D(1800) * n / 184 for n in (31, 31, 30, 31, 30, 31)])
+    assert sz.elszamolt == D(3400) and not sz.becsult  # januárra megadott fűtőérték: 100 m³ × 34,00
+    assert sz.keret == D(63645) - felhasznalt
+    assert sz.kedvezmenyes == sz.keret and sz.piaci == D(3400) - sz.keret
     assert r.alapdij_ft == D(973)
+
+
+def test_gaz_futoertek_hianyzik_becsult(tar):
+    f = Fiok(Kozmu.GAZ, "mvm_next", [DijszabasHozzarendeles("gaz/lakossagi", date(2024, 1, 1))], [Csatorna()],
+             eves_bazis=date(2026, 1, 1))
+    s = Szamlalo([Pont(dt(2026, 1, 1), D(0), True), Pont(dt(2026, 2, 1), D(100), True)])
+    sz = szamol(f, tar, date(2026, 1, 1), date(2026, 2, 1), [s]).szeletek[0]
+    assert sz.elszamolt == D(3461) and sz.becsult and sz.egyseg == "MJ"
+
+
+def test_viz_csatornadij(tar):
+    f = Fiok(Kozmu.VIZ, "vizmu", [DijszabasHozzarendeles("viz/egyedi", date(2024, 1, 1))], [Csatorna()],
+             feluliras=[Feluliras("dijak.viz_m3", D("400"), date(2024, 1, 1)),
+                        Feluliras("dijak.csatorna_m3", D("600"), date(2024, 1, 1)),
+                        Feluliras("dijak.alapdij_ho", D("500"), date(2024, 1, 1))])
+    s = Szamlalo([Pont(dt(2026, 1, 1), D(0), True), Pont(dt(2026, 2, 1), D(10), True)])
+    r = szamol(f, tar, date(2026, 1, 1), date(2026, 2, 1), [s])
+    assert (r.energia_ft, r.szeletek[0].csatorna_ft, r.alapdij_ft) == (D(10000), D(6000), D(500))
+    f.csatornak[0].csatornadij_aktiv = False  # locsolási almérő
+    assert szamol(f, tar, date(2026, 1, 1), date(2026, 2, 1), [s]).energia_ft == D(4000)
 
 
 def test_idoszak_modok():
@@ -214,4 +240,4 @@ def test_nyitott_idoszak_elorejelzes(tar):
     assert n.varhato.mennyiseg == D(300)
     assert n.hatralevo_keret == D(107)
     assert n.varhato_keretatlepes == date(2025, 6, 21)
-    assert n.eddig.alapdij_ft == D(153)  # az alapdíj a teljes hónapra jár
+    assert n.eddig.alapdij_ft == D(154)  # az alapdíj a teljes hónapra jár

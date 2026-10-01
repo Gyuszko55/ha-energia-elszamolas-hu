@@ -1,0 +1,20 @@
+azonosito: viz/egyedi
+nev: "Víz- és csatornadíj (egyedi)"
+kozmu: viz
+egyseg: m3
+# Nincs országos vízdíj: a helyi vízmű díjait a fiókban, felülírással kell megadni
+# (hu_rezsi.feluliras: dijak.viz_m3, dijak.csatorna_m3, dijak.alapdij_ho – bruttó Ft).
+verziok:
+  - ervenyes_tol: 2000-01-01
+    forras: "Sablon – a díjakat a helyi vízmű számlájáról kell megadni"
+    szabalyok:
+      keret: {tipus: nincs}
+      ar: viz_m3
+      csatornadij: {alapertelmezes: be}
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # BRUTTÓ Ft (felülírással add meg)
+        viz_m3: 0
+        csatorna_m3: 0
+        alapdij_ho: 0

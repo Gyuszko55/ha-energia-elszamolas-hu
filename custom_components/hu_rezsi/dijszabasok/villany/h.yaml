@@ -4,7 +4,9 @@ kozmu: villany
 egyseg: kWh
 verziok:
   - ervenyes_tol: 2024-01-01
-    forras: "A v1 díjtáblázata (2026. szeptemberi lakossági árak), visszamenőleg is alkalmazva – ELLENŐRIZENDŐ a számlán"
+    forras: >-
+      A v1 díjtáblázatának bruttó árai nettóra visszaszámolva (ÁFA 27%), H-tarifás számla nélkül – ELLENŐRIZENDŐ.
+      A téli ár itt az energia- és a rendszerhasználati díj együtt.
     szabalyok:
       alapdij:
         mod: idoszakonkent
@@ -18,10 +20,11 @@ verziok:
           dijszabas: villany/a1
           sajat_keret: true
     dijak:
-      alap:
-        energia_teli: 22.962
-        alapdij_ho: 50.165
-      eon: {energia_teli: 23.520}
-      opus_titasz: {energia_teli: 23.520}
-      elmu: {energia_teli: 23.152}
-      elmu_emasz: {energia_teli: 22.682}
+      alap:                    # NETTÓ Ft
+        afa: 27
+        energia_teli: 18.08031   # bruttó 22,962
+        alapdij_ho: 39.50        # bruttó 50,165
+      eon: {energia_teli: 18.51969}
+      opus_titasz: {energia_teli: 18.51969}
+      elmu: {energia_teli: 18.22992}
+      elmu_emasz: {energia_teli: 17.85984}

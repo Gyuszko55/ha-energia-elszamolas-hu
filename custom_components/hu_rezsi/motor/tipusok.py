@@ -54,6 +54,7 @@ class Csatorna:
     szerep: str = "vetelezes"
     merok: list[Mero] = field(default_factory=list)
     keret_aktiv: bool = True
+    csatornadij_aktiv: bool = True  # víz: locsolási almérőnél kikapcsolva
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,7 @@ class Fiok:
     csatornak: list[Csatorna]
     feluliras: list[Feluliras] = field(default_factory=list)
     eves_bazis: date | None = None  # az utolsó éves elszámoló leolvasás napja (éves kerethez)
+    futoertekek: dict[str, Decimal] = field(default_factory=dict)  # gáz: {"ÉÉÉÉ-HH": MJ/m³}
 
 
 @dataclass
@@ -99,6 +101,9 @@ class SzeletEredmeny:
     egysegar_piaci: Decimal
     becsult: bool
     csatorna: str = "vetelezes"
+    elszamolt: Decimal | None = None  # elszámolási egységben (gáznál MJ); None = mennyiseg
+    egyseg: str = ""
+    csatorna_ft: Decimal = Decimal(0)  # víz: ebből a csatornadíj (az energia_ft része)
 
     @property
     def osszesen_ft(self) -> Decimal:

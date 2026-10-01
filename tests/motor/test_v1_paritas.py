@@ -45,11 +45,17 @@ def _dt(d: date) -> datetime:
 def v1_mod_tar() -> DijszabasTar:
     """A díjfájlok a v1 szabályaival: 6,91 kWh/nap kerekítés nélkül, napra arányosított alapdíj."""
     tar = DijszabasTar.mappabol(DIJSZABASOK)
-    for azon in ("villany/a1", "villany/h"):
+    v1_arak = {  # a v1 díjtáblázata, bruttó (MVM Démász)
+        "villany/a1": {"energia_kedvezmenyes": D("36.386"), "energia_piaci": D("70.104"), "alapdij_ho": D("153.035")},
+        "villany/h": {"energia_teli": D("22.962"), "alapdij_ho": D("50.165")},
+    }
+    for azon, arak in v1_arak.items():
         for v in tar[azon].verziok:
             v.szabalyok["alapdij"] = {"mod": "napi_aranyos"}
             if "keret" in v.szabalyok:
                 v.szabalyok["keret"] = {"tipus": "napi_aranyos", "napi_mennyiseg": D("6.91")}
+            v.dijak.clear()
+            v.dijak["alap"] = arak
     return tar
 
 
