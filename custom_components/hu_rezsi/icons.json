@@ -63,6 +63,18 @@
       },
       "osszesen_esedekes": {
         "default": "mdi:calendar-alert"
+      },
+      "szolgaltato": {
+        "default": "mdi:domain"
+      },
+      "szamlazasi_utem": {
+        "default": "mdi:calendar-sync"
+      },
+      "elszamolasi_ciklus": {
+        "default": "mdi:calendar-refresh"
+      },
+      "kovetkezo_elszamolas": {
+        "default": "mdi:calendar-star"
       }
     }
   }

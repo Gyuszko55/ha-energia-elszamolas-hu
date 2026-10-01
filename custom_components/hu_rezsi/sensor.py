@@ -23,7 +23,15 @@ EGYENLEG_KULCSOK = {"befizetve", "varhato_eves_koltseg", "varhato_egyenleg"}
 NAPELEM_KULCSOK = {"betaplalas", "betaplalas_jovairas", "napelem_egyenleg"}
 SZAMLA_KULCSOK = {"utolso_szamla", "eves_szamlaosszeg", "kovetkezo_szamla"}
 # Fix díjas (mérő nélküli) fióknál csak ezek értelmesek:
-FIX_KULCSOK = {"koltseg_eddig", "koltseg_varhato", "utolso_szamla", "eves_szamlaosszeg", "kovetkezo_szamla", "utolso_lezart"}
+FIX_KULCSOK = {
+    "koltseg_eddig", "koltseg_varhato", "utolso_szamla", "eves_szamlaosszeg", "kovetkezo_szamla", "utolso_lezart",
+    "szolgaltato", "szamlazasi_utem",
+}
+UTEM_NEV = {1: "havonta", 2: "kéthavonta", 3: "negyedévente", 6: "félévente", 12: "évente"}
+
+
+def _utem_nev(honap: int | None) -> str | None:
+    return None if not honap else UTEM_NEV.get(int(honap), f"{honap} havonta")
 
 
 def _napelem_attr(a: FiokAllapot) -> dict[str, Any]:
@@ -326,9 +334,48 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement=PENZNEM,
         suggested_display_precision=0,
-        ertek=lambda a: a.utolso_lezart["osszesen_ft"],
-        attr=lambda a: {k: v for k, v in a.utolso_lezart.items() if k != "szeletek"},
-        elerheto=lambda a: a.utolso_lezart is not None,
+        # Az integráció saját havi (negyedéves) lezárása; amíg az első időszak nem zárult le, „ismeretlen”, nem elérhetetlen.
+        ertek=lambda a: a.utolso_lezart["osszesen_ft"] if a.utolso_lezart else None,
+        attr=lambda a: {k: v for k, v in a.utolso_lezart.items() if k != "szeletek"}
+        if a.utolso_lezart
+        else {
+            "allapot": "még nincs lezárt időszak",
+            "elso_lezaras": a.ig.isoformat(),
+            "magyarazat": "Az integráció az elszámolási időszak (hónap, negyedév) végén maga zárja le az időszakot a mért fogyasztásból.",
+        },
+        elerheto=lambda a: True,
+    ),
+    FiokLeiras(
+        key="szolgaltato",
+        translation_key="szolgaltato",
+        ertek=lambda a: a.utem.get("szolgaltato"),
+        attr=lambda a: {"szamlazasi_utem": _utem_nev(a.utem.get("szamlazas_honap"))},
+        elerheto=lambda a: a.utem is not None,
+    ),
+    FiokLeiras(
+        key="szamlazasi_utem",
+        translation_key="szamlazasi_utem",
+        ertek=lambda a: _utem_nev(a.utem.get("szamlazas_honap")),
+        attr=lambda a: {"honap": a.utem.get("szamlazas_honap")},
+        elerheto=lambda a: a.utem is not None and bool(a.utem.get("szamlazas_honap")),
+    ),
+    FiokLeiras(
+        key="elszamolasi_ciklus",
+        translation_key="elszamolasi_ciklus",
+        ertek=lambda a: _utem_nev(a.utem.get("elszamolas_honap")),
+        attr=lambda a: {
+            "honap": a.utem.get("elszamolas_honap"),
+            "kovetkezo_elszamolas": a.utem["kovetkezo_elszamolas"].isoformat() if a.utem.get("kovetkezo_elszamolas") else None,
+        },
+        elerheto=lambda a: a.utem is not None,
+    ),
+    FiokLeiras(
+        key="kovetkezo_elszamolas",
+        translation_key="kovetkezo_elszamolas",
+        device_class=SensorDeviceClass.DATE,
+        ertek=lambda a: a.utem["kovetkezo_elszamolas"],
+        attr=lambda a: {"elszamolasi_ciklus": _utem_nev(a.utem.get("elszamolas_honap")), "becsles": "az utolsó elszámoló leolvasás + a ciklus"},
+        elerheto=lambda a: a.utem is not None and a.utem.get("kovetkezo_elszamolas") is not None,
     ),
 )
 

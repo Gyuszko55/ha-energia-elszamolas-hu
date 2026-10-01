@@ -219,6 +219,18 @@
       },
       "osszesen_esedekes": {
         "name": "Rezsi esedékes ebben a hónapban"
+      },
+      "szolgaltato": {
+        "name": "Szolgáltató"
+      },
+      "szamlazasi_utem": {
+        "name": "Számlázási ütem"
+      },
+      "elszamolasi_ciklus": {
+        "name": "Elszámolási ciklus"
+      },
+      "kovetkezo_elszamolas": {
+        "name": "Következő elszámolás"
       }
     }
   },

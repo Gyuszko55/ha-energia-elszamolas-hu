@@ -335,6 +335,7 @@ class HuRezsiPanel extends HTMLElement {
     const allapot = (id) => {
       const st = this._hass.states[id];
       if (!st) return "–";
+      if (st.state === "unknown" && st.attributes.elso_lezaras) return `első: ${nap(st.attributes.elso_lezaras)}`;
       if (st.state === "unavailable" || st.state === "unknown") return "nincs adat";
       let szoveg;
       try {

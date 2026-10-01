@@ -219,6 +219,18 @@
       },
       "osszesen_esedekes": {
         "name": "Utilities due this month"
+      },
+      "szolgaltato": {
+        "name": "Provider"
+      },
+      "szamlazasi_utem": {
+        "name": "Billing frequency"
+      },
+      "elszamolasi_ciklus": {
+        "name": "Settlement cycle"
+      },
+      "kovetkezo_elszamolas": {
+        "name": "Next settlement"
       }
     }
   },

@@ -13,6 +13,8 @@
 - Víz-átalány: a locsolási almérő tavalyi aránya a csatornadíjból levonódik.
 - Panel: minden kártya jobb felső sarkában hárompontos menü – **Előzmények** (HA előzmény-nézet), **Beállítások** (a fiók entitásai értékkel; koppintásra az entitás beállításai, „Eszköz oldala” gomb), **Kapcsolódó** (eszköz, integráció).
 - Saját ikon minden szenzorhoz (`icons.json`).
+- Új entitások fiókonként: **Szolgáltató**, **Számlázási ütem**, **Elszámolási ciklus**, **Következő elszámolás**.
+- „Utolsó lezárt időszak”: az első lezárásig „ismeretlen” (nem elérhetetlen), attribútumban az első lezárás napjával.
 
 ## Rezsikövető 2.0.0b1 – 2026-10-01 (első béta)
 
