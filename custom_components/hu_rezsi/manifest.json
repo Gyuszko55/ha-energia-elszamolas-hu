@@ -3,7 +3,7 @@
   "name": "Rezsikövető",
   "after_dependencies": ["recorder"],
   "dependencies": ["http", "panel_custom", "websocket_api"],
-  "codeowners": ["@Gyuszko55"],
+  "codeowners": ["@Gyuszko55", "@Krissz55555"],
   "config_flow": true,
   "documentation": "https://github.com/Gyuszko55/ha-energia-elszamolas-hu",
   "integration_type": "service",

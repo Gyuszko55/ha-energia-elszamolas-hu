@@ -183,6 +183,11 @@ Egy hibás bejegyzés törlése: Fejlesztői eszközök → Események.
 - **Frissítés:** másold felül a fájlokat, és indítsd újra a HA-t. A beállított értékek (árak, óraállások, naplók) megmaradnak.
 - **Eltávolítás:** töröld a `packages/energia_elszamolas`, a `custom_templates/villany_elszamolas.jinja`, az `energia_elszamolas` és a `www/hu-szam-sor` mappát/fájlt, az erőforrást és a nézetet, majd indítsd újra a HA-t.
 
+## Készítők
+
+- **Gyuszko55** – ötlet, tervezés, a v1 csomag és a Rezsikövető integráció
+- **Krissz55555** (Krisztián) – társszerző, a Rezsikövető integráció közreműködője
+
 ## Licenc
 
 MIT. Használd, alakítsd át szabadon, garancia nélkül. A számítás tájékoztató jellegű, nem helyettesíti a szolgáltatói számlát (lásd a figyelmeztetést a lap tetején).
