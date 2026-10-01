@@ -169,6 +169,10 @@ def eves_egyenleg(
     for t in tovabbi or []:
         t_most, _ = t.ertek(most)
         arany = (t_most - t.ertek(nap_kezdete(bazis))[0]) / fo_eddig if fo_eddig > 0 else Decimal(0)
+        if fo_eddig <= 0 and elozo_bazis is not None and elozo:
+            # Még nincs idei adat: a tavalyi év aránya (pl. locsolás a főmérő fogyasztásához képest).
+            t_tavaly, _ = t.fogyasztas(nap_kezdete(elozo_bazis), nap_kezdete(bazis))
+            arany = max(t_tavaly, Decimal(0)) / elozo
         t_pontok = [p for p in t.pontok if p.ido <= most] + [Pont(most, t_most, False)]
         for p in pontok:
             if p.ido > most:

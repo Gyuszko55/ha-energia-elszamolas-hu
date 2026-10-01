@@ -63,3 +63,18 @@ def test_almero_elorejelzes_aranyosan():
     f0 = dataclasses.replace(f, csatornak=f.csatornak[:1])  # ugyanaz almérő nélkül
     e0 = eves_egyenleg(f0, TAR, fo, datetime(2026, 10, 1), [], reszszamla_db_ev=5, elozo_ev_mennyiseg=D(100))
     assert e.varhato_eves < e0.varhato_eves  # az almérő levonása csökkenti
+
+
+def test_almero_tavalyi_arany_ha_nincs_idei_adat():
+    import dataclasses
+    from motor.tipusok import Csatorna as Cs
+    f = Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))],
+             [Cs(szerep="fo"), Cs(szerep="almero", csatornadij_aktiv=False, levonas_fobol=True)], eves_bazis=date(2026, 7, 15))
+    # tavaly 128 m³ a főmérőn, 36 m³ az almérőn; idén még nincs leolvasás
+    fo = Szamlalo([Pont(datetime(2025, 7, 27), D(684), True), Pont(datetime(2026, 7, 15), D(812), True)])
+    al = Szamlalo([Pont(datetime(2025, 7, 27), D(81), True), Pont(datetime(2026, 7, 15), D(117), True)])
+    e = eves_egyenleg(f, TAR, fo, datetime(2026, 10, 1), [], reszszamla_db_ev=12, elozo_bazis=date(2025, 7, 27), tovabbi=[al])
+    f0 = dataclasses.replace(f, csatornak=f.csatornak[:1])
+    e0 = eves_egyenleg(f0, TAR, fo, datetime(2026, 10, 1), [], reszszamla_db_ev=12, elozo_bazis=date(2025, 7, 27))
+    assert e.elozo_ev_fogyasztas == D(128)
+    assert e.varhato_eves < e0.varhato_eves  # a tavalyi 28%-os almérő-arány csökkenti a csatornadíjat
