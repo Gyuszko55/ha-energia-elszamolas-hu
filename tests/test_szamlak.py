@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal as D
 
 import tests.conftest  # noqa: F401 – a csomag mappáját a path-ra teszi
-from szamla_import import rogzit, ujraertekel
+from szamla_import import IMPORT_VERZIO, rogzit, ujraertekel
 from szamlak import dakov_szoveg, mohu_xml, mvm_xml
 
 MVM_GAZ = """<?xml version="1.0" encoding="UTF-8"?><szamla szlaszam="111"><fejlec><szamlainfo>
@@ -130,5 +130,11 @@ def test_ujraertekel_regi_importot():
         {"datum": "2025-07-11", "allas": "7410", "elszamolasi": True, "megjegyzes": "v1 éves leolvasás"},
     ]
     db = ujraertekel(t, [mvm_xml(MVM_GAZ_ELSZAMOLO.encode())])
-    assert db == 2 and t["szamla_import_verzio"] == 2
+    assert db == 2 and t["szamla_import_verzio"] == IMPORT_VERZIO
     assert [(lo["datum"], lo["elszamolasi"]) for lo in t["merok"][0]["leolvasasok"]] == [("2025-07-12", False), ("2025-07-11", True)]
+
+
+def test_szamla_meta_idoszak_es_valodi_allas():
+    from szamla_import import szamla_meta
+    m = szamla_meta(mvm_xml(MVM_GAZ_ELSZAMOLO.encode()))
+    assert m["idoszak"] == ["2025-07-12", "2026-07-14"] and m["utolso_valodi_allas"] == "2026-07-14" and m["tipus"] == "elszamolo"

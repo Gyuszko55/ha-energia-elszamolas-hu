@@ -184,6 +184,9 @@
       },
       "utolso_szamla": {
         "name": "Utolsó számla"
+      },
+      "varhato_elszamolas": {
+        "name": "Várható elszámolás"
       }
     }
   },

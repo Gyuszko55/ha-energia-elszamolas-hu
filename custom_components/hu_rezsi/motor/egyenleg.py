@@ -206,3 +206,44 @@ def eves_egyenleg(
         elozo_ev=visszameres,
         megbizhato=elozo is not None and elozo > 0 and utolso > 0,
     )
+
+
+@dataclass
+class VarhatoElszamolas:
+    tol: date  # az utolsó valódi elszámolás vége
+    tenyleges: Decimal  # a mért fogyasztás költsége azóta, alapdíjjal
+    befizetve: Decimal  # az azóta kiállított számlák összege
+    szamlak_db: int
+    mennyiseg: Decimal
+    becsult: bool  # a mostani állás becsült (pl. a legutóbbi leolvasás óta csak szenzor vagy semmi)
+
+    @property
+    def egyenleg(self) -> Decimal:
+        """> 0: várható visszatérítés, < 0: várható ráfizetés."""
+        return _ft(self.befizetve - self.tenyleges)
+
+
+def varhato_elszamolas(
+    fiok: Fiok,
+    tar: DijszabasTar,
+    szamlalo: Szamlalo,
+    most: datetime,
+    tol: date,
+    befizetesek: list[tuple[date, Decimal]],
+    tovabbi: list[Szamlalo] | None = None,
+) -> VarhatoElszamolas:
+    """Ha ma lenne az elszámolás: a [tol, most] fogyasztás költsége mínusz az azóta kiállított számlák."""
+    ma = most.date()
+    energia = _energia(fiok, tar, szamlalo, tol, ma + timedelta(days=1), most, tovabbi)
+    alap_db = len(honap_kezdetek(tol, ma + timedelta(days=1)))
+    tenyleges = energia + havi_alapdij_brutto(fiok, tar, ma) * alap_db
+    q, becsult = szamlalo.fogyasztas(nap_kezdete(tol), most)
+    sajat = [(d, x) for d, x in befizetesek if d > tol]
+    return VarhatoElszamolas(
+        tol=tol,
+        tenyleges=_ft(tenyleges),
+        befizetve=_ft(sum((x for _, x in sajat), Decimal(0))),
+        szamlak_db=len(sajat),
+        mennyiseg=max(q, Decimal(0)),
+        becsult=becsult,
+    )

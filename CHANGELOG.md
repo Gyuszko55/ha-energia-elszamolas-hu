@@ -3,7 +3,8 @@
 ## [Fejlesztés] Rezsikövető 0.4.0-dev (2026-10-01)
 
 - **Automatikus számlafeldolgozás** fiókonként egy mappából (pl. a Díjnet letöltési mappája): MVM áram/gáz és MOHU XML, DAKÖV PDF (pypdf). Rögzíti a befizetést, a valódi (diktált/leolvasott) mérőállást, gáznál a havi fűtőértéket; a becsült és a számla időszakán belüli számított állás kimarad; mérők gyári szám szerint (közös mappa szétválasztható); értesítés az új számlákról; „Utolsó számla” entitás.
-- Befizetések számlaszám szerint egyesítve (számlamappa + Díjnet).
+- Befizetések számlaszám szerint egyesítve (számlamappa + Díjnet; sorszám híján nap + összeg egységes formában).
+- **Várható elszámolás** entitás minden fióknál: az utolsó valódi elszámolás óta mért fogyasztás költsége mínusz az azóta kiállított számlák.
 
 ## [Fejlesztés] Rezsikövető 0.3.0-dev (2026-10-01)
 

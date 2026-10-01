@@ -19,7 +19,8 @@ except ImportError:  # tesztek: a csomag HA nélkül, közvetlenül
 
 
 # 2: a számla időszakán belüli (számított) állások kimaradnak; elszámoló csak az időszak végén.
-IMPORT_VERZIO = 2
+# 3: a számla időszaka és utolsó valódi mérőállásának napja is tárolva (várható elszámoláshoz).
+IMPORT_VERZIO = 3
 
 
 @dataclass
@@ -83,6 +84,19 @@ def _illeszkedik(mero: dict[str, Any], nap: date, allas: Decimal) -> bool:
     return True
 
 
+def szamla_meta(sz: Szamla) -> dict[str, Any]:
+    valodi = [m.datum for m in sz.meroallasok if m.valodi and (not sz.idoszak or m.datum in sz.idoszak)]
+    return {
+        "kelte": sz.kelte.isoformat(),
+        "osszeg": None if sz.osszeg is None else str(sz.osszeg),
+        "tipus": sz.tipus,
+        "forras": sz.forras,
+        "fajl": sz.fajl,
+        "idoszak": [sz.idoszak[0].isoformat(), sz.idoszak[1].isoformat()] if sz.idoszak and all(sz.idoszak) else None,
+        "utolso_valodi_allas": max(valodi).isoformat() if valodi else None,
+    }
+
+
 def _elszamolo_allas(sz: Szamla, ma: Meroallas) -> bool:
     """Elszámoló (éves) leolvasás: leolvasott állás egy elszámoló számla időszakának VÉGÉN."""
     if not (ma.leolvasott and sz.tipus == "elszamolo"):
@@ -118,6 +132,10 @@ def ujraertekel(tarolt: dict[str, Any], szamlak: list[Szamla]) -> int:
                     valtozas += 1
                 uj.append(lo)
             mero["leolvasasok"] = uj
+    ismert = tarolt.get("szamlak") or {}
+    for sorszam, sz in szerint.items():
+        if sorszam in ismert:
+            ismert[sorszam] = szamla_meta(sz)
     tarolt["szamla_import_verzio"] = IMPORT_VERZIO
     return valtozas
 
@@ -131,13 +149,7 @@ def rogzit(tarolt: dict[str, Any], szamlak: list[Szamla], szuro: set[str] | None
     for sz in sorted(szamlak, key=lambda x: x.kelte):
         if not sz.sorszam or sz.sorszam in ismert or not hozzatartozik(sz, szuro):
             continue
-        ismert[sz.sorszam] = {
-            "kelte": sz.kelte.isoformat(),
-            "osszeg": None if sz.osszeg is None else str(sz.osszeg),
-            "tipus": sz.tipus,
-            "forras": sz.forras,
-            "fajl": sz.fajl,
-        }
+        ismert[sz.sorszam] = szamla_meta(sz)
         j.szamlak.append(sz.sorszam)
         # Befizetés: ha kézzel már rögzítve ugyanaz a nap és összeg (vagy a sorszám), nem duplikáljuk.
         if sz.osszeg is not None and not any(

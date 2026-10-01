@@ -81,6 +81,8 @@ A fiók „Számlamappa” mezőjében megadott mappa (a config mappán belül; 
 | Hátralévő kedvezményes keret | Attribútum: várható keretátlépés napja |
 | Aktuális egységár | A következő egység ára – a HA Energia irányítópulthoz ár-entitásként is megadható |
 | Éves fogyasztás | Az utolsó elszámoló (éves) leolvasás óta |
+| Várható elszámolás | „Ha ma lenne az elszámolás”: az utolsó valódi elszámoló számla időszakának vége óta mért fogyasztás költsége (alapdíjjal) és az azóta kiállított számlák különbsége. Pozitív: visszatérítés, negatív: ráfizetés. Ha nincs elszámoló számla, az első számla időszakától számol. |
+| Utolsó számla | A számlamappából feldolgozott legutóbbi számla összege (sorszám, kelte, típus) |
 | Utolsó lezárt időszak | Az időszak végén automatikusan lezárul (a következő időszak első napján 01:00 után) |
 
 A háztartáson: **Rezsi eddig összesen** és **Rezsi várható összesen**.

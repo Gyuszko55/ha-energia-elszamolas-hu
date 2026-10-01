@@ -49,7 +49,7 @@ from . import dijnet, szamlak
 from .szamla_import import IMPORT_VERZIO, rogzit, ujraertekel
 from .modell import betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
-from .motor.egyenleg import EvesEgyenleg, egy_ev_mulva, eves_egyenleg
+from .motor.egyenleg import EvesEgyenleg, VarhatoElszamolas, egy_ev_mulva, eves_egyenleg, varhato_elszamolas
 from .motor.elszamolas import _hozzarendeles, futoertek
 from .motor.dijszabas import DijszabasHiba, DijszabasTar
 from .motor.elorejelzes import NyitottIdoszak, idoszak, nyitott
@@ -79,6 +79,7 @@ class FiokAllapot:
     egyenleg: EvesEgyenleg | None = None
     napelem: napelem.NapelemEredmeny | None = None
     utolso_szamla: dict[str, Any] | None = None
+    elszamolas: VarhatoElszamolas | None = None
     napelem_hiba: str | None = None
     egyenleg_hiba: str | None = None
     hiba: str | None = None
@@ -235,6 +236,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 napelem_e = await self._napelem(sub, tarolt, fiok, szamlalo, tol, ig, most, mod)
             except (NincsAdat, ValueError, DijszabasHiba, KeyError) as err:
                 napelem_hiba = str(err)
+        elszamolas = None
+        try:
+            elszamolas = await self._varhato_elszamolas(sub, tarolt, fiok, szamlalo, most, tovabbi)
+        except (NincsAdat, ValueError, DijszabasHiba) as err:
+            _LOGGER.debug("%s: várható elszámolás nem számolható: %s", sub.title, err)
         egyenleg, egyenleg_hiba = None, None
         if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
             try:
@@ -255,6 +261,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 egyenleg_hiba=egyenleg_hiba,
                 napelem=napelem_e,
                 utolso_szamla=_utolso_szamla(tarolt),
+                elszamolas=elszamolas,
                 napelem_hiba=napelem_hiba,
             ),
             lezart_valt,
@@ -295,20 +302,54 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             )
         return True
 
-    async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime, tovabbi: list[Szamlalo] | None = None) -> EvesEgyenleg:
-        """Részszámlás fiók: kézzel rögzített + Díjnet-számlák, éves egyenleg."""
-        # Számlaszám szerint egyesítve: a számlamappa és a Díjnet ugyanazt a számlát ne számolja kétszer.
+    async def _befizetesek(self, sub: ConfigSubentry, tarolt: dict[str, Any]) -> dict[str, tuple[date, Decimal]]:
+        """Számlaszám szerint egyesítve: a számlamappa és a Díjnet ugyanazt a számlát ne számolja kétszer."""
         reszek: dict[str, tuple[date, Decimal]] = {}
         for r in tarolt.get("reszszamlak", []):
-            kulcs = r.get("sorszam") or f"{r['datum']}|{r['osszeg']}"
+            kulcs = r.get("sorszam") or _bef_kulcs(r["datum"], r["osszeg"])
             reszek[kulcs] = (d(r["datum"]), Decimal(str(r["osszeg"])))
         if sub.data.get(CONF_DIJNET):
             for kelt, osszeg, szlaszam in await self.hass.async_add_executor_job(
                 dijnet.szamlak, Path(self.hass.config.config_dir), DIJNET_MINTA, sub.data[CONF_DIJNET]
             ):
-                if szlaszam not in reszek and f"{kelt.isoformat()}|{osszeg}" not in reszek:
+                if szlaszam not in reszek and _bef_kulcs(kelt.isoformat(), osszeg) not in reszek:
                     reszek[szlaszam] = (kelt, osszeg)
-        lista = list(reszek.values())
+        return reszek
+
+    async def _varhato_elszamolas(
+        self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime, tovabbi: list[Szamlalo]
+    ) -> VarhatoElszamolas | None:
+        """Kiindulás: az utolsó valódi elszámoló számla időszakának vége; ha nincs, az első számla kezdete,
+        végső esetben az éves bázis. Befizetés: az azóta kiállított számlák (a kiinduló elszámoló nélkül)."""
+        szamlak_meta = tarolt.get("szamlak") or {}
+        elszamolok = [
+            (d(x["idoszak"][1]) if x.get("idoszak") else d(x["utolso_valodi_allas"]), s)
+            for s, x in szamlak_meta.items()
+            if x.get("tipus") == "elszamolo" and (x.get("idoszak") or x.get("utolso_valodi_allas"))
+        ]
+        kizart: set[str] = set()
+        if elszamolok:
+            tol, sorszam = max(elszamolok)
+            meta = szamlak_meta[sorszam]
+            # A kiinduló elszámoló számla nem befizetés az új időszakra (sorszám vagy kelte+összeg szerint is).
+            kizart = {sorszam, _bef_kulcs(meta["kelte"], meta["osszeg"])}
+        elif szamlak_meta:
+            kezdetek = [d(x["idoszak"][0]) for x in szamlak_meta.values() if x.get("idoszak")]
+            tol = min(kezdetek) if kezdetek else min(d(x["kelte"]) for x in szamlak_meta.values())
+        elif fiok.eves_bazis and sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
+            tol = fiok.eves_bazis
+        else:
+            return None
+        # Nem kezdődhet a mérők előtt (pl. az első számla időszaka a mérő felszerelése előtt indul).
+        elso_mero = min((m.beepitve for m in fiok.csatornak[0].merok), default=tol)
+        tol = max(tol, elso_mero)
+        reszek = await self._befizetesek(sub, tarolt)
+        befizetesek = [v for k, v in reszek.items() if k not in kizart]
+        return varhato_elszamolas(fiok, self.tar, szamlalo, most, tol, befizetesek, tovabbi)
+
+    async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime, tovabbi: list[Szamlalo] | None = None) -> EvesEgyenleg:
+        """Részszámlás fiók: kézzel rögzített + Díjnet-számlák, éves egyenleg."""
+        lista = list((await self._befizetesek(sub, tarolt)).values())
         return eves_egyenleg(
             fiok, self.tar, szamlalo, most, lista,
             reszszamla_db_ev=int(sub.data.get(CONF_RESZSZAMLA_DB) or 11),
@@ -362,3 +403,8 @@ def _utolso_szamla(tarolt: dict[str, Any]) -> dict[str, Any] | None:
         return None
     sorszam, x = max(sz.items(), key=lambda kv: kv[1]["kelte"])
     return {"sorszam": sorszam, **x, "szamlak_szama": len(sz)}
+
+
+def _bef_kulcs(datum: Any, osszeg: Any) -> str:
+    """Befizetés azonosítója sorszám híján: nap + összeg egységes formában (11202 = 11202.0)."""
+    return f"{str(datum)[:10]}|{Decimal(str(osszeg)).quantize(Decimal('0.01'))}"

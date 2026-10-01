@@ -184,6 +184,9 @@
       },
       "utolso_szamla": {
         "name": "Last invoice"
+      },
+      "varhato_elszamolas": {
+        "name": "Expected settlement"
       }
     }
   },

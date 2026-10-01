@@ -78,3 +78,15 @@ def test_almero_tavalyi_arany_ha_nincs_idei_adat():
     e0 = eves_egyenleg(f0, TAR, fo, datetime(2026, 10, 1), [], reszszamla_db_ev=12, elozo_bazis=date(2025, 7, 27))
     assert e.elozo_ev_fogyasztas == D(128)
     assert e.varhato_eves < e0.varhato_eves  # a tavalyi 28%-os almérő-arány csökkenti a csatornadíjat
+
+
+def test_varhato_elszamolas():
+    from motor.egyenleg import varhato_elszamolas
+    f = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/a1", date(2024, 1, 1))], [Csatorna()])
+    # 04-10 óta 1 800 kWh; azóta két részszámla (13 006 + 14 624), előtte egy (nem számít)
+    s = Szamlalo([Pont(datetime(2026, 4, 10), D(18827), True), Pont(datetime(2026, 9, 29), D(20627), True)])
+    bef = [(date(2026, 4, 13), D(17219)), (date(2026, 5, 14), D(13006)), (date(2026, 6, 9), D(14624))]
+    e = varhato_elszamolas(f, TAR, s, datetime(2026, 9, 29), date(2026, 4, 10), bef)
+    assert e.mennyiseg == D(1800) and e.szamlak_db == 3 and e.befizetve == D(17219 + 13006 + 14624)
+    assert D(80000) < e.tenyleges < D(95000)
+    assert e.egyenleg == e.befizetve - e.tenyleges < 0  # ráfizetés várható
