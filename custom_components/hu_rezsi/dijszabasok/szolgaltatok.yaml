@@ -6,4 +6,5 @@ elmu: {nev: "ELMŰ", kozmu: [villany]}
 elmu_emasz: {nev: "ELMŰ-ÉMÁSZ", kozmu: [villany]}
 mvm_next: {nev: "MVM Next", kozmu: [gaz]}
 vizmu: {nev: "Helyi vízmű", kozmu: [viz]}
+dakov: {nev: "DAKÖV", kozmu: [viz]}
 egyedi: {nev: "Egyedi (kézi díjak)", kozmu: [villany, gaz, viz]}

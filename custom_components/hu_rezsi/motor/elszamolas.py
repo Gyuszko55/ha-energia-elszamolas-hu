@@ -219,14 +219,16 @@ def szamol(
             if afa is not None:
                 # Nettó díjak: a számla tételsoronként forintra kerekít, az ÁFA a nettóra jön.
                 szorzo = 1 + Decimal(afa) / 100
-                netto = kerekit(kedv * ar_k) + kerekit(piaci * ar_p) + kerekit(elsz * rhd)
-                csat_netto = kerekit(q * csat_ar) if csat_ar else Decimal(0)
+                # „tetel”: tételsoronként forintra (MVM); „vegosszeg”: fillérre, csak a végösszeg forintra (pl. DAKÖV).
+                kr = kerekit if sajat.szabalyok.get("szamla_kerekites", "tetel") == "tetel" else fillerre
+                netto = kr(kedv * ar_k) + kr(piaci * ar_p) + kr(elsz * rhd)
+                csat_netto = kr(q * csat_ar) if csat_ar else Decimal(0)
                 energia_ft = fillerre((netto + csat_netto) * szorzo)
                 csatorna_ft = fillerre(csat_netto * szorzo)
                 # A havi alapdíj a számlán egy tétel: egyszer kerekítjük, és csak utána osztjuk szét.
                 havi_n = sajat.dijak.get("alapdij_ho") or Decimal(0)
                 arany = alapdij / havi_n if havi_n else Decimal(0)
-                alapdij_ft = fillerre(kerekit(havi_n) * arany * szorzo)
+                alapdij_ft = fillerre(kr(havi_n) * arany * szorzo)
                 br_k, br_p = (ar_k + rhd) * szorzo, (ar_p + rhd) * szorzo
             else:
                 csat = q * csat_ar if csat_ar else Decimal(0)

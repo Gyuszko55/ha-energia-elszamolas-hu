@@ -49,3 +49,21 @@ def test_gaz_reszszamla_2026_08():
     assert all(sz.piaci == 0 and not sz.becsult for sz in r.szeletek)
     assert r.energia_ft == D(10212) and r.alapdij_ft == D(973)
     assert r.osszesen_ft == D(11185)
+
+
+def test_viz_dakov_2026_03():
+    """DAKÖV víz 1. részszámla, 2026.01.24–03.02, két mérő (becsült fogyasztás):
+
+    fővízmérő 741 → 749 (8 m³: ivóvíz + szennyvíz), locsolási mérő 89 → 92 (3 m³: csak ivóvíz).
+    Tételek (bruttó): 1 026,87 + 2 738,32 + 225,06 + 3 798,01 + 225,06 = 8 013,32 → 8 013 Ft.
+    """
+    fiok = Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))],
+                [Csatorna(szerep="fo"), Csatorna(szerep="locsolo", csatornadij_aktiv=False)])
+    tol, ig = date(2026, 1, 24), date(2026, 3, 3)
+    fo = Szamlalo([Pont(datetime(2026, 1, 24), D(741), True), Pont(datetime(2026, 3, 3), D(749), True)])
+    locsolo = Szamlalo([Pont(datetime(2026, 1, 24), D(89), True), Pont(datetime(2026, 3, 3), D(92), True)])
+    r = szamol(fiok, TAR, tol, ig, [fo, locsolo])
+    fo_sz = [s for s in r.szeletek if s.csatorna == "fo"]
+    assert sum(s.csatorna_ft for s in fo_sz) == D("3798.01")
+    assert r.osszesen_ft == D(8013)
+    assert sum(s.alapdij_ft for s in r.szeletek) == D("450.11")  # 354,42 × 1,27 (a számlán 2 × 225,06)

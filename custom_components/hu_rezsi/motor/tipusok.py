@@ -145,4 +145,4 @@ class IdoszakEredmeny:
 
     @property
     def osszesen_ft(self) -> Decimal:
-        return self.energia_ft + self.alapdij_ft
+        return _ft(sum((s.energia_ft + s.alapdij_ft for s in self.szeletek), Decimal(0)))

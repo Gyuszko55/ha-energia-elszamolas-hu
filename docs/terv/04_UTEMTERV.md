@@ -68,7 +68,7 @@ tests/
 - [x] **G1** `atvaltas: gaz_mj`: havi fűtőérték kézzel vagy entitásból, korrekciós tényező, „becsült” jelzés
 - [x] **G2** Gázkeret MJ-ban, éves bázisdátumtól
 - [x] **V1** Víz modul: vízdíj, csatornadíj (csatornánként kikapcsolható), alapdíj; `viz/egyedi` sablon
-- [~] **V2** Locsolási almérő: csatornadíj fiókonként kikapcsolható; a fővízmérőből való levonás még hátra
+- [x] **V2** Locsolási mérő: külön mérő vagy csatorna, csatornadíj nélkül (a DAKÖV-számla szerint nem levonás, hanem külön mérő) – számlateszttel
 - [~] **P1** `egyedi_nap` kész; `leolvasas_alapu` még hátra
 - [x] **R1** Részszámlás (átalány) fiók: részszámlák rögzítése (kézzel, éves tervből, vagy entitásból – pl. Díjnet), befizetve / tényleges / várható éves költség, **várható éves egyenleg** (ráfizetés vagy visszatérítés), figyelmeztetés küszöb felett. A szezonális gáz-előrejelzés (E1) ehhez szükséges, ezért a kettő együtt készül.
 
@@ -76,10 +76,14 @@ tests/
 
 ## 3. lépcső – Napelem
 
-- [ ] **N0** Szabály-összefoglaló forrásokkal: szaldó, bruttó, egyedi; mióta, kire vonatkozik (00, K7)
-- [ ] **N1** `betaplalas` csatorna-szerep, kétirányú mérő kezelése
-- [ ] **N2** Elszámolási módok a motorban, a keret előtt alkalmazva
-- [ ] **N3** Entitások: nettó egyenleg, betáplálás értéke
+Részletes terv, források és nyitott kérdések: **`05_NAPELEM.md`**. A fejlesztőknek nincs napeleme, ezért a
+szabályok nyilvános forrásokból jönnek, és valódi számlákkal kell majd ellenőrizni.
+
+- [x] **N0** Szabály-összefoglaló forrásokkal, esetek (szaldó/bruttó/váltás, akkumulátor, tarifa, fázis), adatforrások, nyitott kérdések
+- [x] **N1** Motor: bruttó és szaldó elszámolás, szintetikus tesztek
+- [ ] **N2** HA-réteg (kísérleti jelzéssel)
+- [ ] **N3** Valódi napelemes számlák → számlatesztek → a „kísérleti” jelzés levétele
+- [ ] **N4** Akkumulátor és önfogyasztás megtakarítás-elemzése (a 4. lépcsővel)
 
 ## 4. lépcső – Előrejelzés és felület
 

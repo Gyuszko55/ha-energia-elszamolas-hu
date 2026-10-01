@@ -44,6 +44,7 @@ A felhasználó négy kérdésre kapjon választ, ebben a sorrendben:
 | `02_DIJSZABAS_FORMATUM.md` | A verziózott díjszabás-fájlok formátuma, példákkal |
 | `03_ELSZAMOLO_MOTOR.md` | Hogyan lesz a mérőállásokból forint: időszak-bontás, keret, előrejelzés |
 | `04_UTEMTERV.md` | Lépcsők, mérföldkövek, GitHub-jegyek |
+| `05_NAPELEM.md` | Napelem: esetek, szabályok forrásokkal, adatforrások, nyitott kérdések, ellenőrzés |
 
 ## Szójegyzék
 
@@ -68,4 +69,4 @@ A felhasználó négy kérdésre kapjon választ, ebben a sorrendben:
 | K4 | Mi a legrégebbi támogatott HA-verzió? | Az aktuális és az előző fő kiadás (pl. 2026.9+). |
 | K5 | Mi legyen a v1 felhasználóival? | Átvezető útmutató és importáló a leolvasási naplóhoz. A v1 csak hibajavítást kap. |
 | K6 | Lovelace-kártya ugyanabban a tárolóban vagy külön? | Külön tároló, mert a HACS külön kezeli az integrációt és a kártyát. |
-| K7 | Szaldós és bruttó napelemes elszámolás: melyik szabályok érvényesek és mióta? | A 3. lépcső előtt külön, forrásokkal alátámasztott összefoglaló kell. |
+| K7 | Szaldós és bruttó napelemes elszámolás: melyik szabályok érvényesek és mióta? | **Részben megválaszolva (2026-10-01):** `05_NAPELEM.md`, nyitott kérdések NQ1–NQ8; valódi számlák kellenek. |

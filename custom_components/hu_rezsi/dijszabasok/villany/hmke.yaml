@@ -1,0 +1,22 @@
+azonosito: villany/hmke
+nev: "Háztartási méretű kiserőmű (napelem) – betáplálás"
+kozmu: villany
+egyseg: kWh
+# Nem önálló tarifa: a napelemes fiók vételezése az A1/H díjszabás szerint megy, ez a betáplálás árait adja.
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      Bruttó elszámolás (2024-01-01-től, havi, ad-vesz mérő): a betáplált energia átvételi ára elosztónként,
+      mvmoptimum.hu/blog/napelem/brutto-elszamolas (MVM Démász 5,25; MVM Émász 4,94; E.ON és OPUS TITÁSZ 4,39;
+      ELMŰ 5,11 Ft/kWh). Szaldó (éves nettózás, az üzembe helyezéstől 10 évig): mvmnext.hu HMKE-elszámolás;
+      a betáplálási többlet átvételi ára a 4/2011 NFM rendelet szerint, MVM Next szerződésben 1 Ft/kWh – ELLENŐRIZENDŐ.
+      Az ÁFA kezelése (a lakossági betáplálás jóváírása) – ELLENŐRIZENDŐ.
+    szabalyok: {}
+    dijak:
+      alap:                       # Ft/kWh, a felhasználónak jóváírt összeg
+        betaplalas_brutto: 5.25   # MVM Démász
+        szaldo_tobblet: 1.00
+      elmu_emasz: {betaplalas_brutto: 4.94}
+      eon: {betaplalas_brutto: 4.39}
+      opus_titasz: {betaplalas_brutto: 4.39}
+      elmu: {betaplalas_brutto: 5.11}
