@@ -62,7 +62,7 @@ A felhasználó négy kérdésre kapjon választ, ebben a sorrendben:
 
 | # | Kérdés | Javaslat |
 |---|---|---|
-| K1 | Melyik tárolóban és kinek a vezetésével menjen a projekt? | Új, közös tároló (pl. `ha-rezsi-hu`), mindkét fél karbantartó joggal. |
+| K1 | Melyik tárolóban és kinek a vezetésével menjen a projekt? | **Eldöntve (2026-10-01):** a `Gyuszko55/ha-energia-elszamolas-hu` tárolóban, Gyuszko55 vezetésével. A javaslattevő közreműködői jogot kaphat. A tároló később átnevezhető (pl. `ha-rezsi-hu`), a GitHub a régi címről továbbirányít. |
 | K2 | Mi legyen a neve és az integráció azonosítója? | Név: „Rezsikövető”; azonosító: `hu_rezsi`. |
 | K3 | Ki és hogyan frissíti a hivatalos díjakat? | Díjfájlok a tárolóban, változáskor új kiadás. Bárki küldhet javítást, forrásmegjelöléssel. |
 | K4 | Mi a legrégebbi támogatott HA-verzió? | Az aktuális és az előző fő kiadás (pl. 2026.9+). |

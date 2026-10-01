@@ -18,7 +18,7 @@ előző stabil. Méret: **K** = kicsi (néhány este), **K+** = közepes, **N** 
 ## 0. lépcső – Tervezés
 
 - [ ] **T1** A nyitott kérdések (00, K1–K7) eldöntése a javaslattevővel
-- [ ] **T2** Közös tároló létrehozása, karbantartói jogok, licenc (MIT), jegysablonok
+- [ ] **T2** Tároló előkészítése (eldöntve: ez a tároló), közreműködői jog a javaslattevőnek, licenc (MIT), jegysablonok
 - [ ] **T3** Ezek a tervdokumentumok átnézve, a megjegyzések beépítve
 - [ ] **T4** Legalább 3 anonimizált valódi számla összegyűjtése tesztadatnak (villany A1, H, gáz)
 - [ ] **T5** Díjfájl-séma (`schema.json`) és az első díjfájlok: `villany/a1`, `villany/h`, `gaz/lakossagi` a mostani díjtáblázatból
