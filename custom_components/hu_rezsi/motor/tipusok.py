@@ -12,6 +12,7 @@ class Kozmu(StrEnum):
     VILLANY = "villany"
     GAZ = "gaz"
     VIZ = "viz"
+    HULLADEK = "hulladek"  # fix díjas, mérő nélkül
 
 
 class LeolvasasTipus(StrEnum):

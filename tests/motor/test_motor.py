@@ -251,3 +251,19 @@ def test_nyitott_idoszak_elorejelzes(tar):
     assert n.hatralevo_keret == D(107)
     assert n.varhato_keretatlepes == date(2025, 6, 21)
     assert n.eddig.alapdij_ft == D(154)  # az alapdíj a teljes hónapra jár
+
+
+def test_fix_dij_hulladek(tar):
+    f = Fiok(Kozmu.HULLADEK, "mohu", [DijszabasHozzarendeles("hulladek/mohu", date(2024, 1, 1))], [Csatorna(keret_aktiv=False)])
+    s = Szamlalo([Pont(dt(2026, 1, 1), D(0), True)])
+    r = szamol(f, tar, date(2026, 10, 1), date(2026, 11, 1), [s])
+    assert (r.energia_ft, r.alapdij_ft, r.osszesen_ft) == (D(0), D(1924), D(1924))  # 5 772 / negyedév
+
+
+def test_negyedeves_idoszak_es_fix_dij(tar):
+    assert idoszak(date(2026, 10, 1), "negyedev") == (date(2026, 10, 1), date(2027, 1, 1))
+    assert idoszak(date(2026, 2, 15), "negyedev") == (date(2026, 1, 1), date(2026, 4, 1))
+    assert idoszak(date(2026, 9, 30), "negyedev") == (date(2026, 7, 1), date(2026, 10, 1))
+    f = Fiok(Kozmu.HULLADEK, "mohu", [DijszabasHozzarendeles("hulladek/mohu", date(2024, 1, 1))], [Csatorna(keret_aktiv=False)])
+    r = szamol(f, tar, date(2026, 10, 1), date(2027, 1, 1), [Szamlalo([Pont(dt(2026, 1, 1), D(0), True)])])
+    assert r.osszesen_ft == D(5772)  # a negyedéves számla összege

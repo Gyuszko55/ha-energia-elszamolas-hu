@@ -187,6 +187,12 @@
       },
       "varhato_elszamolas": {
         "name": "Expected settlement"
+      },
+      "eves_szamlaosszeg": {
+        "name": "Invoices in the last 12 months"
+      },
+      "kovetkezo_szamla": {
+        "name": "Next invoice expected"
       }
     }
   },
@@ -195,13 +201,15 @@
       "options": {
         "villany": "Electricity",
         "gaz": "Gas",
-        "viz": "Water"
+        "viz": "Water",
+        "hulladek": "Waste collection (fixed fee)"
       }
     },
     "idoszak_mod": {
       "options": {
         "naptari_honap": "Calendar month",
-        "egyedi_nap": "Custom start day (monthly)"
+        "egyedi_nap": "Custom start day (monthly)",
+        "negyedev": "Calendar quarter"
       }
     },
     "leolvasas_tipus": {

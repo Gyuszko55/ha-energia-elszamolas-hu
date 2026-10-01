@@ -195,3 +195,33 @@ def rogzit(tarolt: dict[str, Any], szamlak: list[Szamla], szuro: set[str] | None
             + " – ha mérőcsere volt, rögzítsd (hu_rezsi.merocsere), vagy vedd fel a fiók számla-mérői közé."
         )
     return j
+
+
+def szamla_statisztika(tarolt: dict[str, Any], ma: date, fix_dij: bool = False) -> dict[str, Any] | None:
+    """Az utolsó 12 hónap számláinak összege, és a következő számla várható napja és összege
+    (a legutóbbi számlák szokásos időköze alapján). Figyelmeztet díjváltozásra és elmaradt számlára."""
+    sz = sorted(
+        (_d(x["kelte"]), Decimal(str(x["osszeg"])))
+        for x in (tarolt.get("szamlak") or {}).values()
+        if x.get("osszeg") is not None and Decimal(str(x["osszeg"])) != 0
+    )
+    if not sz:
+        return None
+    eves = [x for d, x in sz if (ma - d).days <= 365]
+    utolsok = sz[-5:]
+    kozok = sorted((b[0] - a[0]).days for a, b in zip(utolsok, utolsok[1:]))
+    idokoz = kozok[len(kozok) // 2] if kozok else None
+    kovetkezo = date.fromordinal(sz[-1][0].toordinal() + idokoz) if idokoz else None
+    figy = []
+    if fix_dij and len(sz) >= 2 and sz[-1][1] != sz[-2][1]:  # változó számláknál ez csak zaj
+        figy.append(f"díjváltozás: {sz[-2][1]} → {sz[-1][1]} Ft")
+    if kovetkezo and (ma - kovetkezo).days > 21:
+        figy.append(f"elmaradt számla: {kovetkezo.isoformat()} körül kellett volna jönnie")
+    return {
+        "eves_osszeg": int(sum(eves, Decimal(0))),
+        "eves_db": len(eves),
+        "kovetkezo_datum": kovetkezo,
+        "kovetkezo_osszeg": int(sz[-1][1]),
+        "idokoz_nap": idokoz,
+        "figyelmeztetes": "; ".join(figy) or None,
+    }

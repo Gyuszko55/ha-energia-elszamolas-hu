@@ -16,6 +16,11 @@ ATLAG_NAPOK = 7
 
 def idoszak(nap: date, mod: str = "naptari_honap", kezdo_nap: int = 1) -> tuple[date, date]:
     """A naphoz tartozó [tol, ig) elszámolási időszak."""
+    if mod == "negyedev":
+        # Naptári negyedév (jan., ápr., júl., okt. 1.) – pl. a negyedévente számlázott hulladékdíj.
+        tol = date(nap.year, (nap.month - 1) // 3 * 3 + 1, 1)
+        ig = date(tol.year + (tol.month == 10), (tol.month + 2) % 12 + 1, 1)
+        return tol, ig
     if mod == "naptari_honap":
         kezdo_nap = 1
     elif mod != "egyedi_nap":

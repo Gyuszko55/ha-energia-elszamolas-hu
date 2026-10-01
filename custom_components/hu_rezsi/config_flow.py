@@ -50,6 +50,7 @@ from .const import (
     CONF_SZAMLA_MAPPA,
     CONF_SZAMLA_MEROK,
     DIJNET_MINTA,
+    FIX_DIJAS,
     CONF_DIJSZABAS,
     CONF_DIJSZABAS_TOL,
     CONF_FORRAS,
@@ -68,7 +69,7 @@ from .const import (
 )
 from .tar import dijszabas_tar
 
-KOZMUVEK = ["villany", "gaz", "viz"]
+KOZMUVEK = ["villany", "gaz", "viz", "hulladek"]
 
 
 class RezsiConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -149,7 +150,27 @@ class FiokFlow(ConfigSubentryFlow):
             return None
         return None
 
+    async def _fix_sema(self, kozmu: str, eddigi: dict[str, Any], uj: bool) -> vol.Schema:
+        """Fix díjas fiók (pl. hulladékszállítás): szolgáltató, díjszabás, kezdőnap, számlamappa."""
+        tar = await dijszabas_tar(self.hass)
+        szolg = [SelectOptionDict(value=k, label=v["nev"]) for k, v in tar.szolgaltatok.items() if kozmu in v.get("kozmu", [])]
+        dijsz = [SelectOptionDict(value=k, label=d.nev) for k, d in sorted(tar.dijszabasok.items()) if d.kozmu == kozmu]
+        mappak = await self.hass.async_add_executor_job(szamlak.jelolt_mappak, Path(self.hass.config.config_dir))
+        mezok: dict[Any, Any] = {
+            vol.Required(CONF_SZOLGALTATO, default=eddigi.get(CONF_SZOLGALTATO, szolg[0]["value"])): SelectSelector(SelectSelectorConfig(options=szolg)),
+            vol.Required(CONF_DIJSZABAS, default=eddigi.get(CONF_DIJSZABAS, dijsz[0]["value"])): SelectSelector(SelectSelectorConfig(options=dijsz)),
+            vol.Required(CONF_DIJSZABAS_TOL, default=eddigi.get(CONF_DIJSZABAS_TOL, "2024-01-01")): DateSelector(),
+            vol.Optional(CONF_SZAMLA_MAPPA, **({"description": {"suggested_value": eddigi[CONF_SZAMLA_MAPPA]}} if eddigi.get(CONF_SZAMLA_MAPPA) else {})): SelectSelector(
+                SelectSelectorConfig(options=mappak, custom_value=True)
+            ),
+        }
+        if uj:
+            mezok[vol.Required(CONF_BEEPITVE, default=date.today().isoformat())] = DateSelector()
+        return vol.Schema(mezok)
+
     async def _sema(self, kozmu: str, eddigi: dict[str, Any], uj: bool) -> vol.Schema:
+        if kozmu in FIX_DIJAS:
+            return await self._fix_sema(kozmu, eddigi, uj)
         tar = await dijszabas_tar(self.hass)
         szolg = [
             SelectOptionDict(value=k, label=v["nev"]) for k, v in tar.szolgaltatok.items() if kozmu in v.get("kozmu", [])
@@ -171,7 +192,7 @@ class FiokFlow(ConfigSubentryFlow):
             ),
             vol.Required(CONF_DIJSZABAS_TOL, default=alap(CONF_DIJSZABAS_TOL, "2024-01-01")): DateSelector(),
             vol.Required(CONF_IDOSZAK_MOD, default=alap(CONF_IDOSZAK_MOD, "naptari_honap")): SelectSelector(
-                SelectSelectorConfig(options=["naptari_honap", "egyedi_nap"], translation_key="idoszak_mod")
+                SelectSelectorConfig(options=["naptari_honap", "egyedi_nap", "negyedev"], translation_key="idoszak_mod")
             ),
             vol.Required(CONF_IDOSZAK_NAP, default=alap(CONF_IDOSZAK_NAP, 1)): NumberSelector(
                 NumberSelectorConfig(min=1, max=28, step=1, mode=NumberSelectorMode.BOX)

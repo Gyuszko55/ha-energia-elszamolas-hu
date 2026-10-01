@@ -37,6 +37,7 @@ from .const import (
     CONF_SZORZO,
     DOMAIN,
     EGYSEG,
+    FIX_DIJAS,
     FIOK,
     FRISSITES_PERC,
     LEZARAS_KESLELTETES_ORA,
@@ -46,7 +47,7 @@ from pathlib import Path
 from homeassistant.components import persistent_notification
 
 from . import dijnet, szamlak
-from .szamla_import import IMPORT_VERZIO, rogzit, ujraertekel
+from .szamla_import import IMPORT_VERZIO, rogzit, szamla_statisztika, ujraertekel
 from .modell import betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
 from .motor.egyenleg import EvesEgyenleg, VarhatoElszamolas, egy_ev_mulva, eves_egyenleg, varhato_elszamolas
@@ -80,6 +81,7 @@ class FiokAllapot:
     napelem: napelem.NapelemEredmeny | None = None
     utolso_szamla: dict[str, Any] | None = None
     elszamolas: VarhatoElszamolas | None = None
+    szamla_stat: dict[str, Any] | None = None
     napelem_hiba: str | None = None
     egyenleg_hiba: str | None = None
     hiba: str | None = None
@@ -187,7 +189,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         self, sid: str, sub: ConfigSubentry, tarolt: dict[str, Any], most: datetime, egyseg: str
     ) -> tuple[FiokAllapot, bool]:
         fiok = fiok_motorba(dict(sub.data), tarolt)
-        mod = sub.data.get(CONF_IDOSZAK_MOD, "naptari_honap")
+        mod = sub.data.get(CONF_IDOSZAK_MOD) or ("negyedev" if sub.data[CONF_KOZMU] in FIX_DIJAS else "naptari_honap")
         nap = int(sub.data.get(CONF_IDOSZAK_NAP) or 1)
         tol, ig = idoszak(most.date(), mod, nap)
         szamlalo = await self.szamlalo(sid, fiok, datetime.combine(tol, datetime.min.time()) - timedelta(days=ELOZMENY_NAPOK), most)
@@ -237,10 +239,13 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             except (NincsAdat, ValueError, DijszabasHiba, KeyError) as err:
                 napelem_hiba = str(err)
         elszamolas = None
-        try:
-            elszamolas = await self._varhato_elszamolas(sub, tarolt, fiok, szamlalo, most, tovabbi)
-        except (NincsAdat, ValueError, DijszabasHiba) as err:
-            _LOGGER.debug("%s: várható elszámolás nem számolható: %s", sub.title, err)
+        if sub.data[CONF_KOZMU] in FIX_DIJAS:
+            pass  # fix díjnál nincs mért fogyasztás, így elszámolás sem
+        else:
+            try:
+                elszamolas = await self._varhato_elszamolas(sub, tarolt, fiok, szamlalo, most, tovabbi)
+            except (NincsAdat, ValueError, DijszabasHiba) as err:
+                _LOGGER.debug("%s: várható elszámolás nem számolható: %s", sub.title, err)
         egyenleg, egyenleg_hiba = None, None
         if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
             try:
@@ -262,6 +267,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 napelem=napelem_e,
                 utolso_szamla=_utolso_szamla(tarolt),
                 elszamolas=elszamolas,
+                szamla_stat=szamla_statisztika(tarolt, most.date(), fix_dij=sub.data[CONF_KOZMU] in FIX_DIJAS),
                 napelem_hiba=napelem_hiba,
             ),
             lezart_valt,

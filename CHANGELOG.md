@@ -4,6 +4,9 @@
 
 - **Automatikus számlafeldolgozás** fiókonként egy mappából (pl. a Díjnet letöltési mappája): MVM áram/gáz és MOHU XML, DAKÖV PDF (pypdf). Rögzíti a befizetést, a valódi (diktált/leolvasott) mérőállást, gáznál a havi fűtőértéket; a becsült és a számla időszakán belüli számított állás kimarad; mérők gyári szám szerint (közös mappa szétválasztható); értesítés az új számlákról; „Utolsó számla” entitás.
 - Befizetések számlaszám szerint egyesítve (számlamappa + Díjnet; sorszám híján nap + összeg egységes formában).
+- **Fix díjas fiók** (hulladékszállítás, MOHU): mérő nélkül, naptári negyedéves időszak (a havi rész attribútumban, a háztartás havi összesítőjében a havi rész), `hulladek/mohu` díjszabás.
+- Új entitások számlamappás fiókoknál: **Számlák az utolsó 12 hónapban**, **Következő számla várható** (szokásos időköz alapján; figyelmeztet elmaradt számlára, fix díjnál díjváltozásra).
+- Új időszakmód: naptári negyedév.
 - **Várható elszámolás** entitás minden fióknál: az utolsó valódi elszámolás óta mért fogyasztás költsége mínusz az azóta kiállított számlák.
 
 ## [Fejlesztés] Rezsikövető 0.3.0-dev (2026-10-01)

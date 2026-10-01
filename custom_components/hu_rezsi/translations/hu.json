@@ -187,6 +187,12 @@
       },
       "varhato_elszamolas": {
         "name": "Várható elszámolás"
+      },
+      "eves_szamlaosszeg": {
+        "name": "Számlák az utolsó 12 hónapban"
+      },
+      "kovetkezo_szamla": {
+        "name": "Következő számla várható"
       }
     }
   },
@@ -195,13 +201,15 @@
       "options": {
         "villany": "Villany",
         "gaz": "Gáz",
-        "viz": "Víz"
+        "viz": "Víz",
+        "hulladek": "Hulladékszállítás (fix díj)"
       }
     },
     "idoszak_mod": {
       "options": {
         "naptari_honap": "Naptári hónap",
-        "egyedi_nap": "Egyedi kezdőnap (havi)"
+        "egyedi_nap": "Egyedi kezdőnap (havi)",
+        "negyedev": "Naptári negyedév"
       }
     },
     "leolvasas_tipus": {

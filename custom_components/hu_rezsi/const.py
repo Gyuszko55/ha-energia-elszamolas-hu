@@ -34,7 +34,8 @@ CONF_ELOZO_EV = "elozo_ev_mennyiseg"
 CONF_SZAMLA_MAPPA = "szamla_mappa"  # a config mappához képest, pl. "Dijnet /mvm_next_foldgaz"
 CONF_SZAMLA_MEROK = "szamla_merok"  # vesszővel elválasztott gyári számok; üres: a mappa minden számlája
 
-EGYSEG = {"villany": "kWh", "gaz": "m³", "viz": "m³"}  # a mért (óra) egység
+EGYSEG = {"villany": "kWh", "gaz": "m³", "viz": "m³", "hulladek": "db"}  # a mért (óra) egység
+FIX_DIJAS = {"hulladek"}  # mérő nélküli közművek: csak alapdíj és számlák
 DIJNET_MINTA = ".dijnet_paid_invoices_*.yaml"
 PENZNEM = "HUF"
 FRISSITES_PERC = 10

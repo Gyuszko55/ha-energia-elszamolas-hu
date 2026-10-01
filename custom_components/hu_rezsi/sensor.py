@@ -14,13 +14,16 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FIZETESI_MOD, CONF_NAPELEM, CONF_SZAMLA_MAPPA, DOMAIN, PENZNEM
+from .const import CONF_FIZETESI_MOD, CONF_KOZMU, CONF_NAPELEM, CONF_SZAMLA_MAPPA, DOMAIN, FIX_DIJAS, PENZNEM
 from .koordinator import FiokAllapot, RezsiKoordinator
 from .modell import szelet_dict
 
 MAX_NAPLO = 24
 EGYENLEG_KULCSOK = {"befizetve", "varhato_eves_koltseg", "varhato_egyenleg"}
 NAPELEM_KULCSOK = {"betaplalas", "betaplalas_jovairas", "napelem_egyenleg"}
+SZAMLA_KULCSOK = {"utolso_szamla", "eves_szamlaosszeg", "kovetkezo_szamla"}
+# Fix díjas (mérő nélküli) fióknál csak ezek értelmesek:
+FIX_KULCSOK = {"koltseg_eddig", "koltseg_varhato", "utolso_szamla", "eves_szamlaosszeg", "kovetkezo_szamla", "utolso_lezart"}
 
 
 def _napelem_attr(a: FiokAllapot) -> dict[str, Any]:
@@ -90,9 +93,15 @@ class FiokLeiras(SensorEntityDescription):
     elerheto: Callable[[FiokAllapot], bool] = lambda a: a.nyitott is not None
 
 
+def honapok(a: FiokAllapot) -> int:
+    """Hány hónapos az elszámolási időszak (negyedévnél 3)."""
+    return max(1, (a.ig.year - a.tol.year) * 12 + a.ig.month - a.tol.month)
+
+
 def _eddig_attr(a: FiokAllapot) -> dict[str, Any]:
     e = a.nyitott.eddig
     return {
+        **({"havi_resz": int(round(e.osszesen_ft / honapok(a))), "idoszak_honap": honapok(a)} if honapok(a) > 1 else {}),
         "idoszak_kezdete": a.tol.isoformat(),
         "idoszak_vege": a.ig.isoformat(),
         "eltelt_nap": _f(a.nyitott.eltelt_nap),
@@ -108,6 +117,7 @@ def _eddig_attr(a: FiokAllapot) -> dict[str, Any]:
 def _varhato_attr(a: FiokAllapot) -> dict[str, Any]:
     v = a.nyitott.varhato
     return {
+        **({"havi_resz": int(round(v.osszesen_ft / honapok(a)))} if honapok(a) > 1 else {}),
         "mennyiseg": _f(v.mennyiseg, 1),
         "energia_ft": int(v.energia_ft),
         "alapdij_ft": int(v.alapdij_ft),
@@ -262,6 +272,28 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         elerheto=lambda a: a.utolso_szamla is not None,
     ),
     FiokLeiras(
+        key="eves_szamlaosszeg",
+        translation_key="eves_szamlaosszeg",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: a.szamla_stat["eves_osszeg"],
+        attr=lambda a: {"szamlak_12_honap": a.szamla_stat["eves_db"], "idoszak": "az utolsó 365 nap számlái (kelte szerint)"},
+        elerheto=lambda a: a.szamla_stat is not None,
+    ),
+    FiokLeiras(
+        key="kovetkezo_szamla",
+        translation_key="kovetkezo_szamla",
+        device_class=SensorDeviceClass.DATE,
+        ertek=lambda a: a.szamla_stat["kovetkezo_datum"],
+        attr=lambda a: {
+            "varhato_osszeg": a.szamla_stat["kovetkezo_osszeg"],
+            "szokasos_idokoz_nap": a.szamla_stat["idokoz_nap"],
+            "figyelmeztetes": a.szamla_stat["figyelmeztetes"],
+        },
+        elerheto=lambda a: a.szamla_stat is not None and a.szamla_stat["kovetkezo_datum"] is not None,
+    ),
+    FiokLeiras(
         key="utolso_lezart",
         translation_key="utolso_lezart",
         device_class=SensorDeviceClass.MONETARY,
@@ -284,7 +316,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 for leiras in FIOK_LEIRASOK
                 if (leiras.key not in EGYENLEG_KULCSOK or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla")
                 and (leiras.key not in NAPELEM_KULCSOK or sub.data.get(CONF_NAPELEM, "nincs") != "nincs")
-                and (leiras.key != "utolso_szamla" or sub.data.get(CONF_SZAMLA_MAPPA))
+                and (leiras.key not in SZAMLA_KULCSOK or sub.data.get(CONF_SZAMLA_MAPPA))
+                and (sub.data.get(CONF_KOZMU) not in FIX_DIJAS or leiras.key in FIX_KULCSOK)
             ],
             config_subentry_id=sid,
         )
@@ -373,7 +406,8 @@ class HaztartasOsszesen(CoordinatorEntity[RezsiKoordinator], SensorEntity):
                 continue
             e = a.nyitott.eddig if self._fajta == "eddig" else a.nyitott.varhato
             sub = koord.fiokok().get(sid)
-            out[sub.title if sub else sid] = int(e.osszesen_ft)
+            # Havi összesítő: a több hónapos (pl. negyedéves) időszakból a havi rész számít.
+            out[sub.title if sub else sid] = int(round(e.osszesen_ft / honapok(a)))
         return out
 
     @property

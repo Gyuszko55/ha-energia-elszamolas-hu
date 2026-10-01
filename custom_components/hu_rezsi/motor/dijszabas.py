@@ -78,7 +78,7 @@ def ellenoriz(adat: dict[str, Any], hely: str = "") -> None:
     for kulcs in ("azonosito", "nev", "kozmu", "egyseg", "verziok"):
         if kulcs not in adat:
             raise hiba(f"hiányzó mező: {kulcs}")
-    if adat["kozmu"] not in ("villany", "gaz", "viz"):
+    if adat["kozmu"] not in ("villany", "gaz", "viz", "hulladek"):
         raise hiba(f"ismeretlen közmű: {adat['kozmu']}")
     verziok = adat["verziok"]
     if not isinstance(verziok, list) or not verziok:

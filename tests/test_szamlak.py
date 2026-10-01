@@ -138,3 +138,16 @@ def test_szamla_meta_idoszak_es_valodi_allas():
     from szamla_import import szamla_meta
     m = szamla_meta(mvm_xml(MVM_GAZ_ELSZAMOLO.encode()))
     assert m["idoszak"] == ["2025-07-12", "2026-07-14"] and m["utolso_valodi_allas"] == "2026-07-14" and m["tipus"] == "elszamolo"
+
+
+def test_szamla_statisztika_negyedeves():
+    from szamla_import import szamla_statisztika
+    t = {"szamlak": {str(i): {"kelte": k, "osszeg": "5772"} for i, k in enumerate(
+        ["2025-10-10", "2026-01-14", "2026-04-15", "2026-07-08"])}}
+    st = szamla_statisztika(t, date(2026, 10, 1))
+    assert st["eves_osszeg"] == 4 * 5772 and st["kovetkezo_osszeg"] == 5772
+    assert st["idokoz_nap"] == 91 and st["kovetkezo_datum"] == date(2026, 10, 7) and st["figyelmeztetes"] is None
+    t["szamlak"]["9"] = {"kelte": "2026-10-09", "osszeg": "6100"}
+    assert "díjváltozás" in szamla_statisztika(t, date(2026, 10, 10), fix_dij=True)["figyelmeztetes"]
+    assert szamla_statisztika(t, date(2026, 10, 10))["figyelmeztetes"] is None  # változó számlánál nem zaj
+    assert "elmaradt" in szamla_statisztika({"szamlak": {k: v for k, v in t["szamlak"].items() if k != "9"}}, date(2026, 11, 15))["figyelmeztetes"]

@@ -197,7 +197,7 @@ def szamol(
 
             if keret is None:
                 kedv, piaci = elsz, Decimal(0)
-                ar_k, ar_p = arak[ar_kulcs], arak.get("energia_piaci", Decimal(0))
+                ar_k, ar_p = arak.get(ar_kulcs, Decimal(0)), arak.get("energia_piaci", Decimal(0))  # fix díjnál nincs egységár
             else:
                 kedv, piaci = min(elsz, keret), max(elsz - keret, Decimal(0))
                 ar_k, ar_p = arak["energia_kedvezmenyes"], arak["energia_piaci"]

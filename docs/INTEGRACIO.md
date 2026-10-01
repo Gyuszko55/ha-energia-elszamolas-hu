@@ -71,6 +71,10 @@ A fiók „Számlamappa” mezőjében megadott mappa (a config mappán belül; 
 - Közös mappánál (pl. A1 és H egy szerződésen) a „Számla-mérők” mezőben a mérő gyári számával választható szét.
 - Az új számlákról értesítés jön; az „Utolsó számla” entitás mutatja a legutóbbit.
 
+## Fix díjas fiók (hulladékszállítás)
+
+Közmű: „Hulladékszállítás (fix díj)”. Nincs mérő: a költség a díjszabás havi díjrésze, az időszak a naptári negyedév (a számlázás ütemezése szerint), a havi rész a `havi_resz` attribútumban; a háztartás havi összesítőjébe a havi rész kerül. A számlák a számlamappából (pl. `Dijnet /mohu_zrt`) jönnek; a „Következő számla várható” figyelmeztet, ha a díj változik vagy egy számla elmarad.
+
 ## Entitások (fiókonként)
 
 | Entitás | Tartalom |
