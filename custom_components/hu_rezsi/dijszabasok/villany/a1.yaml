@@ -1,0 +1,20 @@
+azonosito: villany/a1
+nev: "A1 – általános lakossági"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: "A v1 díjtáblázata (2026. szeptemberi lakossági árak), visszamenőleg is alkalmazva – ELLENŐRIZENDŐ a számlán"
+    szabalyok:
+      keret:
+        tipus: napi_aranyos
+        napi_mennyiseg: 6.91   # 2523 kWh/év ÷ 365, a v1-gyel azonos kerekítéssel
+    dijak:
+      alap:                    # bruttó Ft
+        energia_kedvezmenyes: 36.386
+        energia_piaci: 70.104
+        alapdij_ho: 153.035
+      eon: {energia_kedvezmenyes: 35.293}
+      opus_titasz: {energia_kedvezmenyes: 35.293}
+      elmu: {energia_kedvezmenyes: 36.208}
+      elmu_emasz: {energia_kedvezmenyes: 35.992}

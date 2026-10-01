@@ -1,0 +1,8 @@
+# Szolgáltató-kulcsok: a díjfájlok „dijak” alatti sorai ezekre hivatkoznak.
+mvm_demasz: {nev: "MVM Démász", kozmu: [villany]}
+eon: {nev: "E.ON", kozmu: [villany]}
+opus_titasz: {nev: "OPUS TITÁSZ", kozmu: [villany]}
+elmu: {nev: "ELMŰ", kozmu: [villany]}
+elmu_emasz: {nev: "ELMŰ-ÉMÁSZ", kozmu: [villany]}
+mvm_next: {nev: "MVM Next", kozmu: [gaz]}
+egyedi: {nev: "Egyedi (kézi díjak)", kozmu: [villany, gaz, viz]}

@@ -1,0 +1,17 @@
+azonosito: gaz/lakossagi
+nev: "Lakossági földgáz (m³-alapú, 1. lépcső)"
+kozmu: gaz
+egyseg: m3
+# A 2. lépcsőben MJ-alapúra vált (fűtőérték, korrekciós tényező) – lásd docs/terv/02.
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: "A v1 beállításai (102 / 747 Ft/m³, 1729 m³/év) – ELLENŐRIZENDŐ a számlán"
+    szabalyok:
+      keret:
+        tipus: eves
+        ev_mennyiseg: 1729
+    dijak:
+      alap:
+        energia_kedvezmenyes: 102
+        energia_piaci: 747
+        alapdij_ho: 0
