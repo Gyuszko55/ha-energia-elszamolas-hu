@@ -1,4 +1,32 @@
-# Villany- és gáz-elszámolás Home Assistanthoz (magyar lakossági tarifák)
+# Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
+
+> [!IMPORTANT]
+> **Tájékoztató jellegű számítás, nem helyettesíti a szolgáltatói számlát.**
+
+Ez a tároló két dolgot tartalmaz:
+
+1. **Rezsikövető integráció (2.0 béta, új)** – saját Home Assistant-integráció villanyra, gázra, vízre és fix díjas szolgáltatásra (pl. hulladékszállítás), „Rezsi” oldalsáv-panellel. Lásd alább és a [`docs/INTEGRACIO.md`](docs/INTEGRACIO.md) leírást.
+2. **v1 YAML-csomag** – a korábbi, csomagként telepíthető villany- és gáz-elszámolás (lejjebb, változatlanul). Hibajavítást kap; utódja az integráció.
+
+## Rezsikövető integráció (2.0 béta)
+
+- **Fiókok felületről** (Beállítások → Eszközök és szolgáltatások → Rezsikövető): villany (A1, H-tarifa), gáz, víz (fő- és locsolási almérővel), fix díjas szolgáltatás.
+- **Számlára pontos számítás:** nettó tételsoros számlázás ÁFÁ-val, egész kWh-s kedvezményes keret, számlánkénti alapdíj, gáz MJ-ban havi fűtőértékkel. Valódi MVM- és DAKÖV-számlákon forintra ellenőrizve.
+- **Automatikus számlafeldolgozás** egy mappából (pl. a Díjnet-integráció letöltései): befizetések, valódi mérőállások, havi fűtőértékek.
+- **„Mennyibe került? → Mennyi lesz? → Hol tartok a keretben? → Kell-e változtatnom?”**: eddigi és várható költség, kedvezményes keret, **várható elszámolás** („ha ma lenne az elszámolás”), részszámlás (átalány) fióknál éves egyenleg, elmaradt számla figyelmeztetés.
+- **„Rezsi” oldalsáv-panel** a HA-ban: összesítő, figyelmeztetések, fiókonkénti kártyák, részletek (lezárt időszakok, mérőállások, számlák), mérőállás rögzítése.
+- **Napelem (kísérleti):** bruttó és szaldó elszámolás – valódi napelemes számlákkal még ellenőrizendő (`docs/terv/05_NAPELEM.md`).
+
+### Telepítés (HACS, béta)
+
+1. HACS → ⋮ → **Egyéni tárolók** → `https://github.com/Gyuszko55/ha-energia-elszamolas-hu`, típus: **Integráció**.
+2. A Rezsikövetőnél kapcsold be a **béta verziók megjelenítését**, és töltsd le a legújabbat.
+3. Indítsd újra a Home Assistantot, majd: Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása → **Rezsikövető**.
+4. Részletek, átállás a v1 csomagról: [`docs/INTEGRACIO.md`](docs/INTEGRACIO.md). Tervek: [`docs/terv/`](docs/terv/).
+
+---
+
+# v1 YAML-csomag: villany- és gáz-elszámolás (magyar lakossági tarifák)
 
 > [!IMPORTANT]
 > **Tájékoztató jellegű számítás, nem helyettesíti a szolgáltatói számlát.**

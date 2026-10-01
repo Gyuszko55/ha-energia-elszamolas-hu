@@ -9,6 +9,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, PLATFORMS
 from .koordinator import RezsiKoordinator
+from .panel import regisztral_panel
 from .szolgaltatasok import regisztral
 from .tar import dijszabas_tar
 from .tarolo import Tarolo
@@ -31,6 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: RezsiConfigEntry) -> boo
     await koord.async_config_entry_first_refresh()
     entry.runtime_data = koord
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await regisztral_panel(hass)  # „Rezsi” oldalsáv-menüpont (egyszer)
     entry.async_on_unload(entry.add_update_listener(_ujratolt))
     return True
 

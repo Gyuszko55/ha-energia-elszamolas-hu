@@ -1,5 +1,10 @@
 # Változások
 
+## Rezsikövető 2.0.0b1 – 2026-10-01 (első béta)
+
+- **„Rezsi” oldalsáv-panel** (HTML/JS webkomponens + websocket-végpont): háztartás-összesítő, figyelmeztetések, fiókonkénti kártyák (eddig/várható, keret, várható elszámolás, éves egyenleg, számlák, napelem), részletek, mérőállás rögzítése; mobilon is.
+- Az integráció verziószáma a v1 csomag utódjaként 2.x (a korábbi 0.1–0.4 fejlesztői változatok tartalma alább).
+
 ## [Fejlesztés] Rezsikövető 0.4.0-dev (2026-10-01)
 
 - **Automatikus számlafeldolgozás** fiókonként egy mappából (pl. a Díjnet letöltési mappája): MVM áram/gáz és MOHU XML, DAKÖV PDF (pypdf). Rögzíti a befizetést, a valódi (diktált/leolvasott) mérőállást, gáznál a havi fűtőértéket; a becsült és a számla időszakán belüli számított állás kimarad; mérők gyári szám szerint (közös mappa szétválasztható); értesítés az új számlákról; „Utolsó számla” entitás.

@@ -2,6 +2,7 @@
   "domain": "hu_rezsi",
   "name": "Rezsikövető",
   "after_dependencies": ["recorder"],
+  "dependencies": ["http", "panel_custom", "websocket_api"],
   "codeowners": ["@Gyuszko55"],
   "config_flow": true,
   "documentation": "https://github.com/Gyuszko55/ha-energia-elszamolas-hu",
@@ -9,5 +10,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Gyuszko55/ha-energia-elszamolas-hu/issues",
   "requirements": ["pypdf>=4.0"],
-  "version": "0.4.0"
+  "version": "2.0.0b1"
 }
