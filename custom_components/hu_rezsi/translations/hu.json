@@ -1,0 +1,267 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Rezsikövető – háztartás",
+        "description": "Add meg a háztartás nevét. A szolgáltatói fiókokat (villany, gáz) utána, a bejegyzésnél veheted fel.",
+        "data": {
+          "nev": "Név"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "fiok": {
+      "step": {
+        "user": {
+          "title": "Új fiók",
+          "description": "Egy fiók = egy szerződés egy mérővel (pl. A1 villany, H-tarifa, gáz).",
+          "data": {
+            "nev": "Fiók neve",
+            "kozmu": "Közmű"
+          }
+        },
+        "reszletek": {
+          "title": "Fiók beállításai",
+          "description": "A díjak a kiválasztott szolgáltató hivatalos díjaival indulnak, később felülírhatók. Tájékoztató jellegű számítás.",
+          "data": {
+            "szolgaltato": "Szolgáltató",
+            "dijszabas": "Díjszabás (tarifa)",
+            "dijszabas_tol": "Díjszabás érvényes ettől",
+            "idoszak_mod": "Elszámolási időszak",
+            "idoszak_nap": "Időszak kezdőnapja (egyedi napnál)",
+            "forras_entitas": "Automatikus mérőállás-szenzor (opcionális)",
+            "forras_szorzo": "Szenzor-szorzó",
+            "keret_aktiv": "Kedvezményes (rezsicsökkentett) keret jár",
+            "gyari_szam": "Mérő gyári száma",
+            "beepitve": "Mérő beépítése / kezdőnap",
+            "kezdo_allas": "Mérő állása ezen a napon"
+          },
+          "data_description": {
+            "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
+            "forras_szorzo": "Ha a szenzor rendszeresen eltér az órától (pl. 1,0412).",
+            "idoszak_nap": "Csak az „egyedi nap” módnál számít.",
+            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted."
+          }
+        },
+        "reconfigure": {
+          "title": "Fiók szerkesztése",
+          "data": {
+            "nev": "Fiók neve",
+            "szolgaltato": "Szolgáltató",
+            "dijszabas": "Díjszabás (tarifa)",
+            "dijszabas_tol": "Díjszabás érvényes ettől",
+            "idoszak_mod": "Elszámolási időszak",
+            "idoszak_nap": "Időszak kezdőnapja (egyedi napnál)",
+            "forras_entitas": "Automatikus mérőállás-szenzor (opcionális)",
+            "forras_szorzo": "Szenzor-szorzó",
+            "keret_aktiv": "Kedvezményes (rezsicsökkentett) keret jár",
+            "gyari_szam": "Mérő gyári száma",
+            "beepitve": "Mérő beépítése / kezdőnap",
+            "kezdo_allas": "Mérő állása ezen a napon"
+          },
+          "data_description": {
+            "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
+            "forras_szorzo": "Ha a szenzor rendszeresen eltér az órától (pl. 1,0412).",
+            "idoszak_nap": "Csak az „egyedi nap” módnál számít.",
+            "kezdo_allas": "Innen indul a számítás; a későbbi leolvasásokat szolgáltatással rögzítheted."
+          }
+        }
+      },
+      "initiate_flow": {
+        "user": "Fiók hozzáadása"
+      },
+      "entry_type": "Szolgáltatói fiók",
+      "abort": {
+        "reconfigure_successful": "A fiók beállításai frissültek."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "koltseg_eddig": {
+        "name": "Költség eddig"
+      },
+      "koltseg_varhato": {
+        "name": "Várható költség"
+      },
+      "fogyasztas_idoszak": {
+        "name": "Fogyasztás az időszakban"
+      },
+      "hatralevo_keret": {
+        "name": "Hátralévő kedvezményes keret"
+      },
+      "aktualis_ar": {
+        "name": "Aktuális egységár"
+      },
+      "eves_fogyasztas": {
+        "name": "Éves fogyasztás"
+      },
+      "utolso_lezart": {
+        "name": "Utolsó lezárt időszak"
+      },
+      "osszesen_eddig": {
+        "name": "Rezsi eddig összesen"
+      },
+      "osszesen_varhato": {
+        "name": "Rezsi várható összesen"
+      }
+    }
+  },
+  "selector": {
+    "kozmu": {
+      "options": {
+        "villany": "Villany",
+        "gaz": "Gáz"
+      }
+    },
+    "idoszak_mod": {
+      "options": {
+        "naptari_honap": "Naptári hónap",
+        "egyedi_nap": "Egyedi kezdőnap (havi)"
+      }
+    },
+    "leolvasas_tipus": {
+      "options": {
+        "kezi": "Saját (kézi)",
+        "szolgaltatoi": "Szolgáltatói"
+      }
+    }
+  },
+  "services": {
+    "leolvasas_rogzites": {
+      "name": "Mérőállás rögzítése",
+      "description": "Kézi vagy szolgáltatói leolvasás egy fiók mérőjére. Az automatikus szenzornál mindig erősebb.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        },
+        "allas": {
+          "name": "Állás",
+          "description": "A mérőóra állása."
+        },
+        "tipus": {
+          "name": "Típus",
+          "description": ""
+        },
+        "elszamolasi": {
+          "name": "Elszámoló (éves) leolvasás",
+          "description": "Ettől indul az éves keret, és itt kettéválik az időszak."
+        },
+        "megjegyzes": {
+          "name": "Megjegyzés",
+          "description": ""
+        }
+      }
+    },
+    "leolvasas_torles": {
+      "name": "Leolvasás törlése",
+      "description": "Egy nap összes leolvasását törli a fiókból.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        }
+      }
+    },
+    "merocsere": {
+      "name": "Mérőcsere",
+      "description": "Lezárja a mostani mérőt, és újat nyit. A fogyasztás a cserén át folytonos marad.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "datum": {
+          "name": "Dátum",
+          "description": ""
+        },
+        "regi_zaro_allas": {
+          "name": "Régi mérő záró állása",
+          "description": ""
+        },
+        "uj_kezdo_allas": {
+          "name": "Új mérő kezdő állása",
+          "description": ""
+        },
+        "uj_gyari_szam": {
+          "name": "Új mérő gyári száma",
+          "description": ""
+        }
+      }
+    },
+    "feluliras": {
+      "name": "Díj felülírása",
+      "description": "Egy díj vagy szabály egyedi értéke dátumtól. Érték nélkül a felülírás törlődik.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        },
+        "kulcs": {
+          "name": "Kulcs",
+          "description": "Pl. dijak.energia_kedvezmenyes, dijak.energia_piaci, dijak.alapdij_ho"
+        },
+        "ertek": {
+          "name": "Érték",
+          "description": "Bruttó Ft"
+        },
+        "ervenyes_tol": {
+          "name": "Érvényes ettől",
+          "description": ""
+        }
+      }
+    },
+    "naplo": {
+      "name": "Napló lekérése",
+      "description": "A fiók lezárt időszakai, mérői, leolvasásai és felülírásai.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        }
+      }
+    },
+    "csv_export": {
+      "name": "CSV-export",
+      "description": "A lezárt időszakokat és a leolvasásokat CSV-be írja a /config/hu_rezsi mappába.",
+      "fields": {
+        "device_id": {
+          "name": "Fiók",
+          "description": "A Rezsikövető-fiók eszköze."
+        }
+      }
+    },
+    "v1_import": {
+      "name": "Átvétel a v1-csomagból",
+      "description": "A régi YAML-csomag leolvasási naplóját és havi elszámolásait átmásolja. Alapból csak próbafuttatás.",
+      "fields": {
+        "a_fiok": {
+          "name": "A1 fiók",
+          "description": ""
+        },
+        "h_fiok": {
+          "name": "H-tarifa fiók",
+          "description": ""
+        },
+        "gaz_fiok": {
+          "name": "Gáz fiók",
+          "description": ""
+        },
+        "probafuttatas": {
+          "name": "Csak próbafuttatás",
+          "description": "Kikapcsolva ment is."
+        }
+      }
+    }
+  }
+}

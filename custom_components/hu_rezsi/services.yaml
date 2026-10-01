@@ -1,0 +1,77 @@
+leolvasas_rogzites:
+  fields:
+    device_id: &fiok
+      required: true
+      selector:
+        device:
+          integration: hu_rezsi
+    datum: &datum
+      required: true
+      selector:
+        date:
+    allas:
+      required: true
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    tipus:
+      default: kezi
+      selector:
+        select:
+          options: [kezi, szolgaltatoi]
+          translation_key: leolvasas_tipus
+    elszamolasi:
+      default: false
+      selector:
+        boolean:
+    megjegyzes:
+      selector:
+        text:
+leolvasas_torles:
+  fields:
+    device_id: *fiok
+    datum: *datum
+merocsere:
+  fields:
+    device_id: *fiok
+    datum: *datum
+    regi_zaro_allas:
+      required: true
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    uj_kezdo_allas:
+      default: 0
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    uj_gyari_szam:
+      selector:
+        text:
+feluliras:
+  fields:
+    device_id: *fiok
+    kulcs:
+      required: true
+      example: dijak.energia_piaci
+      selector:
+        text:
+    ertek:
+      selector:
+        number: {min: 0, max: 100000, step: 0.001, mode: box}
+    ervenyes_tol: *datum
+naplo:
+  fields:
+    device_id: *fiok
+csv_export:
+  fields:
+    device_id: *fiok
+v1_import:
+  fields:
+    a_fiok: &opc
+      selector:
+        device:
+          integration: hu_rezsi
+    h_fiok: *opc
+    gaz_fiok: *opc
+    probafuttatas:
+      default: true
+      selector:
+        boolean:

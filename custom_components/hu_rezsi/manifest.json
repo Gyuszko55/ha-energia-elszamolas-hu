@@ -1,0 +1,13 @@
+{
+  "domain": "hu_rezsi",
+  "name": "Rezsikövető",
+  "after_dependencies": ["recorder"],
+  "codeowners": ["@Gyuszko55"],
+  "config_flow": true,
+  "documentation": "https://github.com/Gyuszko55/ha-energia-elszamolas-hu",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/Gyuszko55/ha-energia-elszamolas-hu/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
