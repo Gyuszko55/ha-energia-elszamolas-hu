@@ -5,6 +5,9 @@
 - **H-tarifa két regiszterrel:** a téli (1.81) és a nyári (1.82) regiszter külön szenzorból és külön leolvasással mérődik, és külön számolódik (téli: H-ár, nyári: A1 ár saját kerettel, amely csak nyáron gyűlik). Az októberi és áprilisi váltás hónapjában mindkét tarifa külön sorban látszik (panel, `idenyszakok` attribútum). Az előrejelzés a két regiszter együttes napi átlagát naptár szerint osztja szét (okt. 15-től a téli, ápr. 15-től a nyári).
 - **Átalány bármely szolgáltatásnál:** „átalány” jelzés; **Havi fizetendő (átalány)** entitás = az átalány napra leosztva × a hónap napjai (az utolsó részszámla összege / időszakának napjai, vagy a beállított havi átalány × 12 / 365); a háztartás havi összesítőjében átalánynál a fizetendő szerepel.
 - DAKÖV-számlák elszámolt időszaka (import-verzió 4); üres háztartás a panelen.
+- **Mennyiségi átalány** (pl. 293 kWh/hó): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva (H-nál a téli/nyári ár naptár szerint). Átalányos fióknál a panel tételes forintszámítás helyett a fogyasztást mutatja, az átalány mennyiségével összevetve.
+- Éves egyenleg: az előző év kezdete legalább ~10 hónappal korábbi elszámoló leolvasás; rövid év esetén a mérő felszerelése óta mért fogyasztásból becsül; H-tarifánál a két regiszter együtt, naptár szerint szétosztva.
+- H-kártya: „Nyári (1.82) rezsicsökkentett keret – a téli H-árra nincs keret”.
 
 ## Rezsikövető 2.0.0b1 – 2026-10-01 (első béta)
 

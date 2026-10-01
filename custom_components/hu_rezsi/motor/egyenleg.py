@@ -141,9 +141,17 @@ def eves_egyenleg(
     teny = _ev_koltseg(fiok, tar, szamlalo, bazis, ev_ig, most, havi_alap, alap_eddig, tovabbi)
 
     # Előrejelzés: tavalyi éves fogyasztás × a hátralévő idő profil szerinti része.
+    # H-tarifa két regiszterrel: a mennyiséget a két regiszter együtt adja.
+    szerepek = [c.szerep for c in fiok.csatornak]
+    regiszteres = "h_teli" in szerepek and "h_nyari" in szerepek
+    mennyiseg_szamlalok = [szamlalo, *(tovabbi or [])] if regiszteres else [szamlalo]
+
+    def fogy(t1: datetime, t2: datetime) -> Decimal:
+        return sum((sz.fogyasztas(t1, t2)[0] for sz in mennyiseg_szamlalok), Decimal(0))
+
     elozo = None
     if elozo_bazis is not None:
-        elozo, _ = szamlalo.fogyasztas(nap_kezdete(elozo_bazis), nap_kezdete(bazis))
+        elozo = fogy(nap_kezdete(elozo_bazis), nap_kezdete(bazis))
     kozmu = str(fiok.kozmu)
     most_ertek, _ = szamlalo.ertek(most)
     pontok = [p for p in szamlalo.pontok if p.ido <= most] + [Pont(most, most_ertek, False)]
@@ -153,32 +161,47 @@ def eves_egyenleg(
         elozo = Decimal(elozo_ev_mennyiseg)
         alap_q, modszer = elozo, "beállított éves fogyasztás × havi profil"
     else:
-        eltelt = _profil_resz(bazis, ma, kozmu) or Decimal(1)
-        alap_q = (most_ertek - szamlalo.ertek(nap_kezdete(bazis))[0]) / eltelt
-        modszer = "az idei eddigi fogyasztásból, havi profillal"
+        # Idei adatból; ha az év eleje óta kevés (60 napnál rövidebb) az adat, a mérő felszerelése óta
+        # (legfeljebb egy évre visszamenőleg) eltelt időből.
+        kezd = bazis
+        if (ma - bazis).days < 60:
+            elso = min((m.beepitve for c in fiok.csatornak for m in c.merok), default=bazis)
+            kezd = max(elso, ma - timedelta(days=365))
+        eltelt = _profil_resz(kezd, ma, kozmu) or Decimal(1)
+        alap_q = fogy(nap_kezdete(kezd), most) / eltelt
+        modszer = "az idei eddigi fogyasztásból, havi profillal" if kezd == bazis else f"a {kezd.isoformat()} óta mért fogyasztásból, havi profillal"
+    bazis_ertek = fogy(nap_kezdete(bazis), most)
     ertek, elozo_nap = most_ertek, ma
     for d in sorted(x for x in honap_kezdetek(ma, ev_ig) | {ev_ig} if x > ma):
         ertek += alap_q * _profil_resz(elozo_nap, d, kozmu)
         pontok.append(Pont(nap_kezdete(d), ertek, False))
         elozo_nap = d
     elorejelzett = Szamlalo(pontok)
+    varhato_q = bazis_ertek + (ertek - most_ertek)
 
-    # A további csatornák (víz-almérő) előrejelzése a főmérőhöz mért idei arányukkal.
-    fo_eddig = most_ertek - szamlalo.ertek(nap_kezdete(bazis))[0]
     tovabbi_elore: list[Szamlalo] = []
-    for t in tovabbi or []:
-        t_most, _ = t.ertek(most)
-        arany = (t_most - t.ertek(nap_kezdete(bazis))[0]) / fo_eddig if fo_eddig > 0 else Decimal(0)
-        if fo_eddig <= 0 and elozo_bazis is not None and elozo:
-            # Még nincs idei adat: a tavalyi év aránya (pl. locsolás a főmérő fogyasztásához képest).
-            t_tavaly, _ = t.fogyasztas(nap_kezdete(elozo_bazis), nap_kezdete(bazis))
-            arany = max(t_tavaly, Decimal(0)) / elozo
-        t_pontok = [p for p in t.pontok if p.ido <= most] + [Pont(most, t_most, False)]
-        for p in pontok:
-            if p.ido > most:
-                t_pontok.append(Pont(p.ido, t_most + (p.ertek - most_ertek) * arany, False))
-        tovabbi_elore.append(Szamlalo(t_pontok))
-    varhato_q = ertek - szamlalo.ertek(nap_kezdete(bazis))[0]
+    if regiszteres:
+        # A becsült napi mennyiség naptár szerint a téli vagy a nyári regiszterre kerül.
+        from .elorejelzes import _h_regiszter_elorejelzes  # noqa: PLC0415
+
+        elorejelzett, *tovabbi_elore = _h_regiszter_elorejelzes(
+            fiok, tar, [szamlalo, *(tovabbi or [])], szerepek, alap_q / 365, most, nap_kezdete(ev_ig)
+        )
+    else:
+        # A további csatornák (víz-almérő) előrejelzése a főmérőhöz mért idei arányukkal.
+        fo_eddig = most_ertek - szamlalo.ertek(nap_kezdete(bazis))[0]
+        for t in tovabbi or []:
+            t_most, _ = t.ertek(most)
+            arany = (t_most - t.ertek(nap_kezdete(bazis))[0]) / fo_eddig if fo_eddig > 0 else Decimal(0)
+            if fo_eddig <= 0 and elozo_bazis is not None and elozo:
+                # Még nincs idei adat: a tavalyi év aránya (pl. locsolás a főmérő fogyasztásához képest).
+                t_tavaly, _ = t.fogyasztas(nap_kezdete(elozo_bazis), nap_kezdete(bazis))
+                arany = max(t_tavaly, Decimal(0)) / elozo
+            t_pontok = [p for p in t.pontok if p.ido <= most] + [Pont(most, t_most, False)]
+            for p in pontok:
+                if p.ido > most:
+                    t_pontok.append(Pont(p.ido, t_most + (p.ertek - most_ertek) * arany, False))
+            tovabbi_elore.append(Szamlalo(t_pontok))
     varhato = _ev_koltseg(fiok, tar, elorejelzett, bazis, ev_ig, None, havi_alap, len(honap_kezdetek(bazis, ev_ig + timedelta(days=1))), tovabbi_elore)
 
     visszameres = None
@@ -250,3 +273,32 @@ def varhato_elszamolas(
         mennyiseg=max(q, Decimal(0)),
         becsult=becsult,
     )
+
+
+def atalany_havi(
+    fiok: Fiok, tar: DijszabasTar, tol: date, ig: date, havi_mennyiseg: Decimal
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Mennyiségben megadott átalány (pl. 293 kWh/hó) a [tol, ig) időszakra: (napi mennyiség, időszak
+    mennyisége, fizetendő Ft). A napi mennyiség = havi × 12 / 365; az időszak mennyiségét a fiók díjszabása
+    árazza (keret, alapdíj). H-tarifa két regiszterénél a napi mennyiség naptár szerint a téli vagy a nyári
+    regiszterre kerül (okt. 15. / ápr. 15.)."""
+    from .elszamolas import _hozzarendeles, idenyszak  # noqa: PLC0415
+
+    napi = Decimal(havi_mennyiseg) * 12 / 365
+    szerepek = [c.szerep for c in fiok.csatornak]
+    idenyek = tar.felold(_hozzarendeles(fiok, tol), tol, fiok.szolgaltato, fiok.feluliras).szabalyok.get("idenyszak") or []
+    ertek = {sz: Decimal(0) for sz in szerepek}
+    pontok = {sz: [Pont(nap_kezdete(tol), Decimal(0), True)] for sz in szerepek}
+    d = tol
+    while d < ig:
+        if "h_teli" in szerepek:
+            cel = f"h_{(idenyszak(d, idenyek) or {}).get('nev')}"
+        else:
+            cel = szerepek[0]  # az almérő nem kap átalányt (a főmérő része)
+        if cel in ertek:
+            ertek[cel] += napi
+        d = d + timedelta(days=1)
+        for sz in szerepek:
+            pontok[sz].append(Pont(nap_kezdete(d), ertek[sz], True))
+    r = szamol(fiok, tar, tol, ig, [Szamlalo(pontok[sz]) for sz in szerepek])
+    return napi, sum(ertek.values(), Decimal(0)), r.osszesen_ft

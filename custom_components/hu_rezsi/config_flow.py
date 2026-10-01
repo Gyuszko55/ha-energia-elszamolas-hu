@@ -44,6 +44,7 @@ from .const import (
     CONF_NAPELEM,
     CONF_DIJNET,
     CONF_FIZETESI_MOD,
+    CONF_ATALANY_MENNYISEG,
     CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
     CONF_RESZSZAMLA_OSSZEG,
@@ -217,7 +218,7 @@ class FiokFlow(ConfigSubentryFlow):
                 NumberSelectorConfig(min=1, max=12, step=1, mode=NumberSelectorMode.BOX)
             ),
         }
-        for kulcs in (CONF_RESZSZAMLA_OSSZEG, CONF_ELOZO_EV):
+        for kulcs in (CONF_ATALANY_MENNYISEG, CONF_RESZSZAMLA_OSSZEG, CONF_ELOZO_EV):
             mezok[vol.Optional(kulcs, **({"description": {"suggested_value": eddigi[kulcs]}} if eddigi.get(kulcs) else {}))] = NumberSelector(
                 NumberSelectorConfig(min=0, max=10000000, step="any", mode=NumberSelectorMode.BOX)
             )

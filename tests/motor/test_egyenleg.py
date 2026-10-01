@@ -7,7 +7,7 @@ from tests.conftest import DIJSZABASOK
 from motor.dijszabas import DijszabasTar
 from motor.egyenleg import _profil_resz, eves_egyenleg
 from motor.szamlalo import Pont, Szamlalo
-from motor.tipusok import Csatorna, DijszabasHozzarendeles, Fiok, Kozmu
+from motor.tipusok import Csatorna, DijszabasHozzarendeles, Fiok, Kozmu, Mero
 
 TAR = DijszabasTar.mappabol(DIJSZABASOK)
 
@@ -90,3 +90,27 @@ def test_varhato_elszamolas():
     assert e.mennyiseg == D(1800) and e.szamlak_db == 3 and e.befizetve == D(17219 + 13006 + 14624)
     assert D(80000) < e.tenyleges < D(95000)
     assert e.egyenleg == e.befizetve - e.tenyleges < 0  # ráfizetés várható
+
+
+def test_mennyisegi_atalany_a1_es_h():
+    from motor.egyenleg import atalany_havi
+    a1 = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/a1", date(2024, 1, 1))], [Csatorna()])
+    napi, q, ft = atalany_havi(a1, TAR, date(2026, 10, 1), date(2026, 11, 1), D(293))
+    assert round(napi, 3) == round(D(293) * 12 / 365, 3) and round(q, 1) == round(D(293) * 12 / 365 * 31, 1)
+    assert D(13500) < ft < D(14500)  # ~299 kWh: 214 a kereten belül, ~85 piaci áron, + alapdíj
+    h = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/h", date(2024, 1, 1))],
+             [Csatorna(szerep="h_teli", keret_aktiv=False), Csatorna(szerep="h_nyari")])
+    _, qh, fth = atalany_havi(h, TAR, date(2026, 10, 1), date(2026, 11, 1), D(10))
+    assert round(qh, 1) == round(D(10) * 12 / 365 * 31, 1) and D(250) < fth < D(400)  # ~10 kWh + 51 Ft alapdíj
+
+
+def test_h_regiszteres_eves_egyenleg_rovid_ev_utan():
+    # H-óra 2026-02-08 óta: 474 kWh téli + 528 kWh nyári; éves leolvasás 2026-09-29 (2 napja)
+    h = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/h", date(2024, 1, 1))],
+             [Csatorna(szerep="h_teli", keret_aktiv=False, merok=[Mero("H", date(2026, 2, 8))]), Csatorna(szerep="h_nyari")],
+             eves_bazis=date(2026, 9, 29))
+    teli = Szamlalo([Pont(datetime(2026, 2, 8), D(0), True), Pont(datetime(2026, 4, 15), D(474), True), Pont(datetime(2026, 10, 1), D(474), True)])
+    nyari = Szamlalo([Pont(datetime(2026, 2, 8), D(0), True), Pont(datetime(2026, 4, 15), D(0), True), Pont(datetime(2026, 10, 1), D(528), True)])
+    e = eves_egyenleg(h, TAR, teli, datetime(2026, 10, 1), [], reszszamla_db_ev=11, reszszamla_osszeg=D(347), tovabbi=[nyari])
+    assert D(1300) < e.varhato_fogyasztas < D(1600)  # ~1 002 kWh / 235 nap × 365
+    assert e.varhato_egyenleg < -20000 and "óta mért" in e.modszer  # a 10 kWh/hó átalány messze kevés

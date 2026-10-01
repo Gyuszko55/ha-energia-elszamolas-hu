@@ -53,7 +53,8 @@
             "szamla_mappa": "Számlamappa (opcionális)",
             "szamla_merok": "Számla-mérők (opcionális)",
             "h_teli_forras": "H-tarifa: téli regiszter (1.81) szenzora",
-            "h_nyari_forras": "H-tarifa: nyári regiszter (1.82) szenzora"
+            "h_nyari_forras": "H-tarifa: nyári regiszter (1.82) szenzora",
+            "atalany_mennyiseg": "Átalány mennyisége havonta (opcionális)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -74,7 +75,8 @@
             "szamla_mappa": "A config mappán belül, pl. a Díjnet letöltési mappája. Az új számlákból a befizetés, a valódi (diktált/leolvasott) mérőállás és gáznál a havi fűtőérték magától rögzül.",
             "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik.",
             "h_teli_forras": "Csak H-tarifánál. Ha a téli és a nyári regiszter szenzora is meg van adva, a két regiszter külön mérődik és számolódik (a téli H-áron, a nyári A1 áron saját kerettel).",
-            "h_nyari_forras": "Csak H-tarifánál, a téli regiszterrel együtt."
+            "h_nyari_forras": "Csak H-tarifánál, a téli regiszterrel együtt.",
+            "atalany_mennyiseg": "Ha a szolgáltató havi mennyiséget számláz átalányként (pl. 293 kWh vagy 10 kWh): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. Elsőbbséget élvez az összeggel szemben."
           }
         },
         "reconfigure": {
@@ -109,7 +111,8 @@
             "szamla_mappa": "Számlamappa (opcionális)",
             "szamla_merok": "Számla-mérők (opcionális)",
             "h_teli_forras": "H-tarifa: téli regiszter (1.81) szenzora",
-            "h_nyari_forras": "H-tarifa: nyári regiszter (1.82) szenzora"
+            "h_nyari_forras": "H-tarifa: nyári regiszter (1.82) szenzora",
+            "atalany_mennyiseg": "Átalány mennyisége havonta (opcionális)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -130,7 +133,8 @@
             "szamla_mappa": "A config mappán belül, pl. a Díjnet letöltési mappája. Az új számlákból a befizetés, a valódi (diktált/leolvasott) mérőállás és gáznál a havi fűtőérték magától rögzül.",
             "szamla_merok": "Vesszővel elválasztott gyári számok. Ha egy mappában több fiók számlája van (pl. A1 és H), ezzel választható szét; üresen a mappa minden számlája ehhez a fiókhoz tartozik.",
             "h_teli_forras": "Csak H-tarifánál. Ha a téli és a nyári regiszter szenzora is meg van adva, a két regiszter külön mérődik és számolódik (a téli H-áron, a nyári A1 áron saját kerettel).",
-            "h_nyari_forras": "Csak H-tarifánál, a téli regiszterrel együtt."
+            "h_nyari_forras": "Csak H-tarifánál, a téli regiszterrel együtt.",
+            "atalany_mennyiseg": "Ha a szolgáltató havi mennyiséget számláz átalányként (pl. 293 kWh vagy 10 kWh): napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. Elsőbbséget élvez az összeggel szemben."
           }
         }
       },

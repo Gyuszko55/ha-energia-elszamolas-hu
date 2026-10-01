@@ -77,7 +77,7 @@ A H-tarifás fióknál megadható a **téli (1.81)** és a **nyári (1.82)** reg
 
 ## Átalány
 
-Bármely fiók lehet **részszámlás (átalány)**. Ilyenkor a panelen „átalány” jelzés látszik, és a **Havi fizetendő (átalány)** = az átalány napra leosztva × a hónap napjai. A napi összeg az utolsó részszámla összege osztva az időszakának napjaival, vagy a beállított havi átalány × 12 / 365. A háztartás havi összesítőjében az átalányos szolgáltatás a fizetendővel szerepel; a tényleges fogyasztás költsége mellette látszik, és a várható elszámolás ebből számol.
+Bármely fiók lehet **részszámlás (átalány)**. Ilyenkor a panelen „átalány” jelzés látszik, és a **Havi fizetendő (átalány)** = az átalány napra leosztva × a hónap napjai. A napi összeg az utolsó részszámla összege osztva az időszakának napjaival, vagy a beállított havi átalány × 12 / 365. Ha a szolgáltató **mennyiséget** számláz átalányként (pl. MVM: 293 kWh/hó), az „Átalány mennyisége havonta” mezőben adható meg: napra leosztva × a hónap napjai, a fiók díjszabásával beárazva. A háztartás havi összesítőjében az átalányos szolgáltatás a fizetendővel szerepel; a panel tételes forintszámítás helyett a fogyasztást mutatja, összevetve az átalány mennyiségével. A várható elszámolás és az éves egyenleg a tényleges fogyasztásból számol.
 
 ## Fix díjas fiók (hulladékszállítás)
 

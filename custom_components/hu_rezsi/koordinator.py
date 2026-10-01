@@ -22,6 +22,7 @@ from .const import (
     CONF_DIJNET,
     CONF_NAPELEM,
     CONF_FIZETESI_MOD,
+    CONF_ATALANY_MENNYISEG,
     CONF_ELOZO_EV,
     CONF_RESZSZAMLA_DB,
     CONF_RESZSZAMLA_OSSZEG,
@@ -52,7 +53,7 @@ from . import dijnet, szamlak
 from .szamla_import import IMPORT_VERZIO, atalany_szamitas, rogzit, szamla_statisztika, ujraertekel
 from .modell import betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
-from .motor.egyenleg import EvesEgyenleg, VarhatoElszamolas, egy_ev_mulva, eves_egyenleg, varhato_elszamolas
+from .motor.egyenleg import EvesEgyenleg, VarhatoElszamolas, atalany_havi, egy_ev_mulva, eves_egyenleg, varhato_elszamolas
 from .motor.elszamolas import _hozzarendeles, futoertek, idenyszak
 from .motor.dijszabas import DijszabasHiba, DijszabasTar
 from .motor.elorejelzes import NyitottIdoszak, idoszak, nyitott
@@ -254,10 +255,16 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 elszamolas = await self._varhato_elszamolas(sub, tarolt, fiok, szamlalo, most, tovabbi)
             except (NincsAdat, ValueError, DijszabasHiba) as err:
                 _LOGGER.debug("%s: várható elszámolás nem számolható: %s", sub.title, err)
+        atalany_e = None
+        if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
+            if sub.data.get(CONF_ATALANY_MENNYISEG):
+                atalany_e = self._mennyisegi_atalany(sub, fiok, tol, ig, most)
+            else:
+                atalany_e = atalany_szamitas(sub.data.get(CONF_RESZSZAMLA_OSSZEG), tarolt, tol, ig, most)
         egyenleg, egyenleg_hiba = None, None
         if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
             try:
-                egyenleg = await self._egyenleg(sub, tarolt, fiok, szamlalo, most, tovabbi)
+                egyenleg = await self._egyenleg(sub, tarolt, fiok, szamlalo, most, tovabbi, atalany_e["havi"] if atalany_e else None)
             except (NincsAdat, ValueError, DijszabasHiba) as err:
                 egyenleg_hiba = str(err)
         return (
@@ -275,8 +282,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 napelem=napelem_e,
                 utolso_szamla=_utolso_szamla(tarolt),
                 elszamolas=elszamolas,
-                atalany=atalany_szamitas(sub.data.get(CONF_RESZSZAMLA_OSSZEG), tarolt, tol, ig, most)
-                if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla" else None,
+                atalany=atalany_e,
                 szamla_stat=szamla_statisztika(tarolt, most.date(), fix_dij=sub.data[CONF_KOZMU] in FIX_DIJAS),
                 napelem_hiba=napelem_hiba,
             ),
@@ -363,7 +369,28 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         befizetesek = [v for k, v in reszek.items() if k not in kizart]
         return varhato_elszamolas(fiok, self.tar, szamlalo, most, tol, befizetesek, tovabbi)
 
-    async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime, tovabbi: list[Szamlalo] | None = None) -> EvesEgyenleg:
+    def _mennyisegi_atalany(self, sub: ConfigSubentry, fiok: Fiok, tol: date, ig: date, most: datetime) -> dict[str, Any]:
+        havi_q = Decimal(str(sub.data[CONF_ATALANY_MENNYISEG]))
+        napi_q, idoszak_q, havi_ft = atalany_havi(fiok, self.tar, tol, ig, havi_q)
+        napok = (ig - tol).days
+        eltelt = min(max((most.date() - tol).days + 1, 0), napok)
+        egyseg = EGYSEG.get(sub.data[CONF_KOZMU], "")
+        return {
+            "napi": round(float(havi_ft) / napok, 2),
+            "havi": int(havi_ft),
+            "eddig": int(round(float(havi_ft) * eltelt / napok)),
+            "napok": napok,
+            "eltelt_nap": eltelt,
+            "mennyiseg_havi": float(havi_q),
+            "mennyiseg_napi": round(float(napi_q), 3),
+            "mennyiseg_idoszak": round(float(idoszak_q), 1),
+            "forras": (
+                f"átalány {float(havi_q):g} {egyseg}/hó → napi {float(napi_q):.2f} {egyseg}, "
+                f"ebben a hónapban {float(idoszak_q):.1f} {egyseg}"
+            ).replace(".", ","),
+        }
+
+    async def _egyenleg(self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, szamlalo: Szamlalo, most: datetime, tovabbi: list[Szamlalo] | None = None, atalany_havi_ft: int | None = None) -> EvesEgyenleg:
         """Részszámlás fiók: kézzel rögzített + Díjnet-számlák, éves egyenleg."""
         lista = list((await self._befizetesek(sub, tarolt)).values())
         return eves_egyenleg(
@@ -371,7 +398,10 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             reszszamla_db_ev=int(sub.data.get(CONF_RESZSZAMLA_DB) or 11),
             elozo_bazis=elozo_bazis(tarolt),
             tovabbi=tovabbi,
-            reszszamla_osszeg=Decimal(str(sub.data[CONF_RESZSZAMLA_OSSZEG])) if sub.data.get(CONF_RESZSZAMLA_OSSZEG) else None,
+            reszszamla_osszeg=(
+                Decimal(str(sub.data[CONF_RESZSZAMLA_OSSZEG])) if sub.data.get(CONF_RESZSZAMLA_OSSZEG)
+                else Decimal(atalany_havi_ft) if atalany_havi_ft else None
+            ),
             elozo_ev_mennyiseg=Decimal(str(sub.data[CONF_ELOZO_EV])) if sub.data.get(CONF_ELOZO_EV) else None,
         )
 

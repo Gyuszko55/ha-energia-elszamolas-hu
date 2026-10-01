@@ -31,6 +31,7 @@ CONF_ALMERO_BEEPITVE = "almero_beepitve"
 CONF_ALMERO_FORRAS = "almero_forras"
 CONF_RESZSZAMLA_OSSZEG = "reszszamla_osszeg"
 CONF_ELOZO_EV = "elozo_ev_mennyiseg"
+CONF_ATALANY_MENNYISEG = "atalany_mennyiseg"  # havi átalány mennyiségben (pl. 293 kWh/hó)
 CONF_SZAMLA_MAPPA = "szamla_mappa"  # a config mappához képest, pl. "Dijnet /mvm_next_foldgaz"
 CONF_H_TELI = "h_teli_forras"  # H-tarifa téli regiszter (1.81) szenzora
 CONF_H_NYARI = "h_nyari_forras"  # H-tarifa nyári regiszter (1.82) szenzora

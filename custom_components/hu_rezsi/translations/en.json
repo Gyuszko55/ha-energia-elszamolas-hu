@@ -53,7 +53,8 @@
             "szamla_mappa": "Invoice folder (optional)",
             "szamla_merok": "Invoice meters (optional)",
             "h_teli_forras": "H tariff: winter register (1.81) sensor",
-            "h_nyari_forras": "H tariff: summer register (1.82) sensor"
+            "h_nyari_forras": "H tariff: summer register (1.82) sensor",
+            "atalany_mennyiseg": "Flat-rate monthly quantity (optional)"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -74,7 +75,8 @@
             "szamla_mappa": "Inside the config folder, e.g. the Díjnet download folder. New invoices add payments, real meter readings and monthly calorific values.",
             "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account.",
             "h_teli_forras": "H tariff only. With both registers set, they are measured and billed separately.",
-            "h_nyari_forras": "H tariff only, together with the winter register."
+            "h_nyari_forras": "H tariff only, together with the winter register.",
+            "atalany_mennyiseg": "If the provider bills a fixed monthly quantity (e.g. 293 kWh): per day × days of the month, priced with the account's tariff."
           }
         },
         "reconfigure": {
@@ -109,7 +111,8 @@
             "szamla_mappa": "Invoice folder (optional)",
             "szamla_merok": "Invoice meters (optional)",
             "h_teli_forras": "H tariff: winter register (1.81) sensor",
-            "h_nyari_forras": "H tariff: summer register (1.82) sensor"
+            "h_nyari_forras": "H tariff: summer register (1.82) sensor",
+            "atalany_mennyiseg": "Flat-rate monthly quantity (optional)"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -130,7 +133,8 @@
             "szamla_mappa": "Inside the config folder, e.g. the Díjnet download folder. New invoices add payments, real meter readings and monthly calorific values.",
             "szamla_merok": "Comma-separated meter serials to split a shared folder (e.g. A1 and H); empty: all invoices belong to this account.",
             "h_teli_forras": "H tariff only. With both registers set, they are measured and billed separately.",
-            "h_nyari_forras": "H tariff only, together with the winter register."
+            "h_nyari_forras": "H tariff only, together with the winter register.",
+            "atalany_mennyiseg": "If the provider bills a fixed monthly quantity (e.g. 293 kWh): per day × days of the month, priced with the account's tariff."
           }
         }
       },
