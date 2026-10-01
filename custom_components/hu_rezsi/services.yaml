@@ -26,6 +26,12 @@ leolvasas_rogzites:
     megjegyzes:
       selector:
         text:
+    csatorna:
+      default: vetelezes
+      selector:
+        select:
+          options: [vetelezes, betaplalas]
+          translation_key: csatorna
 leolvasas_torles:
   fields:
     device_id: *fiok

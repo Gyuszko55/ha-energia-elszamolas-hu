@@ -41,7 +41,9 @@
             "reszszamla_db_ev": "Részszámlák száma évente",
             "dijnet_szolgaltato": "Díjnet-szolgáltató (részszámlákhoz)",
             "csatornadij_aktiv": "Csatornadíj",
-            "forras_tol": "A szenzor érvényes ettől"
+            "forras_tol": "A szenzor érvényes ettől",
+            "napelem_mod": "Napelem (kísérleti)",
+            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -53,7 +55,9 @@
             "reszszamla_db_ev": "Az elszámoló számlán kívül (MVM gáz: 11).",
             "dijnet_szolgaltato": "A Díjnet-integráció kifizetett számláiból veszi a befizetéseket.",
             "csatornadij_aktiv": "Locsolási almérőnél kapcsold ki.",
-            "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk."
+            "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk.",
+            "napelem_mod": "Bruttó: havi elszámolás, a betáplálás átvételi áron. Szaldó: éves nettózás (az üzembe helyezéstől 10 évig). Részletek: docs/terv/05_NAPELEM.md.",
+            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk."
           }
         },
         "reconfigure": {
@@ -76,7 +80,9 @@
             "reszszamla_db_ev": "Részszámlák száma évente",
             "dijnet_szolgaltato": "Díjnet-szolgáltató (részszámlákhoz)",
             "csatornadij_aktiv": "Csatornadíj",
-            "forras_tol": "A szenzor érvényes ettől"
+            "forras_tol": "A szenzor érvényes ettől",
+            "napelem_mod": "Napelem (kísérleti)",
+            "betaplalas_entitas": "Betáplálás-szenzor (2.8.0)"
           },
           "data_description": {
             "forras_entitas": "Olyan szenzor, amelynek az értéke a mérőórával együtt nő (statisztikával). A kézi leolvasás mindig felülbírálja.",
@@ -88,7 +94,9 @@
             "reszszamla_db_ev": "Az elszámoló számlán kívül (MVM gáz: 11).",
             "dijnet_szolgaltato": "A Díjnet-integráció kifizetett számláiból veszi a befizetéseket.",
             "csatornadij_aktiv": "Locsolási almérőnél kapcsold ki.",
-            "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk."
+            "forras_tol": "Ha a szenzor korábbi adatai hibásak (pl. képletjavítás előtt), az ez előtti értékeit figyelmen kívül hagyjuk.",
+            "napelem_mod": "Bruttó: havi elszámolás, a betáplálás átvételi áron. Szaldó: éves nettózás (az üzembe helyezéstől 10 évig). Részletek: docs/terv/05_NAPELEM.md.",
+            "betaplalas_entitas": "Ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánljuk."
           }
         }
       },
@@ -138,6 +146,15 @@
       },
       "varhato_egyenleg": {
         "name": "Várható éves egyenleg"
+      },
+      "betaplalas": {
+        "name": "Betáplálás"
+      },
+      "betaplalas_jovairas": {
+        "name": "Betáplálás jóváírása"
+      },
+      "napelem_egyenleg": {
+        "name": "Napelemes egyenleg"
       }
     }
   },
@@ -172,6 +189,19 @@
         "fogyasztas_szerint": "Fogyasztás szerint",
         "reszszamla": "Részszámlás (átalány)"
       }
+    },
+    "napelem_mod": {
+      "options": {
+        "nincs": "Nincs napelem",
+        "brutto": "Bruttó elszámolás",
+        "szaldo": "Szaldó elszámolás"
+      }
+    },
+    "csatorna": {
+      "options": {
+        "vetelezes": "Vételezés (1.8.0)",
+        "betaplalas": "Betáplálás (2.8.0)"
+      }
     }
   },
   "services": {
@@ -202,6 +232,10 @@
         "megjegyzes": {
           "name": "Megjegyzés",
           "description": ""
+        },
+        "csatorna": {
+          "name": "Mérőregiszter",
+          "description": "Napelemes ad-vesz mérőnél: vételezés vagy betáplálás."
         }
       }
     },

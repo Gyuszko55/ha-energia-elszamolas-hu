@@ -1,5 +1,11 @@
 # Változások
 
+## [Fejlesztés] Rezsikövető 0.3.0-dev (2026-10-01)
+
+- Napelem (kísérleti): bruttó és szaldó elszámolás, betáplálás-szenzor (Energia-beállításból ajánlva), 2.8.0-s leolvasás; `villany/hmke` forrásokkal; `docs/terv/05_NAPELEM.md`.
+- Víz: `viz/dakov` (DAKÖV-számlán forintra pontos), végösszeg-kerekítési mód.
+- Javítás: új fiók felvételekor az entitásai azonnal elérhetők (újraszámolás, ha a fiók még hiányzik).
+
 ## [Fejlesztés] Rezsikövető 0.2.0-dev (2026-10-01)
 
 - Nettó tételsoros számlázás ÁFÁ-val: mindkét valódi számla forintra pontos.

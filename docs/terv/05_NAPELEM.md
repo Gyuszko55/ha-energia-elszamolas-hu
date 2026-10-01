@@ -79,6 +79,6 @@ megtérülés – 4. lépcső) használjuk, nem a számla kiszámításához.
 
 - [x] **N0** Ez az összefoglaló, forrásokkal és nyitott kérdésekkel
 - [x] **N1** Motor: bruttó és szaldó elszámolás (`motor/napelem.py`), szintetikus tesztek
-- [ ] **N2** HA-réteg (kísérleti): napelemes mód a fiókban, betáplálás-forrás (Energia-beállításból, szenzorból vagy kézi leolvasással), entitások: betáplálás, jóváírás, egyenleg / szaldó
+- [x] **N2** HA-réteg (kísérleti): napelemes mód a fiókban (bruttó/szaldó), betáplálás-szenzor (az Energia-beállításból ajánlva), 2.8.0-s kézi leolvasás (`csatorna: betaplalas`), entitások: Betáplálás, Betáplálás jóváírása, Napelemes egyenleg. Élő próba szimulált fiókokkal 2026-10-01 (bruttó és szaldó), utána törölve.
 - [ ] **N3** Valódi számlák gyűjtése napelemes felhasználóktól (GitHub-felhívás) → számlatesztek → a „kísérleti” jelzés levétele
 - [ ] **N4** Akkumulátor és önfogyasztás: megtakarítás-elemzés (4. lépcső)

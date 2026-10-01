@@ -35,7 +35,9 @@ from pathlib import Path
 from . import dijnet
 from .const import (
     CONF_BEEPITVE,
+    CONF_BETAPLALAS,
     CONF_CSATORNADIJ,
+    CONF_NAPELEM,
     CONF_DIJNET,
     CONF_FIZETESI_MOD,
     CONF_RESZSZAMLA_DB,
@@ -123,6 +125,22 @@ class FiokFlow(ConfigSubentryFlow):
         sema = vol.Schema({vol.Required("nev", default=sub.title): TextSelector()}).extend(sema.schema)
         return self.async_show_form(step_id="reconfigure", data_schema=sema)
 
+    async def _energia_betaplalas(self) -> str | None:
+        """Ha a HA Energia irányítópulton van beállított hálózati betáplálás, azt ajánljuk fel."""
+        try:
+            from homeassistant.components.energy.data import async_get_manager  # noqa: PLC0415
+
+            adat = (await async_get_manager(self.hass)).data or {}
+            for forras in adat.get("energy_sources", []):
+                if forras.get("type") == "grid" and forras.get("stat_energy_to"):
+                    return forras["stat_energy_to"]
+                for f in forras.get("flow_to", []) if forras.get("type") == "grid" else []:  # régebbi formátum
+                    if f.get("stat_energy_to"):
+                        return f["stat_energy_to"]
+        except Exception:  # noqa: BLE001 – az ajánlás nem kötelező
+            return None
+        return None
+
     async def _sema(self, kozmu: str, eddigi: dict[str, Any], uj: bool) -> vol.Schema:
         tar = await dijszabas_tar(self.hass)
         szolg = [
@@ -172,6 +190,14 @@ class FiokFlow(ConfigSubentryFlow):
         if dn:
             mezok[vol.Optional(CONF_DIJNET, **({"description": {"suggested_value": eddigi[CONF_DIJNET]}} if eddigi.get(CONF_DIJNET) else {}))] = SelectSelector(
                 SelectSelectorConfig(options=dn, custom_value=True)
+            )
+        if kozmu == "villany":
+            ajanlott = eddigi.get(CONF_BETAPLALAS) or await self._energia_betaplalas()
+            mezok[vol.Required(CONF_NAPELEM, default=alap(CONF_NAPELEM, "nincs"))] = SelectSelector(
+                SelectSelectorConfig(options=["nincs", "brutto", "szaldo"], translation_key="napelem_mod")
+            )
+            mezok[vol.Optional(CONF_BETAPLALAS, **({"description": {"suggested_value": ajanlott}} if ajanlott else {}))] = EntitySelector(
+                EntitySelectorConfig(domain="sensor")
             )
         if kozmu == "viz":
             mezok[vol.Required(CONF_CSATORNADIJ, default=alap(CONF_CSATORNADIJ, True))] = BooleanSelector()

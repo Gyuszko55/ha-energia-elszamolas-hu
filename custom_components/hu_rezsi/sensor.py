@@ -14,12 +14,32 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FIZETESI_MOD, DOMAIN, PENZNEM
+from .const import CONF_FIZETESI_MOD, CONF_NAPELEM, DOMAIN, PENZNEM
 from .koordinator import FiokAllapot, RezsiKoordinator
 from .modell import szelet_dict
 
 MAX_NAPLO = 24
 EGYENLEG_KULCSOK = {"befizetve", "varhato_eves_koltseg", "varhato_egyenleg"}
+NAPELEM_KULCSOK = {"betaplalas", "betaplalas_jovairas", "napelem_egyenleg"}
+
+
+def _napelem_attr(a: FiokAllapot) -> dict[str, Any]:
+    n = a.napelem
+    return {
+        "mod": {"brutto": "bruttó (havi)", "szaldo": "szaldó (éves)"}[n.mod],
+        "idoszak_kezdete": n.tol.isoformat(),
+        "idoszak_vege": n.ig.isoformat(),
+        "vetelezes_kwh": _f(n.vetelezes, 3),
+        "betaplalas_kwh": _f(n.betaplalas, 3),
+        "elszamolt_vetelezes_kwh": _f(n.elszamolt_vetelezes, 3),
+        "betaplalasi_tobblet_kwh": _f(n.tobblet, 3),
+        "energia_ft": float(n.energia_ft),
+        "alapdij_ft": float(n.alapdij_ft),
+        "jovairas_ft": float(n.jovairas_ft),
+        "becsult": n.becsult,
+        "kiserleti": True,
+        "megjegyzes": "Kísérleti: a szabályokat még nem ellenőriztük valódi napelemes számlán (docs/terv/05_NAPELEM.md).",
+    }
 EGYSEG_MEGJELENES = {"m3": "m³"}
 
 
@@ -183,6 +203,35 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         elerheto=lambda a: a.egyenleg is not None,
     ),
     FiokLeiras(
+        key="betaplalas",
+        translation_key="betaplalas",
+        suggested_display_precision=1,
+        ertek=lambda a: _f(a.napelem.betaplalas, 3),
+        egyseg=lambda a: "kWh",
+        attr=_napelem_attr,
+        elerheto=lambda a: a.napelem is not None,
+    ),
+    FiokLeiras(
+        key="betaplalas_jovairas",
+        translation_key="betaplalas_jovairas",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: int(round(a.napelem.jovairas_ft)),
+        attr=_napelem_attr,
+        elerheto=lambda a: a.napelem is not None,
+    ),
+    FiokLeiras(
+        key="napelem_egyenleg",
+        translation_key="napelem_egyenleg",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: int(a.napelem.egyenleg_ft),
+        attr=_napelem_attr,
+        elerheto=lambda a: a.napelem is not None,
+    ),
+    FiokLeiras(
         key="utolso_lezart",
         translation_key="utolso_lezart",
         device_class=SensorDeviceClass.MONETARY,
@@ -203,10 +252,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             [
                 FiokSzenzor(koord, entry, sid, sub.title, leiras)
                 for leiras in FIOK_LEIRASOK
-                if leiras.key not in EGYENLEG_KULCSOK or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla"
+                if (leiras.key not in EGYENLEG_KULCSOK or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla")
+                and (leiras.key not in NAPELEM_KULCSOK or sub.data.get(CONF_NAPELEM, "nincs") != "nincs")
             ],
             config_subentry_id=sid,
         )
+    # Új fiók felvételekor az újratöltés versenyhelyzetbe kerülhet: ha egy fiók még nincs a számolt
+    # adatok között, azonnal újraszámolunk (különben az entitásai a következő frissítésig elérhetetlenek).
+    if set(koord.fiokok()) - set(koord.data or {}):
+        await koord.async_request_refresh()
 
 
 class FiokSzenzor(CoordinatorEntity[RezsiKoordinator], SensorEntity):
@@ -232,6 +286,9 @@ class FiokSzenzor(CoordinatorEntity[RezsiKoordinator], SensorEntity):
     @property
     def available(self) -> bool:
         a = self._allapot
+        if a is None and super().available and not getattr(self.coordinator, "_ujraszamol_kert", False):
+            self.coordinator._ujraszamol_kert = True  # egyszer kérünk újraszámolást a hiányzó fiókhoz
+            self.hass.async_create_task(self.coordinator.async_request_refresh())
         return super().available and a is not None and a.hiba is None and self.entity_description.elerheto(a)
 
     @property

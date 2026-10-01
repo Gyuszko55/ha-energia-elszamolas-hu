@@ -41,7 +41,9 @@
             "reszszamla_db_ev": "Partial bills per year",
             "dijnet_szolgaltato": "Díjnet provider (for partial bills)",
             "csatornadij_aktiv": "Sewage fee",
-            "forras_tol": "Sensor valid from"
+            "forras_tol": "Sensor valid from",
+            "napelem_mod": "Solar (experimental)",
+            "betaplalas_entitas": "Feed-in sensor (2.8.0)"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -53,7 +55,9 @@
             "reszszamla_db_ev": "Excluding the settlement bill (MVM gas: 11).",
             "dijnet_szolgaltato": "Payments are read from the Díjnet integration's paid invoices.",
             "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
-            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored."
+            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored.",
+            "napelem_mod": "Gross: monthly billing, feed-in credited at the purchase price. Net (szaldó): yearly netting (10 years from commissioning).",
+            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured."
           }
         },
         "reconfigure": {
@@ -76,7 +80,9 @@
             "reszszamla_db_ev": "Partial bills per year",
             "dijnet_szolgaltato": "Díjnet provider (for partial bills)",
             "csatornadij_aktiv": "Sewage fee",
-            "forras_tol": "Sensor valid from"
+            "forras_tol": "Sensor valid from",
+            "napelem_mod": "Solar (experimental)",
+            "betaplalas_entitas": "Feed-in sensor (2.8.0)"
           },
           "data_description": {
             "forras_entitas": "A sensor that increases with the meter (with statistics). Manual readings always override it.",
@@ -88,7 +94,9 @@
             "reszszamla_db_ev": "Excluding the settlement bill (MVM gas: 11).",
             "dijnet_szolgaltato": "Payments are read from the Díjnet integration's paid invoices.",
             "csatornadij_aktiv": "Turn off for an irrigation sub-meter.",
-            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored."
+            "forras_tol": "Earlier sensor data (e.g. before a formula fix) is ignored.",
+            "napelem_mod": "Gross: monthly billing, feed-in credited at the purchase price. Net (szaldó): yearly netting (10 years from commissioning).",
+            "betaplalas_entitas": "Suggested from the HA Energy dashboard grid export, if configured."
           }
         }
       },
@@ -138,6 +146,15 @@
       },
       "varhato_egyenleg": {
         "name": "Expected yearly balance"
+      },
+      "betaplalas": {
+        "name": "Feed-in"
+      },
+      "betaplalas_jovairas": {
+        "name": "Feed-in credit"
+      },
+      "napelem_egyenleg": {
+        "name": "Solar balance"
       }
     }
   },
@@ -172,6 +189,19 @@
         "fogyasztas_szerint": "By consumption",
         "reszszamla": "Partial billing (flat)"
       }
+    },
+    "napelem_mod": {
+      "options": {
+        "nincs": "No solar",
+        "brutto": "Gross billing",
+        "szaldo": "Net billing (szaldó)"
+      }
+    },
+    "csatorna": {
+      "options": {
+        "vetelezes": "Import (1.8.0)",
+        "betaplalas": "Export (2.8.0)"
+      }
     }
   },
   "services": {
@@ -202,6 +232,10 @@
         "megjegyzes": {
           "name": "Note",
           "description": ""
+        },
+        "csatorna": {
+          "name": "Meter register",
+          "description": "For a bidirectional meter: import or export."
         }
       }
     },

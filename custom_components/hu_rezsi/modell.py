@@ -51,13 +51,15 @@ def kezdo_mero(beallitas: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def mero_motorba(m: dict[str, Any]) -> Mero:
+def mero_motorba(m: dict[str, Any], csatorna: str = "vetelezes") -> Mero:
+    """Egy mérő egy regisztere (csatornája): vételezés (1.8.0) vagy betáplálás (2.8.0)."""
+    be = csatorna == "betaplalas"
     return Mero(
         gyari_szam=m.get("gyari_szam", ""),
         beepitve=d(m["beepitve"]),
-        kezdo_allas=dec(m.get("kezdo_allas")) or Decimal(0),
+        kezdo_allas=dec(m.get("kezdo_betaplalas" if be else "kezdo_allas")) or Decimal(0),
         kiszerelve=d(m.get("kiszerelve")),
-        zaro_allas=dec(m.get("zaro_allas")),
+        zaro_allas=dec(m.get("zaro_betaplalas" if be else "zaro_allas")),
         leolvasasok=[
             Leolvasas(
                 datum=d(lo["datum"]),
@@ -67,6 +69,7 @@ def mero_motorba(m: dict[str, Any]) -> Mero:
                 megjegyzes=lo.get("megjegyzes", ""),
             )
             for lo in m.get("leolvasasok", [])
+            if lo.get("csatorna", "vetelezes") == csatorna
         ],
     )
 
@@ -101,6 +104,11 @@ def fiok_motorba(beallitas: dict[str, Any], tarolt: dict[str, Any]) -> Fiok:
         eves_bazis=eves_bazis(tarolt),
         futoertekek={k: Decimal(str(v)) for k, v in (tarolt.get("futoertekek") or {}).items()},
     )
+
+
+def betaplalas_csatorna(tarolt: dict[str, Any]) -> Csatorna:
+    """Napelemes fiók: az ad-vesz mérő betáplálási regisztere (2.8.0), keret nélkül."""
+    return Csatorna(szerep="betaplalas", merok=[mero_motorba(m, "betaplalas") for m in tarolt["merok"]], keret_aktiv=False)
 
 
 def elozo_bazis(tarolt: dict[str, Any]) -> date | None:

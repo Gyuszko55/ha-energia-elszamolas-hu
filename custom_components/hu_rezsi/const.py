@@ -23,6 +23,8 @@ CONF_FIZETESI_MOD = "fizetesi_mod"  # fogyasztas_szerint | reszszamla
 CONF_RESZSZAMLA_DB = "reszszamla_db_ev"
 CONF_DIJNET = "dijnet_szolgaltato"  # a Díjnet-integráció számláinak „provider” mezője
 CONF_CSATORNADIJ = "csatornadij_aktiv"
+CONF_NAPELEM = "napelem_mod"  # nincs | brutto | szaldo
+CONF_BETAPLALAS = "betaplalas_entitas"
 
 EGYSEG = {"villany": "kWh", "gaz": "m³", "viz": "m³"}  # a mért (óra) egység
 DIJNET_MINTA = ".dijnet_paid_invoices_*.yaml"

@@ -16,7 +16,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_BETAPLALAS,
     CONF_DIJNET,
+    CONF_NAPELEM,
     CONF_FIZETESI_MOD,
     CONF_RESZSZAMLA_DB,
     DIJNET_MINTA,
@@ -36,8 +38,9 @@ from .const import (
 from pathlib import Path
 
 from . import dijnet
-from .modell import d, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
-from .motor.egyenleg import EvesEgyenleg, eves_egyenleg
+from .modell import betaplalas_csatorna, d, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
+from .motor import napelem
+from .motor.egyenleg import EvesEgyenleg, egy_ev_mulva, eves_egyenleg
 from .motor.elszamolas import _hozzarendeles, futoertek
 from .motor.dijszabas import DijszabasHiba, DijszabasTar
 from .motor.elorejelzes import NyitottIdoszak, idoszak, nyitott
@@ -65,6 +68,8 @@ class FiokAllapot:
     aktualis_ar: Decimal | None = None
     utolso_lezart: dict[str, Any] | None = None
     egyenleg: EvesEgyenleg | None = None
+    napelem: napelem.NapelemEredmeny | None = None
+    napelem_hiba: str | None = None
     egyenleg_hiba: str | None = None
     hiba: str | None = None
 
@@ -135,6 +140,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
     async def _async_update_data(self) -> dict[str, FiokAllapot]:
         most = helyi_most()
         self._forras_hianyzik = False
+        self._ujraszamol_kert = False
         kimenet: dict[str, FiokAllapot] = {}
         valtozott = False
         for sid, sub in self.fiokok().items():
@@ -197,6 +203,13 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             except NincsAdat:
                 eves = None
         lezartak = sorted(tarolt["lezart"], key=lambda x: x["tol"])
+        napelem_e, napelem_hiba = None, None
+        mod = sub.data.get(CONF_NAPELEM, "nincs")
+        if mod in ("brutto", "szaldo"):
+            try:
+                napelem_e = await self._napelem(sub, tarolt, fiok, szamlalo, tol, ig, most, mod)
+            except (NincsAdat, ValueError, DijszabasHiba, KeyError) as err:
+                napelem_hiba = str(err)
         egyenleg, egyenleg_hiba = None, None
         if sub.data.get(CONF_FIZETESI_MOD) == "reszszamla":
             try:
@@ -215,6 +228,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 utolso_lezart=lezartak[-1] if lezartak else None,
                 egyenleg=egyenleg,
                 egyenleg_hiba=egyenleg_hiba,
+                napelem=napelem_e,
+                napelem_hiba=napelem_hiba,
             ),
             lezart_valt,
         )
@@ -235,6 +250,26 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             reszszamla_db_ev=int(sub.data.get(CONF_RESZSZAMLA_DB) or 11),
             elozo_bazis=elozo_bazis(tarolt),
         )
+
+    async def _napelem(
+        self, sub: ConfigSubentry, tarolt: dict[str, Any], fiok: Fiok, vetel: Szamlalo, tol: date, ig: date, most: datetime, mod: str
+    ) -> napelem.NapelemEredmeny:
+        """Napelemes fiók (kísérleti): betáplálási számláló a 2.8.0-s leolvasásokból és a betáplálás-szenzorból."""
+        csat = betaplalas_csatorna(tarolt)
+        sorozat = None
+        if sub.data.get(CONF_BETAPLALAS):
+            kezdet = min([tol, fiok.eves_bazis or tol, *(m.beepitve for m in csat.merok)])
+            sorozat = await self._sorozat(sub.data[CONF_BETAPLALAS], datetime.combine(kezdet, datetime.min.time()) - timedelta(days=1), most)
+        tol_nap = d(sub.data.get(CONF_FORRAS_TOL))
+        betap = Szamlalo.csatornabol(
+            csat, sorozat, Decimal(str(sub.data.get(CONF_SZORZO) or 1)),
+            meroallas=sub.data.get(CONF_FORRAS_TIPUS, "meroallas") == "meroallas",
+            sorozat_tol=datetime.combine(tol_nap, datetime.min.time()) if tol_nap else None,
+        )
+        if mod == "brutto":
+            return napelem.brutto(fiok, self.tar, tol, ig, vetel, betap, meres_vege=most)
+        bazis = fiok.eves_bazis or tol
+        return napelem.szaldo(fiok, self.tar, bazis, egy_ev_mulva(bazis), vetel, betap, meres_vege=most)
 
     def _aktualis_ar(self, fiok: Fiok, ny: NyitottIdoszak, most: datetime) -> Decimal | None:
         """A következő elfogyasztott egység ára a mért egységben (gáznál Ft/m³), a HA Energia irányítópulthoz."""

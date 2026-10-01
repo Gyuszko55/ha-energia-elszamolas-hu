@@ -55,9 +55,13 @@ async def leolvasas_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
     nap: date = call.data["datum"]
     allas = Decimal(str(call.data["allas"]))
     mero = _aktiv_mero(tarolt, nap)
-    if allas < Decimal(mero["kezdo_allas"]):
+    csatorna = call.data.get("csatorna", "vetelezes")
+    kezdo = mero.get("kezdo_betaplalas" if csatorna == "betaplalas" else "kezdo_allas") or 0
+    if allas < Decimal(str(kezdo)):
         raise ServiceValidationError("Az állás kisebb, mint a mérő kezdőállása.")
     for lo in mero["leolvasasok"]:
+        if lo.get("csatorna", "vetelezes") != csatorna:
+            continue
         ld, la = d(lo["datum"]), Decimal(lo["allas"])
         if (ld < nap and la > allas) or (ld > nap and la < allas):
             raise ServiceValidationError(
@@ -65,7 +69,9 @@ async def leolvasas_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
             )
     tipus = call.data.get("tipus", "kezi")
     mero["leolvasasok"] = [
-        lo for lo in mero["leolvasasok"] if not (lo["datum"] == nap.isoformat() and lo.get("tipus") == tipus)
+        lo
+        for lo in mero["leolvasasok"]
+        if not (lo["datum"] == nap.isoformat() and lo.get("tipus") == tipus and lo.get("csatorna", "vetelezes") == csatorna)
     ] + [
         {
             "datum": nap.isoformat(),
@@ -73,6 +79,7 @@ async def leolvasas_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
             "tipus": tipus,
             "elszamolasi": call.data.get("elszamolasi", False),
             "megjegyzes": call.data.get("megjegyzes", ""),
+            "csatorna": csatorna,
         }
     ]
     mero["leolvasasok"].sort(key=lambda x: x["datum"])
@@ -245,6 +252,7 @@ def regisztral(hass: HomeAssistant) -> None:
                 vol.Optional("tipus", default="kezi"): vol.In(TIPUSOK),
                 vol.Optional("elszamolasi", default=False): cv.boolean,
                 vol.Optional("megjegyzes", default=""): cv.string,
+                vol.Optional("csatorna", default="vetelezes"): vol.In(["vetelezes", "betaplalas"]),
             }
         ),
     )

@@ -46,6 +46,16 @@ Ha a fiók fizetési módja „Részszámlás”, három entitás jön létre: *
 
 Gáznál a havi fűtőérték a számláról rögzíthető: `hu_rezsi.futoertek_rogzites` (hónap `ÉÉÉÉ-HH`, MJ/m³).
 
+## Napelemes fiók (kísérleti)
+
+Villanyfióknál a „Napelem” mező: **bruttó** (havi; a vételezés a rendes díjszabás szerint, a betáplálás az elosztó átvételi árán jóváírva) vagy **szaldó** (éves nettózás az elszámolási évre; vételezési többletnél a nettó a rendes díjszabás szerint, betáplálási többletnél alacsony átvételi ár). A betáplálást (2.8.0) egy szenzor adja – ha a HA Energia irányítópulton be van állítva a hálózati betáplálás, azt ajánlja fel –, vagy kézi leolvasás `csatorna: betaplalas` értékkel. Entitások: **Betáplálás**, **Betáplálás jóváírása**, **Napelemes egyenleg**.
+
+> A szabályok nyilvános forrásokon alapulnak, valódi napelemes számlán még nem ellenőriztük. Esetek, források, nyitott kérdések: `docs/terv/05_NAPELEM.md`. **Ha van napelemed, egy anonimizált számlád sokat segítene.**
+
+## Víz
+
+A `viz/dakov` díjszabás a DAKÖV lakossági díjaival (számlán ellenőrizve: 8 013 Ft forintra pontos); más vízműnél a `viz/egyedi` sablon díjait felülírással kell megadni. A locsolási mérő külön fiók vagy csatorna, csatornadíj nélkül.
+
 ## Entitások (fiókonként)
 
 | Entitás | Tartalom |

@@ -81,7 +81,7 @@ szabályok nyilvános forrásokból jönnek, és valódi számlákkal kell majd 
 
 - [x] **N0** Szabály-összefoglaló forrásokkal, esetek (szaldó/bruttó/váltás, akkumulátor, tarifa, fázis), adatforrások, nyitott kérdések
 - [x] **N1** Motor: bruttó és szaldó elszámolás, szintetikus tesztek
-- [ ] **N2** HA-réteg (kísérleti jelzéssel)
+- [x] **N2** HA-réteg (kísérleti jelzéssel), élő próba szimulált fiókokkal
 - [ ] **N3** Valódi napelemes számlák → számlatesztek → a „kísérleti” jelzés levétele
 - [ ] **N4** Akkumulátor és önfogyasztás megtakarítás-elemzése (a 4. lépcsővel)
 
