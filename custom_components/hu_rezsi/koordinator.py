@@ -109,15 +109,16 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             vege = dt_util.utc_from_timestamp(r["end"]) if isinstance(r["end"], (int, float)) else r["end"]
             sor.append((dt_util.as_local(vege).replace(tzinfo=None), Decimal(str(r["state"]))))
         allapot = self.hass.states.get(entity_id)
-        if allapot is not None:
-            try:
-                sor.append((most, Decimal(allapot.state)))
-            except InvalidOperation:
-                pass
+        try:
+            sor.append((most, Decimal(allapot.state)))
+        except (AttributeError, InvalidOperation):
+            # Induláskor a forrás még nem kész: hamarosan újraszámolunk.
+            self._forras_hianyzik = True
         return sor
 
     async def _async_update_data(self) -> dict[str, FiokAllapot]:
         most = helyi_most()
+        self._forras_hianyzik = False
         kimenet: dict[str, FiokAllapot] = {}
         valtozott = False
         for sid, sub in self.fiokok().items():
@@ -138,6 +139,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             valtozott = True
         if valtozott:
             await self.tarolo.ment()
+        self.update_interval = timedelta(minutes=1 if self._forras_hianyzik else FRISSITES_PERC)
         return kimenet
 
     async def _fiok(
