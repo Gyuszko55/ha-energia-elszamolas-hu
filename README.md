@@ -17,6 +17,22 @@ Ez a tároló két dolgot tartalmaz:
 - **„Rezsi” oldalsáv-panel** a HA-ban: összesítő, figyelmeztetések, fiókonkénti kártyák, részletek (lezárt időszakok, mérőállások, számlák), mérőállás rögzítése.
 - **Napelem (kísérleti):** bruttó és szaldó elszámolás – valódi napelemes számlákkal még ellenőrizendő (`docs/terv/05_NAPELEM.md`).
 
+### Telepítés feltételei – mit kell előre telepíteni (integráció)
+
+| # | Mit | Honnan / hogyan | Kötelező? |
+|---|---|---|---|
+| 1 | **Home Assistant 2025.6 vagy újabb** | Beállítások → Rendszer → Frissítések | igen |
+| 2 | **[HACS](https://hacs.xyz/)** (Home Assistant Community Store) | https://hacs.xyz/docs/use/ | igen (a telepítéshez; kézzel is másolható, lásd INTEGRACIO.md) |
+| 3 | **Mérőszenzor** a fiókhoz (kWh / m³, folyamatosan növekvő): energiamérő (Shelly EM, P1-olvasó), gázóra-impulzus, vízóra-olvasó | a mérő integrációja | nem – szenzor nélkül a kézzel rögzített mérőállásokból és a számlákból számol |
+| 4 | **[Díjnet integráció](https://github.com/laszlojakab/homeassistant-dijnet)** a Díjnet-fiókodhoz, **letöltési mappával** beállítva | HACS → Integrációk → „Dijnet” → Letöltés → újraindítás → Integráció hozzáadása → Dijnet; a beállításnál a **Letöltési könyvtár** mezőben adj meg egy mappát (pl. `Dijnet`) | nem – a számlák automatikus beolvasásához kell; nélküle a számlák kézzel tölthetők fel |
+| 5 | **A szolgáltató díjszabása** (A1, H, gáz, víz…) és egy **valódi számla** az összevetéshez | a saját számlád | nem kötelező, de ajánlott: a fiók beállításakor ezekből ellenőrizheted, hogy forintra egyezik-e |
+
+> [!TIP]
+> **Ha nem jönnek be a számlák:** a Díjnet-integráció csak akkor tölt le fájlt, ha a beállításánál **letöltési mappa** is
+> meg van adva – a Rezsikövető fiókjánál pedig ezt a mappát (pl. `Dijnet /mvm_next_aram`) kell számlamappának választani.
+> Ha egy HA-újraindítás után a Díjnet szenzora „nem elérhető”, a Díjnet-integráció indulása átmeneti Díjnet-hiba miatt
+> elakadt, és a következő újraindításig nem tölt le semmit: indítsd újra a Home Assistantot.
+
 ### Telepítés (HACS, béta)
 
 1. HACS → ⋮ → **Egyéni tárolók** → `https://github.com/Gyuszko55/ha-energia-elszamolas-hu`, típus: **Integráció**.

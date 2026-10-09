@@ -1,7 +1,9 @@
-# Rezsikövető integráció (0.1 – fejlesztői változat)
+# Rezsikövető integráció (2.0 béta)
 
 > **Tájékoztató jellegű számítás, a hivatalos számlát nem helyettesíti.**
-> A 0.1 a v1 YAML-csomag tudását hozza integrációként. A víz, a gáz MJ-alapú elszámolása és a napelem a következő lépcsőkben jön (lásd `docs/terv/04_UTEMTERV.md`).
+> A 2.0 béta villanyra (A1, H-tarifa két regiszterrel), gázra (MJ-alapú elszámolás), vízre (fő- és locsolási almérővel)
+> és fix díjas szolgáltatásra számol; a napelem kísérleti. Az ütemterv: `docs/terv/04_UTEMTERV.md`.
+> Előfeltételek: a README „Telepítés feltételei (integráció)” táblázata.
 
 ## Mennyire pontos?
 
@@ -18,7 +20,9 @@ A számlákból átvett szabályok: a díjak nettók, a számla tételsoronként
 
 ## Telepítés
 
-1. Másold a `custom_components/hu_rezsi` mappát a HA `config/custom_components/` mappájába (később: HACS egyéni tároló).
+1. **HACS-ból (ajánlott):** HACS → ⋮ → Egyéni tárolók → `https://github.com/Gyuszko55/ha-energia-elszamolas-hu`, típus:
+   **Integráció**; a Rezsikövetőnél kapcsold be a béta verziók megjelenítését, és töltsd le a legújabbat.
+   **Kézzel:** másold a `custom_components/hu_rezsi` mappát a HA `config/custom_components/` mappájába.
 2. Indítsd újra a Home Assistantot.
 3. **Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása → Rezsikövető**, add meg a háztartás nevét.
 4. A háztartás bejegyzésén: **Fiók hozzáadása**. Egy fiók = egy szerződés egy mérővel (pl. „Villany A1”, „Villany H”, „Gáz”).
@@ -127,3 +131,10 @@ A korrekció-típusú v1 bejegyzéseket az importáló kihagyja; ezeket kézi le
 ## Hibakeresés
 
 **Beállítások → Eszközök és szolgáltatások → Rezsikövető → ⋮ → Diagnosztika letöltése.** Benne vannak a fiókok beállításai, a tárolt adatok és a számláló utolsó pontjai.
+
+| Mit látsz | Ok | Teendő |
+|---|---|---|
+| Nem jönnek be a számlák | A Díjnet-integrációnál nincs letöltési mappa, vagy a fiók számlamappája nem az a mappa. | Díjnet: Beállítások → letöltési mappa; Rezsikövető fiók: Számlamappa = a szolgáltató mappája (pl. `Dijnet /mvm_next_foldgaz`). |
+| Újraindítás után a Díjnet szenzora „nem elérhető”, nem jön új számla | A Díjnet-integráció indulása átmeneti Díjnet-hiba miatt elakadt (a naplóban: „Error while setting up dijnet platform”). | Indítsd újra a Home Assistantot. |
+| A Rezsikövető mérőállása eltér a valódi órától | Szenzoros fióknál a mérő pontatlansága; vagy egy elírt kézi leolvasás. | Rögzíts egy friss, ellenőrzött leolvasást (a korrekció ehhez igazodik); az elírt leolvasást töröld. |
+| Közös mappában (A1 + H) összekeverednek a számlák | Egy szerződés, két mérő. | A fiók „Számla-mérők” mezőjébe a mérő gyári számát írd. |
