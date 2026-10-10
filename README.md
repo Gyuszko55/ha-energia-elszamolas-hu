@@ -86,6 +86,14 @@ Home Assistant csomag, amely a magyar lakossági áramszámlát **napra készen*
 
 ## Telepítés
 
+> [!WARNING]
+> **A v1 csomag nem HACS-integráció.** Ne vedd fel a HACS-ben egyéni tárolóként (típus: Integráció), mert a
+> HACS ezt a hibát adja:
+> `<Integration Gyuszko55/ha-energia-elszamolas-hu> Repository structure for v1.0.0 is not compliant`.
+> A HACS integrációt keres (`custom_components/` mappát), a v1 viszont YAML-csomag, amelyet kézzel kell a `config`
+> mappába másolni (lent, 1. lépés). Ha már felvetted: HACS → ⋮ → **Egyéni tárolók** → a tároló sorában a kuka ikon.
+> Ettől eltűnik a hibaüzenet. A HACS-re a v1-hez csak a **html-template-card** kártya miatt van szükség.
+
 ### 1. Fájlok másolása
 
 Töltsd le a [legfrissebb kiadás](../../releases/latest) zip-fájlját, és a benne lévő `config/` mappa **tartalmát** másold a Home Assistant `config` mappájába (Samba, File editor vagy Studio Code Server). A szerkezet:
