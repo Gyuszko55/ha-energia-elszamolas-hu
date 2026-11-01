@@ -1,0 +1,45 @@
+azonosito: villany/a2
+nev: "A2 – kétzónás (csúcs / völgy)"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MVM Next hivatalos árlap „Villamosenergia-díjak az egyetemes szolgáltatásban lakossági ügyfeleknek 2022. augusztus 1-jétől” (VE_Lakossági_Árak_2025/1): kedvezményes energiadíj csúcsidőszakban MVM Démász 8,95, E.ON / OPUS TITÁSZ 10,78,
+      ELMŰ 10,03, MVM Émász 8,49; völgyidőszakban Démász 1,05, E.ON / OPUS TITÁSZ 2,40, ELMŰ 1,93, MVM Émász 1,00 Ft/kWh
+      nettó; lakossági piaci ár mindkét zónában 31,80; rendszerhasználati díj 23,40 Ft/kWh, alapdíj 120,50 Ft/hó.
+      Völgyidőszak: munkanapokon 22–06 óra (nyári időszámításban 23–07), nem munkanapokon a csúcsidőszak is.
+      Kedvezményes keret: 2523 kWh/év a mérési pontra, a két zóna KÖZÖS kerete – a Rezsikövető a zónák között a
+      fogyasztásuk arányában osztja meg (az MVM pontos megosztási módja ELLENŐRIZENDŐ számlával).
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-04
+      mivel: "MVM árlap VE_Lakossági_Árak_2025/1 (2026-10-03); valódi A2-számla még nincs"
+    szabalyok:
+      keret:
+        tipus: napi_aranyos
+        ev_mennyiseg: 2523
+        kerekites: 0
+        osszesitett: true      # az elszámolási évben halmozva, mint az A1-nél
+      # Két regiszter-szenzorral a két csatorna (zona_csucs, zona_volgy) külön mérődik. Nélkülük a fogyasztás-szenzor
+      # órás adataiból bont: völgy munkanapon 22–06 (nyári időszámításban 23–07), nem munkanapon egész nap.
+      zonak:
+        - nev: csucs
+          ar: energia_csucs
+        - nev: volgy
+          ar: energia_volgy
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # NETTÓ Ft (MVM Démász terület)
+        afa: 27
+        energia_csucs: 8.95            # bruttó 41,085
+        energia_volgy: 1.05            # bruttó 31,052
+        energia_kedvezmenyes: 8.95     # tartalék; egy csatornán a motor órák szerint bont (motor/zona.py)
+        energia_piaci: 31.80           # bruttó 70,104
+        rendszerhasznalati: 23.40
+        alapdij_ho: 120.50             # bruttó 153,035
+      eon: {energia_csucs: 10.78, energia_volgy: 2.40, energia_kedvezmenyes: 10.78}          # bruttó 43,409 / 32,766
+      opus_titasz: {energia_csucs: 10.78, energia_volgy: 2.40, energia_kedvezmenyes: 10.78}  # bruttó 43,409 / 32,766
+      elmu: {energia_csucs: 10.03, energia_volgy: 1.93, energia_kedvezmenyes: 10.03}         # bruttó 42,456 / 32,169
+      elmu_emasz: {energia_csucs: 8.49, energia_volgy: 1.00, energia_kedvezmenyes: 8.49}     # bruttó 40,500 / 30,988

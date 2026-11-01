@@ -2,3 +2,5 @@ helyi_adatok/
 __pycache__/
 .pytest_cache/
 *.pyc
+# Helyi tiltó-/cserelista a dev-szkriptekhez (valódi nevek, azonosítók) – soha ne kerüljön a tárolóba.
+dev/helyi_tiltolista.json

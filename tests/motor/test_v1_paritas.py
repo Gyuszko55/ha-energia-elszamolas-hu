@@ -70,7 +70,7 @@ def test_v1_honap(m):
     teli, nyari = D(str(m["h_teli_kwh"])), D(str(m["h_nyari_kwh"]))
     pontok = [Pont(_dt(tol), D(0), True)]
     if tol.day == 1 and tol.month == 4:
-        pontok.append(Pont(datetime(tol.year, 4, 15), teli, True))
+        pontok.append(Pont(datetime(tol.year, 4, 16), teli, True))  # a téli idény ápr. 15-ével bezárólag tart
     if tol.day == 1 and tol.month == 10:
         pontok.append(Pont(datetime(tol.year, 10, 15), nyari, True))
     pontok.append(Pont(_dt(ig), teli + nyari, True))

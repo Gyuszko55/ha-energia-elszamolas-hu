@@ -1,0 +1,89 @@
+azonosito: tavho/hvsz
+nev: "HVSZ Zrt. – lakossági távhő (fűtés + melegvíz)"
+kozmu: tavho
+egyseg: m3
+# A mért mennyiség a használati melegvíz (m³, melegvízóra – diktálás, leolvasás áprilisban és októberben). A fűtés
+# a lakásban nem mért: havi tételként jár a légköbméter-arányos alapdíj (szept.–máj.) és a hődíj-átalány (okt.–márc.,
+# GJ/hó a fiókban); a fűtési idény után a költségmegosztás (Techem) szerinti hődíj-korrekció külön számlán jön.
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      HVSZ Zrt. távhőszámlái, 2025.09 – 2026.08 (APEH-XML):
+      távfűtés alapdíj nettó 22,75 Ft/lm³/hó, hődíj 2 891 Ft/GJ (ÁFA 5%); használati melegvíz alapdíj 4,92 Ft/lm³/hó,
+      melegvíz 389 Ft/m³ (ÁFA 27%); a melegvíz csatornahasználata 240 Ft/m³ (27%, 2025. november végéig). Az alapdíjak szept.–máj. között
+      járnak (a júl.–aug. számlán nincsenek); hődíj-átalány okt.–márc.
+    ellenorzes:
+      allapot: szamlabol
+      datum: 2026-10-06
+      mivel: "HVSZ H90001/2025, H90002/2025, H90003…H90004/2026 számlák díjtételei (Városi lakás)"
+    szabalyok: &szab
+      keret: {tipus: nincs}
+      ar: hmv_m3
+      mennyiseg_egesz: true    # a melegvízóra egész m³-es állásainak különbsége
+      mennyiseg_minimum: 1     # számlánként legalább 1 m³ melegvíz
+      csatornadij: {alapertelmezes: be}
+      szamla_kerekites: vegosszeg
+      alapdij:
+        mod: idoszakonkent
+        szorzo: legterfogat           # használati melegvíz alapdíj: Ft/lm³/hó × a lakás légtérfogata
+        honapok: [9, 10, 11, 12, 1, 2, 3, 4, 5]
+      kiegeszito:
+        - {nev: "Távfűtés alapdíj", dij: futes_alapdij_lm3, szorzo: legterfogat, afa: 5, honapok: [9, 10, 11, 12, 1, 2, 3, 4, 5]}
+        - {nev: "Távfűtés hődíj (átalány)", dij: hodij_gj, szorzo: futes_gj_ho, afa: 5, honapok: [10, 11, 12, 1, 2, 3]}
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        hmv_m3: 389.00
+        csatorna_m3: 240.00
+        alapdij_ho: 4.92         # Ft/lm³/hó (használati melegvíz alapdíj)
+        futes_alapdij_lm3: 22.75
+        hodij_gj: 2891.00
+  - ervenyes_tol: 2025-12-01
+    forras: >-
+      2025. decembertől a melegvíz csatornahasználata nem szerepel a távhőszámlán (H90003/2026-tól; 2026. áprilistól
+      0 Ft-os sorként) – a melegvíz szennyvizét a víziközmű-szolgáltató (ALFÖLDVÍZ) számlázza a vízszámlán.
+    ellenorzes:
+      allapot: szamlabol
+      datum: 2026-10-06
+      mivel: "HVSZ H90003/2026 (2025. december), H90005/2026 … H90004/2026"
+    szabalyok: *szab
+    dijak:
+      alap:
+        afa: 27
+        hmv_m3: 389.00
+        csatorna_m3: 0
+        alapdij_ho: 4.92
+        futes_alapdij_lm3: 22.75
+        hodij_gj: 2891.00
+  - ervenyes_tol: 2026-01-01
+    forras: >-
+      2026. január: a hődíj és a melegvíz díja 30%-kal kevesebb (H90006/2026: 2 024 Ft/GJ, 272 Ft/m³; a Techem-elszámolás
+      is 2 024 Ft/GJ-lal számolja a januárt).
+    ellenorzes:
+      allapot: szamlabol
+      datum: 2026-10-06
+      mivel: "HVSZ H90006/2026 (2026. január) és a Techem 2025/26 elszámolás"
+    szabalyok: *szab
+    dijak:
+      alap:
+        afa: 27
+        hmv_m3: 272.00
+        csatorna_m3: 0
+        alapdij_ho: 4.92
+        futes_alapdij_lm3: 22.75
+        hodij_gj: 2024.00
+  - ervenyes_tol: 2026-02-01
+    forras: "2026. februártól ismét a teljes díj (H90007/2026: 2 891 Ft/GJ, 389 Ft/m³)."
+    ellenorzes:
+      allapot: szamlabol
+      datum: 2026-10-06
+      mivel: "HVSZ H90007/2026, H90008/2026"
+    szabalyok: *szab
+    dijak:
+      alap:
+        afa: 27
+        hmv_m3: 389.00
+        csatorna_m3: 0
+        alapdij_ho: 4.92
+        futes_alapdij_lm3: 22.75
+        hodij_gj: 2891.00

@@ -7,8 +7,16 @@ egyseg: m3
 verziok:
   - ervenyes_tol: 2000-01-01
     forras: "Sablon – a díjakat a helyi vízmű számlájáról kell megadni"
+    ellenorzes:
+      allapot: sablon
+      datum: 2026-10-04
+      mivel: "sablon – a díjakat a helyi vízmű számlájáról kell megadni"
     szabalyok:
       keret: {tipus: nincs}
+      mennyiseg_egesz: true
+      mennyiseg_minimum: 1   # számlánként legalább 1 m³ (víz és csatorna) – üdülőnél (sajátos számlázás) nem
+      # A locsolási almérő levonása a csatornadíjból csak a locsolási idényben (58/2013. Korm. rendelet).
+      almero_idoszak: {tol: "05-01", ig: "10-01"}    # a számla egész m³-re (lefelé) kerekített óraállások különbségével számol
       ar: viz_m3
       csatornadij: {alapertelmezes: be}
       alapdij:

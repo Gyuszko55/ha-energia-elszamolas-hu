@@ -1,0 +1,23 @@
+azonosito: kozos/tarsashaz
+nev: "Társasházi közös költség (fix havi díj)"
+kozmu: kozos
+egyseg: db
+# A közös költséget a társasház közgyűlése állapítja meg (gyakran Ft/m²/hó × alapterület); tartalmazhatja a
+# szemétszállítást (2026. júliustól Budapesten a MOHU főszabályként a társasháznak számláz), a közös víz-különbözetet,
+# a takarítást, a felújítási alapot. Számla nincs: a közös képviselő kimutatása szerinti havi befizetendő („előírás”).
+# A havi díjat a fiókban kell megadni felülírással (hu_rezsi.feluliras: dijak.alapdij_ho, bruttó Ft) – közgyűlési
+# emelésnél új érvényességi kezdőnappal.
+verziok:
+  - ervenyes_tol: 2000-01-01
+    forras: "Sablon – a havi közös költség a társasház közgyűlési határozatából / a közös képviselő kimutatásából"
+    ellenorzes:
+      allapot: sablon
+      datum: 2026-10-07
+      mivel: "sablon – a díjat a felhasználó adja meg"
+    szabalyok:
+      keret: {tipus: nincs}
+      alapdij:
+        mod: honaponkent
+    dijak:
+      alap:                    # bruttó Ft (felülírással add meg)
+        alapdij_ho: 0

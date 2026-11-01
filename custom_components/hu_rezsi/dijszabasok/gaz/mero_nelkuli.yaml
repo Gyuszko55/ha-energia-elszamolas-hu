@@ -1,0 +1,28 @@
+azonosito: gaz/mero_nelkuli
+nev: "Földgáz – gázmérő nélkül (átalánydíj, pl. csak gáztűzhely)"
+kozmu: gaz
+egyseg: MJ
+# Gázmérő nélküli felhasználó (jellemzően csak gáztűzhely): havi fix mennyiség a szobaszám és a tűzhely szerint,
+# mérés és kedvezményes keret nélkül. A havi díj = az átalány MJ-ja (gaz_atalany.py, a fiók adataiból) × egységár.
+verziok:
+  - ervenyes_tol: 2023-10-01
+    forras: >-
+      MVM „Földgázdíjak mérő nélküli (átalánydíjas) ügyfeleknek 2023. október 1-jétől” (Átalány_országos_2023/1): a nettó
+      egységár országosan 2,465 Ft/MJ (bruttó 3,131 Ft/MJ); havi MJ szobaszám (1–4) és tűzhely (2 lángú, 3–4 lángú,
+      4 lángú elektromos sütővel, 5+ lángú, garzon) szerint, pl. 1 szoba, 2 lángú: 210 MJ/hó = 518 Ft nettó / 657 Ft
+      bruttó. Megegyezik a „C – gázmérővel nem rendelkezők” árlap-sorral (Gáz_2026/2).
+    ellenorzes:
+      allapot: szamlaval_egyezik
+      datum: 2026-10-04
+      mivel: "hu_rezsi.szamla_osszevetes 2026-10-04: Városi lakás 8 negyedéves MVM gázszámla (2024 Q4 – 2026 Q3, 1,5 szoba, 3–4 lángú: 370 MJ/hó) – mind forintra (3 475 Ft); MVM árlap Átalány_országos_2023/1"
+      validalas:
+        - {hely: Városi lakás, szolgaltato: mvm_next, elszamolas: fix, szamla_tipusok: [negyedeves], idoszak: "2024 Q4 – 2026 Q3", szamlak: 8, forintra: 8, max_elteres_ft: 0}
+    szabalyok:
+      keret: {tipus: nincs}
+      alapdij:
+        mod: honaponkent
+        szorzo: atalany_mj     # a fiók szobaszámából és tűzhelyéből (MJ/hó)
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        alapdij_ho: 2.465      # Ft/MJ – × a havi átalány MJ = havi díj

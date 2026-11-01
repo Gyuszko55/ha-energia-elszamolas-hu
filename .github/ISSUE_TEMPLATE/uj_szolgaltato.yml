@@ -1,0 +1,50 @@
+name: Új szolgáltató / számlaformátum
+description: Beolvasó kérése egy még nem támogatott szolgáltató PDF- vagy XML-számlájához
+title: "[Számla] <szolgáltató> – <PDF/XML>"
+labels: ["számla-beolvasó"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Köszönjük! Egy **kitakart** mintaszámla kell, hogy beolvasót írhassunk hozzá.
+        **Kitakarandó:** név, cím, ügyfél- és szerződésszám, mérési pont azonosító, bankszámla.
+        **Maradjon:** összegek, dátumok, mérőállások, a számla szerkezete (PDF-ben a szöveg legyen kijelölhető, ne szkennelt kép).
+  - type: input
+    id: szolgaltato
+    attributes:
+      label: Szolgáltató
+      placeholder: pl. E.ON Energiakereskedelmi Kft.
+    validations:
+      required: true
+  - type: dropdown
+    id: kozmu
+    attributes:
+      label: Közmű
+      options: [villany, gáz, víz, hulladék, egyéb]
+    validations:
+      required: true
+  - type: dropdown
+    id: formatum
+    attributes:
+      label: Formátum
+      options: [XML, PDF, mindkettő]
+    validations:
+      required: true
+  - type: dropdown
+    id: tipus
+    attributes:
+      label: Számla típusa
+      multiple: true
+      options: [részszámla, elszámoló számla, egyéb]
+  - type: textarea
+    id: minta
+    attributes:
+      label: Kitakart mintaszámla
+      description: Húzd ide a fájlt (PDF/XML; XML-t .txt kiterjesztéssel is csatolhatsz).
+    validations:
+      required: true
+  - type: textarea
+    id: megjegyzes
+    attributes:
+      label: Megjegyzés
+      description: Pl. hány mérő, H-tarifa, almérő, napelem; mit szeretnél, hogy átvegyen.

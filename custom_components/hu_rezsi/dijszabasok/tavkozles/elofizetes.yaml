@@ -1,0 +1,21 @@
+azonosito: tavkozles/elofizetes
+nev: "Internet, TV, telefon – havi előfizetés (fix díj)"
+kozmu: tavkozles
+egyseg: db
+# Internet, televízió, vezetékes telefon (pl. Telekom, One, DIGI): havidíj a díjcsomagok és a kedvezmények szerint –
+# a szerződésből vagy a számláról, felülírással (hu_rezsi.feluliras: dijak.alapdij_ho, bruttó Ft). Az egyszeri
+# tételeket (kiszállási díj, munkadíj, készülék) a számla hozza; a számla-ellenőrzés ezeket eltérésként mutatja.
+verziok:
+  - ervenyes_tol: 2000-01-01
+    forras: "Sablon – a havidíj a szerződésből / a számláról (díjcsomagok − kedvezmények)"
+    ellenorzes:
+      allapot: sablon
+      datum: 2026-10-07
+      mivel: "sablon – a díjat a felhasználó adja meg"
+    szabalyok:
+      keret: {tipus: nincs}
+      alapdij:
+        mod: honaponkent
+    dijak:
+      alap:                    # bruttó Ft (felülírással add meg)
+        alapdij_ho: 0

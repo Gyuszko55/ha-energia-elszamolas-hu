@@ -4,19 +4,23 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FIZETESI_MOD, CONF_KOZMU, CONF_NAPELEM, CONF_SZAMLA_MAPPA, DOMAIN, FIX_DIJAS, PENZNEM
+from .beallitas import fix_dijas, reszszamlas
+from .const import CONF_DIJSZABAS, CONF_KERET_AKTIV, CONF_NAPELEM, CONF_SZAMLA_MAPPA, DOMAIN, PENZNEM
 from .koordinator import FiokAllapot, RezsiKoordinator
 from .modell import szelet_dict
+from . import sziget_ha
 
 MAX_NAPLO = 24
 EGYENLEG_KULCSOK = {"befizetve", "varhato_eves_koltseg", "varhato_egyenleg"}
@@ -27,7 +31,7 @@ FIX_KULCSOK = {
     "koltseg_eddig", "koltseg_varhato", "utolso_szamla", "eves_szamlaosszeg", "kovetkezo_szamla", "utolso_lezart",
     "szolgaltato", "szamlazasi_utem",
 }
-UTEM_NEV = {1: "havonta", 2: "kéthavonta", 3: "negyedévente", 6: "félévente", 12: "évente"}
+UTEM_NEV = {1: "havonta", 2: "kéthavonta", 3: "negyedévente", 4: "négyhavonta", 6: "félévente", 12: "évente"}
 
 
 def _utem_nev(honap: int | None) -> str | None:
@@ -107,9 +111,15 @@ def honapok(a: FiokAllapot) -> int:
 
 
 def idenyszakok(e: Any) -> dict[str, Any] | None:
-    """Idényszakonkénti bontás (H-tarifa: téli 1.81 / nyári 1.82), ha van."""
+    """Idényszakonkénti / zónánkénti bontás (H-tarifa: téli 1.81 / nyári 1.82; A2: csúcs / völgy), ha van."""
     out: dict[str, dict[str, float]] = {}
     for s in e.szeletek:
+        if s.volgy is not None:  # A2 egy csatornán: órák szerinti csúcs/völgy bontás
+            for nev, q, ft in (("volgy", s.volgy, s.volgy_ft), ("csucs", s.mennyiseg - s.volgy, s.energia_ft - s.volgy_ft)):
+                x = out.setdefault(nev, {"mennyiseg": 0.0, "energia_ft": 0.0})
+                x["mennyiseg"] += float(q)
+                x["energia_ft"] += float(ft)
+            continue
         nev = s.idenyszak or ({"h_teli": "teli", "h_nyari": "nyari"}.get(s.csatorna))
         if not nev:
             continue
@@ -175,6 +185,25 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         suggested_display_precision=1,
         ertek=lambda a: _f(a.nyitott.eddig.mennyiseg, 3),
         egyseg=lambda a: a.egyseg,
+    ),
+    FiokLeiras(
+        key="d_kulonbseg",
+        translation_key="d_kulonbseg",
+        native_unit_of_measurement=PENZNEM,
+        suggested_display_precision=0,
+        ertek=lambda a: a.d_osszevetes["kulonbseg_12ho"],
+        attr=lambda a: {
+            "szamitas": "naptári hónap, MVM szerint (keret feletti × a hónap súlyozott D-ára)"
+            if a.d_osszevetes.get("naptari_honapok") else "számlázási időszakok",
+            "atlepes_szerint": a.d_osszevetes.get("kulonbseg_12ho_sajat"),
+            "honapok": a.d_osszevetes.get("naptari_honapok"),
+            "tol": a.d_osszevetes.get("naptari_tol"),
+            "ig": a.d_osszevetes.get("naptari_ig"),
+            "folyo_idoszak": a.d_osszevetes.get("folyo"),
+            "lezart_idoszakok": a.d_osszevetes.get("kulonbseg_lezart"),
+            "arlista_ig": a.d_osszevetes.get("arlista_ig"),
+        },
+        elerheto=lambda a: bool(a.d_osszevetes and "kulonbseg_12ho" in a.d_osszevetes),
     ),
     FiokLeiras(
         key="hatralevo_keret",
@@ -380,19 +409,61 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
 )
 
 
+def _van_keret(koord: RezsiKoordinator, data: dict[str, Any]) -> bool:
+    """A fiók díjszabásában van-e (bekapcsolt) kedvezményes keret – víznél nincs."""
+    if not data.get(CONF_KERET_AKTIV, True):
+        return False
+    return _dijszabas_keretes(koord, data.get(CONF_DIJSZABAS), set())
+
+
+def _dijszabas_keretes(koord: RezsiKoordinator, azonosito: str | None, latott: set[str]) -> bool:
+    """Van-e keret a díjszabás bármely verziójában – az idényszakoké is (H-tarifa: a nyári szak az A1 kerete)."""
+    if not azonosito or azonosito in latott:
+        return False
+    latott.add(azonosito)
+    try:
+        dsz = koord.tar[azonosito]
+    except (KeyError, TypeError):
+        return True  # ismeretlen díjszabás: inkább legyen entitás
+    for v in dsz.verziok:
+        if ((v.szabalyok.get("keret") or {}).get("tipus") or "nincs") != "nincs":
+            return True
+        for sz in v.szabalyok.get("idenyszak") or []:
+            if ((sz.get("keret") or {}).get("tipus") or "nincs") != "nincs":
+                return True
+            if sz.get("dijszabas") and _dijszabas_keretes(koord, sz["dijszabas"], latott):
+                return True
+    return False
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     koord: RezsiKoordinator = entry.runtime_data
-    async_add_entities([HaztartasOsszesen(koord, entry, k) for k in ("eddig", "varhato", "esedekes")])
+    async_add_entities([HaztartasOsszesen(koord, entry, k) for k in ("eddig", "varhato", "esedekes")] + [HaztartasFizetendo(koord, entry)])
+    reg = er.async_get(hass)
     for sid, sub in koord.fiokok().items():
+        keret = _van_keret(koord, dict(sub.data))
+        if not keret and (eid := reg.async_get_entity_id("sensor", DOMAIN, f"{sid}_hatralevo_keret")):
+            reg.async_remove(eid)  # korábbi változatból maradt, keret nélküli fiók: mindig elérhetetlen volt
         async_add_entities(
             [
                 FiokSzenzor(koord, entry, sid, sub.title, leiras)
                 for leiras in FIOK_LEIRASOK
-                if (leiras.key not in EGYENLEG_KULCSOK | {"atalany_havi"} or sub.data.get(CONF_FIZETESI_MOD) == "reszszamla")
+                if (leiras.key != "hatralevo_keret" or keret)
+                and (leiras.key != "d_kulonbseg" or sub.data.get(CONF_DIJSZABAS) == "villany/a1")
+                and (leiras.key not in EGYENLEG_KULCSOK | {"atalany_havi"} or reszszamlas(sub.data))
                 and (leiras.key not in NAPELEM_KULCSOK or sub.data.get(CONF_NAPELEM, "nincs") != "nincs")
                 and (leiras.key not in SZAMLA_KULCSOK or sub.data.get(CONF_SZAMLA_MAPPA))
-                and (sub.data.get(CONF_KOZMU) not in FIX_DIJAS or leiras.key in FIX_KULCSOK)
+                and (not fix_dijas(sub.data) or leiras.key in FIX_KULCSOK)
             ],
+            config_subentry_id=sid,
+        )
+    # Szigetüzemi rendszerek (kísérleti): a folyó hónap kWh-ja szerepkörönként, önellátottság, adatminőség.
+    for sid, sub in sziget_ha.szigetek(koord).items():
+        szerepek = sziget_ha.szerepek(sub)
+        async_add_entities(
+            [SzigetSzenzor(koord, sid, sub.title, k, nev, egys) for k, nev, egys in SZIGET_SZENZOROK
+             if k.split(":")[0] != "szerep" or k.split(":")[1] in szerepek
+             if k != "halozati_reszarany" or "halozat" in szerepek],
             config_subentry_id=sid,
         )
     # Új fiók felvételekor az újratöltés versenyhelyzetbe kerülhet: ha egy fiók még nincs a számolt
@@ -478,8 +549,9 @@ class HaztartasOsszesen(CoordinatorEntity[RezsiKoordinator], SensorEntity):
         for sid, a in (koord.data or {}).items():
             if self._fajta == "esedekes":
                 sub = koord.fiokok().get(sid)
-                if a.esedekes:
-                    out[sub.title if sub else sid] = a.esedekes["e_havi_osszesen"]
+                uton = sum(x["osszeg"] for x in (a.uton_szamlak or []))
+                if a.esedekes or uton:
+                    out[sub.title if sub else sid] = (a.esedekes or {}).get("e_havi_osszesen", 0) + uton
                 continue
             if a.nyitott is None:
                 continue
@@ -487,7 +559,10 @@ class HaztartasOsszesen(CoordinatorEntity[RezsiKoordinator], SensorEntity):
             sub = koord.fiokok().get(sid)
             # Havi összesítő: átalánynál a fizetendő (napra leosztva), egyébként a költség; a több hónapos
             # (pl. negyedéves) időszakból a havi rész.
-            if a.atalany:
+            if sub and fix_dijas(sub.data):
+                # Fix díjas (pl. negyedéves szemétszállítás): csak az esedékesség hónapjában, a teljes összeggel.
+                out[sub.title] = (a.esedekes or {}).get("e_havi_osszesen", 0)
+            elif a.atalany:
                 out[sub.title if sub else sid] = a.atalany["eddig" if self._fajta == "eddig" else "havi"]
             else:
                 out[sub.title if sub else sid] = int(round(e.osszesen_ft / honapok(a)))
@@ -501,3 +576,102 @@ class HaztartasOsszesen(CoordinatorEntity[RezsiKoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"fiokok": self._reszek()}
+
+
+class HaztartasFizetendo(CoordinatorEntity[RezsiKoordinator], SensorEntity):
+    """Az otthon kifizetetlen számláinak összege – ugyanaz, mint az indítókártya „Fizetendő” száma. Attribútumban a
+    lejárt rész, a legközelebbi határidő, az esedékes, de még nem számlázott összeg és a fiókonkénti bontás."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_native_unit_of_measurement = PENZNEM
+    _attr_suggested_display_precision = 0
+    _attr_translation_key = "fizetendo"
+
+    def __init__(self, koord: RezsiKoordinator, entry: ConfigEntry) -> None:
+        super().__init__(koord)
+        self._attr_unique_id = f"{entry.entry_id}_fizetendo"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+
+    def _fiokok(self) -> list[dict[str, Any]] | None:
+        # Újraindítás után a Díjnet-fizetések beolvasásáig nem mutatunk értéket (a fizetett számla is tartozásnak látszana).
+        if self.coordinator.data is None or not getattr(self.coordinator, "dijnet_kesz", True):
+            return None
+        from .panel import fiok_fizetendok  # körkörös import nélkül
+
+        return fiok_fizetendok(self.coordinator, date.today())
+
+    @property
+    def native_value(self) -> int | None:
+        f = self._fiokok()
+        return None if f is None else sum(x["nyitott_ft"] for x in f)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        f = self._fiokok() or []
+        nyitott = [x for x in f if x["nyitott_ft"] > 0 or x["varhato_ft"] > 0]
+        return {
+            "szamlak_db": sum(x["nyitott_db"] for x in f),
+            "lejart": sum(x["lejart_ft"] for x in f),
+            "lejart_db": sum(x["lejart_db"] for x in f),
+            "kovetkezo_hatarido": min((x["hatarido"] for x in f if x["hatarido"]), default=None),
+            "meg_nem_szamlazott": sum(x["varhato_ft"] for x in f),
+            "fiokok": {x["nev"]: {"fizetendo": x["nyitott_ft"], "lejart": x["lejart_ft"], "meg_nem_szamlazott": x["varhato_ft"]}
+                       for x in nyitott},
+        }
+
+
+SZIGET_SZENZOROK = [
+    ("szerep:fogyasztas", "Fogyasztás (hónap)", "kWh"),
+    ("szerep:pv", "PV-termelés (hónap)", "kWh"),
+    ("szerep:akku_toltes", "Akku töltés (hónap)", "kWh"),
+    ("szerep:akku_kisutes", "Akku kisütés (hónap)", "kWh"),
+    ("szerep:halozat", "Hálózati vételezés (hónap)", "kWh"),
+    ("szerep:generator", "Generátor (hónap)", "kWh"),
+    ("onellatottsag", "Önellátottság (hónap)", "%"),
+    ("halozati_reszarany", "Hálózati részarány (hónap)", "%"),
+    ("minoseg", "Adatminőség", None),
+]
+
+
+class SzigetSzenzor(CoordinatorEntity[RezsiKoordinator], SensorEntity):
+    """Szigetüzem (kísérleti): a folyó hónap értéke a sziget_ha eredményéből."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, koord: RezsiKoordinator, sid: str, nev: str, kulcs: str, felirat: str, egyseg: str | None) -> None:
+        super().__init__(koord)
+        self._sid, self._kulcs = sid, kulcs
+        self._attr_unique_id = f"{sid}_sziget_{kulcs.replace(':', '_')}"
+        self._attr_name = felirat
+        self._attr_native_unit_of_measurement = egyseg
+        if egyseg == "kWh":
+            self._attr_device_class = SensorDeviceClass.ENERGY
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, sid)}, name=nev, manufacturer="Rezsikövető", model="Szigetüzem (kísérleti)",
+            entry_type=DeviceEntryType.SERVICE,
+        )
+
+    @property
+    def _honap(self) -> dict[str, Any] | None:
+        a = self.coordinator.sziget_allapot.get(self._sid) or {}
+        return (a.get("idoszakok") or {}).get("honap")
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._honap is not None
+
+    @property
+    def native_value(self) -> Any:
+        h = self._honap
+        if h is None:
+            return None
+        if self._kulcs.startswith("szerep:"):
+            return (h.get("ertekek") or {}).get(self._kulcs.split(":")[1])
+        return h.get(self._kulcs)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        h = self._honap
+        # A közös mérési ablak kezdete (ha az időszakon belül indul): minden érték attól számol.
+        return {"idoszak": f"{(h.get('kezdet') or h['tol'])[:10]} – {h['ig'][:10]}", "adatminoseg": h["minoseg"]} if h else None

@@ -1,5 +1,5 @@
 azonosito: gaz/lakossagi
-nev: "Lakossági földgáz"
+nev: "Lakossági földgáz – 20 m³/h alatti mérő (A1)"
 kozmu: gaz
 egyseg: MJ
 # A gázóra m³-t mér; a számla MJ-ban: m³ × korrekciós tényező × az adott havi fűtőérték, egész MJ-ra kerekítve.
@@ -7,23 +7,43 @@ egyseg: MJ
 verziok:
   - ervenyes_tol: 2024-01-01
     forras: >-
-      MVM Next gázszámla, 2026-08-24 (2026.07.15–08.13): kedvezményes gázdíj nettó 2,256 Ft/MJ,
-      háztartási alapdíj nettó 766 Ft/hó, fűtőérték 34,61 MJ/m³, korrekciós tényező 1,0000, ÁFA 27%.
-      Piaci ár: a számla „rezsicsökkentett díj nélkül” összegéből visszaszámolva – ELLENŐRIZENDŐ.
-      Éves keret: 1729 m³-nek megfelelő 63 645 MJ – ELLENŐRIZENDŐ.
+      MVM Next „Földgázdíjak az egyetemes szolgáltatásban lakossági és nem lakossági ügyfeleknek 2025. augusztus 1-jétől”
+      (Gáz_2026/2; az egységárak 2023. október 1-je óta változatlanok), A1 sor – 20 m³/h alatti gázmérővel rendelkező
+      lakossági felhasználók: kedvezményes gázdíj nettó 2,256 Ft/MJ (bruttó 2,9), versenypiaci költségeket tükröző ár
+      nettó 17,324 Ft/MJ (bruttó 22,002), alapdíj nettó 9 192 Ft/év (bruttó 11 674) = 766 Ft/hó. Kedvezményes mennyiség
+      63 645 MJ/év/felhasználási hely. Ellenőrizve: MVM gázszámla 2026-08-24 (2026.07.15–08.13).
+      Keret (MVM lakossági rezsi GYIK – földgáz): diktálásnál (és leolvasásnál, becslésnél, hőmérsékletfüggő
+      részszámlánál) a 2024. augusztus 1-jétől rögzített havi megosztás, a kedvezményes évben (aug. 1. – júl. 31.)
+      halmozva („sávkorrekció”, a ki nem használt keret nem vész el); átalánynál (egyenletes részszámla) éves keret.
+    ellenorzes:
+      allapot: szamlaval_egyezik
+      datum: 2026-10-04
+      mivel: "MVM gázszámla 104500000008 (2026.07.15–08.13, 103 m³ = 3 564 MJ): 11 185 Ft = 11 185 Ft; éves elszámolók (2024/25, 2025/26): 150 027 / 139 731 Ft – számított +8 / +5 Ft (a számla szerinti korrekciós tényezővel és fűtőértékkel)"
+      validalas:
+        - {hely: Kertes ház, szolgaltato: mvm_next, elszamolas: atalany, szamla_tipusok: [resz, elszamolo], idoszak: "2024-07 – 2026-08", szamlak: 3, forintra: 1, max_elteres_ft: 8}
     szabalyok:
       atvaltas:
         tipus: gaz_mj
         futoertek_alap: 34.61
         korrekcios_tenyezo_alap: 1
       keret:
-        tipus: eves
+        tipus: havi_sulyozott
         ev_mennyiseg: 63645
+        # MJ/hó (az MVM táblázata: január 399, február 372 / szökőévben 359, … MJ/nap). A hónap napjai között
+        # egyenletesen oszlik el; egy számlára a benne lévő napok része jár.
+        havi: [12365, 10421, 8915, 5145, 1827, 635, 512, 565, 1109, 3724, 7490, 10937]
+        kerekites: 0
+        osszesitett: true
+        ev_kezdet: "08-01"     # kedvezményes év: augusztus 1. – július 31.
+        visszamenoleges: false # a ki nem használt keret később jár, a korábbi túllépést nem írja jóvá (MVM GYIK)
+        reszszamla:            # átalány (egyenletes részszámla): éves keret az elszámolási évre
+          tipus: eves
+          ev_mennyiseg: 63645
       alapdij:
         mod: idoszakonkent
     dijak:
       alap:                            # NETTÓ Ft/MJ
         afa: 27
-        energia_kedvezmenyes: 2.256    # bruttó 2,865 Ft/MJ ≈ 99,16 Ft/m³
-        energia_piaci: 17.3239         # bruttó ~22,00 Ft/MJ ≈ 761 Ft/m³
-        alapdij_ho: 766                # bruttó 972,82
+        energia_kedvezmenyes: 2.256    # bruttó 2,865 Ft/MJ ≈ 99,9 Ft/m³ (34,87 MJ/m³)
+        energia_piaci: 17.324          # bruttó 22,002 Ft/MJ ≈ 767,2 Ft/m³
+        alapdij_ho: 766                # 9 192 Ft/év; bruttó 972,82 Ft/hó

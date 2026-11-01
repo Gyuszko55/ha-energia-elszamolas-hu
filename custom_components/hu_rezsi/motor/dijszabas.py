@@ -16,7 +16,7 @@ import yaml
 
 from .tipusok import Feluliras
 
-KERET_TIPUSOK = {"napi_aranyos", "eves", "nincs"}
+KERET_TIPUSOK = {"napi_aranyos", "havi_sulyozott", "eves", "nincs"}
 
 
 class DijszabasHiba(ValueError):
@@ -36,12 +36,58 @@ def _dec(x: Any) -> Any:
     return x
 
 
+# A tarifaadat ellenőrzöttsége (a verzió „ellenorzes.allapot” mezője):
+ELLENORZES_ALLAPOTOK = {
+    "szamlaval_egyezik": "valódi számlával forintra összevetve",
+    "szamlabol": "a díjak egy valódi számláról, forintos összevetés nélkül",
+    "arlapbol": "a szolgáltató hivatalos árlapjáról",
+    "ellenorizendo": "nem hivatalos vagy hiányos forrás – ellenőrizendő",
+    "sablon": "sablon, a díjakat a felhasználó adja meg",
+}
+
+# „szamlaval_egyezik” állapotnál kötelező a „validalas” lista: mely számlák igazolták (számlacsoportonként).
+VALIDALAS_ELSZAMOLAS = {
+    "diktalas": "diktálás szerint, havonta",
+    "atalany": "átalány (részszámla) + elszámoló",
+    "leolvasas": "leolvasás szerint",
+    "tavleolvasas": "távleolvasás",
+    "fix": "fix díj / mérő nélküli átalány",
+}
+VALIDALAS_SZAMLA = {
+    "havi": "havi", "resz": "részszámla", "elszamolo": "elszámoló", "ketthavi": "kéthavi",
+    "negyedeves": "negyedéves", "vegszamla": "végszámla",
+}
+VALIDALAS_HMKE = {"szaldo": "éves szaldó", "brutto": "bruttó elszámolás"}
+
+
+def _validalas_hiba(azonosito: str, lista: Any) -> str | None:
+    """A „validalas” lista ellenőrzése – hibaszöveg vagy None."""
+    if not isinstance(lista, list) or not lista:
+        return "„szamlaval_egyezik” állapothoz kell a „validalas” lista (szolgáltató, elszámolási mód, számlatípus, számlák)"
+    for i, x in enumerate(lista):
+        if not isinstance(x, dict) or not str(x.get("szolgaltato", "")).strip():
+            return f"validalas[{i}]: hiányzik a szolgáltató"
+        if x.get("elszamolas") not in VALIDALAS_ELSZAMOLAS:
+            return f"validalas[{i}]: ismeretlen elszámolási mód: {x.get('elszamolas')!r}"
+        tipusok = x.get("szamla_tipusok")
+        if not tipusok or any(t not in VALIDALAS_SZAMLA for t in tipusok):
+            return f"validalas[{i}]: ismeretlen vagy hiányzó számlatípus: {tipusok!r}"
+        db, ok = x.get("szamlak"), x.get("forintra")
+        if not isinstance(db, int) or db < 1 or not isinstance(ok, int) or not 0 <= ok <= db:
+            return f"validalas[{i}]: a „szamlak” (≥1) és a „forintra” (0…szamlak) egész szám"
+        if azonosito == "villany/hmke" and x.get("hmke") not in VALIDALAS_HMKE:
+            return f"validalas[{i}]: HMKE-nél kötelező a „hmke”: szaldo / brutto"
+    return None
+
+
 @dataclass(frozen=True)
 class Verzio:
     ervenyes_tol: date
     forras: str
     szabalyok: dict[str, Any]
     dijak: dict[str, dict[str, Decimal]]
+    ervenyes_ig: date | None = None  # ha ismert a vége (különben a következő verzióig)
+    ellenorzes: dict[str, Any] | None = None  # {allapot, datum, mivel, validalas}
 
 
 @dataclass(frozen=True)
@@ -53,10 +99,11 @@ class Dijszabas:
     verziok: tuple[Verzio, ...]
 
     def verzio(self, nap: date) -> Verzio:
+        """A napon érvényes verzió. Az első verzió előtti napra (pl. a fiók 2024-es kezdete, de a díjszabás csak egy
+        későbbi árlapról ismert) az első verzió – nem hiba, hogy egy korai nap ne állítsa le az egész fiókot; a
+        feloldás „verzio_elott” jelzéssel jelöli (a szelet becsült)."""
         jo = [v for v in self.verziok if v.ervenyes_tol <= nap]
-        if not jo:
-            raise DijszabasHiba(f"{self.azonosito}: nincs érvényes verzió {nap} napra")
-        return jo[-1]
+        return jo[-1] if jo else self.verziok[0]
 
 
 @dataclass(frozen=True)
@@ -67,6 +114,7 @@ class Ervenyes:
     verzio_tol: date
     szabalyok: dict[str, Any]
     dijak: dict[str, Decimal]
+    verzio_elott: bool = False  # a nap az első ismert verzió előtti: annak díjaival, becsült
 
     @property
     def cimke(self) -> str:
@@ -78,7 +126,7 @@ def ellenoriz(adat: dict[str, Any], hely: str = "") -> None:
     for kulcs in ("azonosito", "nev", "kozmu", "egyseg", "verziok"):
         if kulcs not in adat:
             raise hiba(f"hiányzó mező: {kulcs}")
-    if adat["kozmu"] not in ("villany", "gaz", "viz", "hulladek"):
+    if adat["kozmu"] not in ("villany", "gaz", "viz", "hulladek", "tavho", "kozos", "tavkozles"):
         raise hiba(f"ismeretlen közmű: {adat['kozmu']}")
     verziok = adat["verziok"]
     if not isinstance(verziok, list) or not verziok:
@@ -93,12 +141,28 @@ def ellenoriz(adat: dict[str, Any], hely: str = "") -> None:
         elozo = tol
         if not str(v.get("forras", "")).strip():
             raise hiba(f"{tol}: a forrás kötelező")
+        ig = v.get("ervenyes_ig")
+        if ig is not None and (not isinstance(ig, date) or ig <= tol):
+            raise hiba(f"{tol}: érvénytelen ervenyes_ig: {ig!r}")
+        ell = v.get("ellenorzes")
+        if ell is not None:
+            if ell.get("allapot") not in ELLENORZES_ALLAPOTOK:
+                raise hiba(f"{tol}: ismeretlen ellenőrzési állapot: {ell.get('allapot')!r}")
+            if not isinstance(ell.get("datum"), date) or not str(ell.get("mivel", "")).strip():
+                raise hiba(f"{tol}: az ellenőrzéshez dátum és „mivel” kell")
+            if ell.get("allapot") == "szamlaval_egyezik" and (vh := _validalas_hiba(adat.get("azonosito", ""), ell.get("validalas"))):
+                raise hiba(f"{tol}: {vh}")
         if "alap" not in (v.get("dijak") or {}):
             raise hiba(f"{tol}: hiányzik a dijak.alap sor")
         sz = v.get("szabalyok") or {}
         keret = sz.get("keret")
         if keret is not None and keret.get("tipus") not in KERET_TIPUSOK:
             raise hiba(f"{tol}: ismeretlen kerettípus: {keret.get('tipus')}")
+        for k in sz.get("kiegeszito") or []:
+            if not k.get("nev") or not k.get("dij"):
+                raise hiba(f"{tol}: a kiegészítő tételhez „nev” és „dij” kell")
+            if k["dij"] not in (v["dijak"].get("alap") or {}):
+                raise hiba(f"{tol}: a kiegészítő tétel díja ({k['dij']}) hiányzik a dijak.alap sorból")
         for idx, idenyszak in enumerate(sz.get("idenyszak") or []):
             if "nev" not in idenyszak:
                 raise hiba(f"{tol}: az {idx}. idényszaknak nincs neve")
@@ -116,6 +180,8 @@ def betolt_fajl(adat: dict[str, Any], hely: str = "") -> Dijszabas:
             forras=str(v["forras"]),
             szabalyok=_dec(v.get("szabalyok") or {}),
             dijak={k: _dec(s or {}) for k, s in v["dijak"].items()},
+            ervenyes_ig=v.get("ervenyes_ig"),
+            ellenorzes=v.get("ellenorzes"),
         )
         for v in adat["verziok"]
     )
@@ -178,7 +244,7 @@ class DijszabasTar:
                 cel[reszek[-1]] = f.ertek
             else:
                 raise DijszabasHiba(f"érvénytelen felülírási kulcs: {f.kulcs}")
-        return Ervenyes(azonosito, v.ervenyes_tol, szabalyok, dijak)
+        return Ervenyes(azonosito, v.ervenyes_tol, szabalyok, dijak, verzio_elott=nap < v.ervenyes_tol)
 
     def valtozasi_napok(self, azonosito: str) -> set[date]:
         """Minden nap, amikor a díjszabás vagy egy általa hivatkozott díjszabás új verzióra vált."""

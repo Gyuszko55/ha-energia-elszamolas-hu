@@ -1,0 +1,51 @@
+azonosito: viz/drv
+nev: "DRV Zrt. – lakossági víz és csatorna (állami tulajdonú közmű)"
+kozmu: viz
+egyseg: m3
+# Dunántúli Regionális Vízmű Zrt. (Siófok) – Balaton-part, pl. Fonyód. Az állami tulajdonú víziközművek általános
+# lakossági díja (2013. július 1. óta változatlan); az önkormányzati tulajdonú települések díja eltérhet.
+# Idényes lakossági felhasználási hely (üdülő): negyedéves elszámoló számla – az 1. negyedév csak alapdíj, a 2. és 4.
+# becsült fogyasztással (az előző 12 hónap átlaga), a 3. negyedévben a tényleges, évi egyszeri leolvasás szerint.
+# Év közben bejelentett mérőállást a következő negyedéves elszámolás figyelembe veszi.
+verziok:
+  - ervenyes_tol: 2013-07-01     # a díjak 2013. július 1. óta változatlanok (a 2026-os árlap is ezeket közli)
+    forras: >-
+      DRV Zrt. „Lakossági felhasználók víziközmű-szolgáltatási díjai 2026.01.01.” (T-02-2026 F09 v1), 1.1 és 2.1 pont:
+      ivóvíz alapdíj nettó 234 Ft/hó/bekötés, ivóvíz fogyasztási díj nettó 357,30 Ft/m³, csatorna alapdíj nettó
+      378 Ft/hó/fogyasztási hely, csatorna fogyasztási díj nettó 390,60 Ft/m³, ÁFA 27%. Az alapdíj nem függ a mérő
+      méretétől. Számlázási rend: drv.hu/szamlazas1, leolvasás: drv.hu/leolvasas-elszamolas.
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-07
+      mivel: "drv.hu díjtáblázat 2026.01.01 – valódi számlával még nem összevetve"
+    szabalyok: &szab
+      keret: {tipus: nincs}
+      mennyiseg_egesz: true
+      mennyiseg_minimum: 1   # számlánként legalább 1 m³ (víz és csatorna) – üdülőnél (sajátos számlázás) nem
+      ar: viz_m3
+      csatornadij: {alapertelmezes: be}
+      szamla_kerekites: vegosszeg
+      alapdij:
+        mod: idoszakonkent     # annyi havi alapdíj, ahány hónap 1-je esik az elszámolt időszakba
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        viz_m3: 357.30
+        csatorna_m3: 390.60
+        alapdij_ho: 612.00     # ivóvíz 234 + csatorna 378
+  - ervenyes_tol: 2026-06-01
+    forras: >-
+      Mint fent, és a DRV „Lakossági és nem lakossági felhasználók vízterhelési díjai 2026.06.” szerint a lakossági
+      csatornahasználat áthárított vízterhelési díja 2026. június 1-től nettó 3,00 Ft/m³ – a csatornadíjba vonva.
+      (A június előtti vízterhelési díj nem ismert, ott 0-val számol.)
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-07
+      mivel: "drv.hu díjtáblázatok – valódi számlával még nem összevetve"
+    szabalyok: *szab
+    dijak:
+      alap:
+        afa: 27
+        viz_m3: 357.30
+        csatorna_m3: 393.60    # csatorna 390,60 + vízterhelési díj 3,00
+        alapdij_ho: 612.00

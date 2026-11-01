@@ -7,12 +7,28 @@ verziok:
     forras: >-
       MVM Next villanyszámla, 2026-06-09 (2026.05.14–06.08): nettó 5,25 Ft/kWh a keretig, 31,80 Ft/kWh felette,
       rendszerhasználati díj 23,40 Ft/kWh, elosztói alapdíj 120,50 Ft/számla, ÁFA 27%.
-      A többi elosztói terület kedvezményes energiadíja a v1 díjtáblázatának bruttó áraiból visszaszámolva – ELLENŐRIZENDŐ.
+      A többi elosztói terület kedvezményes energiadíja: MVM Next hivatalos árlap „Villamosenergia-díjak az egyetemes szolgáltatásban lakossági ügyfeleknek 2022. augusztus 1-jétől” (VE_Lakossági_Árak_2025/1). A piaci ár (31,80), a
+      rendszerhasználati díj és az alapdíj minden területen azonos.
+    ellenorzes:
+      allapot: szamlaval_egyezik
+      datum: 2026-10-04
+      mivel: "hu_rezsi.szamla_osszevetes 2026-10-04: Városi lakás 17 MVM-számla (2024.12–2026.09) – 14 forintra, mind ±2 Ft-on belül; Kertes ház 19 számla – 14 forintra (a keret számlánkénti kerekítése után), a legnagyobb eltérés 1 754 Ft (MVM sávkorrekció-átütemezés); részletek: docs/ellenorzes/szamla_osszevetes_2026-10-04.md"
+      validalas:
+        - {hely: Városi lakás, szolgaltato: mvm_demasz, elszamolas: diktalas, szamla_tipusok: [havi, elszamolo], idoszak: "2024-12 – 2026-09", szamlak: 17, forintra: 14, max_elteres_ft: 2}
+        - {hely: Kertes ház, szolgaltato: mvm_demasz, elszamolas: atalany, szamla_tipusok: [resz, elszamolo, vegszamla], idoszak: "2023 – 2026-09", szamlak: 19, forintra: 14, max_elteres_ft: 1754, megjegyzes: "a legnagyobb eltérés az MVM sávkorrekció-átütemezése"}
     szabalyok:
       keret:
         tipus: napi_aranyos
         ev_mennyiseg: 2523     # kWh/év; a számlán a keret egész kWh (26 nap → 180 kWh)
         kerekites: 0
+        tetel_hatar: "08-01"   # MVM: a számla aug. 1-jén két tételre bomlik, a keret tételenként kerekítve (2023–2025 számlák)
+        # Az elszámolási évben HALMOZVA: a kedvezményes rész az év elejétől a halmozott fogyasztás és a halmozott
+        # keret kisebbike (a ki nem használt keret később jár; MVM-számlán „sávkorrekció”). Elszámolási év: az éves
+        # elszámoló leolvasástól a következő éves elszámoló leolvasásig; a keret csak ezen belül csoportosítható át,
+        # a következő évre nem vihető át. Ugyanígy működik a B (vezérelt) és a H-tarifa nyári (1.82) regiszterén,
+        # mérőnként külön 2523 kWh-val; felette lakossági piaci ár.
+        # Ellenőrizve: Kertes ház 2024/25 éve (2524 vs 2523 kWh) és 2026-08-09–09-09 (221+52=273 kWh).
+        osszesitett: true
       alapdij:
         mod: idoszakonkent     # számlánként 1 havi alapdíj, nem napra arányosítva
     dijak:
@@ -22,7 +38,7 @@ verziok:
         energia_piaci: 31.80
         rendszerhasznalati: 23.40      # minden kWh-ra (bruttó: 36,386 / 70,104 Ft/kWh)
         alapdij_ho: 120.50             # bruttó 153,035
-      eon: {energia_kedvezmenyes: 4.38976}         # bruttó 35,293
-      opus_titasz: {energia_kedvezmenyes: 4.38976} # bruttó 35,293
-      elmu: {energia_kedvezmenyes: 5.11024}        # bruttó 36,208
-      elmu_emasz: {energia_kedvezmenyes: 4.94016}  # bruttó 35,992
+      eon: {energia_kedvezmenyes: 4.39}            # bruttó 35,293
+      opus_titasz: {energia_kedvezmenyes: 4.39}    # bruttó 35,293
+      elmu: {energia_kedvezmenyes: 5.11}           # bruttó 36,208
+      elmu_emasz: {energia_kedvezmenyes: 4.94}     # MVM Émász terület, bruttó 35,992

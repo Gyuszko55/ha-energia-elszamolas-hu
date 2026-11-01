@@ -10,14 +10,29 @@ verziok:
       Ugyanezek a díjak a 2023-as, 2024-es és 2025-ös számlákon is (2023-01-26, 2024-04-30, 2025-09-30).
       A tételek fillérre pontosak, csak a végösszeg kerekül forintra. A 2026-07-es számla szerint a locsolási
       almérő a főmérő mögött van: a mennyisége a főmérő csatornadíjából levonódik. Az alapdíj naptári
-      hónaponként jár (a júliusi számlán 2026.06.01–07.31: 2 hónap).
+      hónaponként jár (a júliusi számlán 2026.06.01–07.31: 2 hónap). A szolgáltató évente, júliusban olvas le (éves
+      elszámolás); közben kéthavi (2026 augusztusától átalány-) részszámlák, a fogyasztó diktálhat.
+    ellenorzes:
+      allapot: szamlaval_egyezik
+      datum: 2026-10-04
+      mivel: "hu_rezsi.szamla_osszevetes 2026-10-04: Kertes ház 20 DAKÖV-számla (2023–2026) – 18 forintra (az almérő egész évben levonva); a maradék a 2026-os elszámoló 14/17 m³-es almérő-levonása"
+      validalas:
+        - {hely: Kertes ház, szolgaltato: dakov, elszamolas: atalany, szamla_tipusok: [ketthavi, elszamolo], idoszak: "2023 – 2026", szamlak: 20, forintra: 18, max_elteres_ft: 2450, megjegyzes: "a maradék a 2026-os elszámoló almérő-levonása (14/17 m³)"}
     szabalyok:
       keret: {tipus: nincs}
+      mennyiseg_egesz: true
+      mennyiseg_minimum: 1   # számlánként legalább 1 m³ (víz és csatorna) – üdülőnél (sajátos számlázás) nem
+      # A locsolási almérő fogyasztása EGÉSZ ÉVBEN levonódik a csatornadíjból – a DAKÖV-számlák szerint idényen kívül
+      # (okt.–ápr.) is (2023 ősz: 2 m³, 2025 tavasz: 3 m³). Idénykorlát (58/2013. Korm. rendelet): „almero_idoszak”.
+      # A számla egész m³-re (lefelé) kerekített óraállások különbségével számol.
       ar: viz_m3
       csatornadij: {alapertelmezes: be}
       szamla_kerekites: vegosszeg
+      # 2026 márciusától kéthavi számlázás: diktálni a számla zárása előtt, a záró hónap 20–25-én lehet (a számlán
+      # közölt „következő diktálás” erősebb); ha nem diktálnak, átalányt számláz.
+      diktalas: {honap: zaro, ablak: [20, 25]}
       alapdij:
-        mod: honaponkent       # naptári hónaponként (a havi elszámolásban 1 hónap = 1 alapdíj)
+        mod: idoszakonkent     # DAKÖV: annyi havi alapdíj, ahány hónap 1-je esik az elszámolt időszakba (számlák szerint)
     dijak:
       alap:                    # NETTÓ Ft
         afa: 27

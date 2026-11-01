@@ -1,0 +1,27 @@
+azonosito: hulladek/mohu_udulo
+nev: "Hulladékszállítás – MOHU, üdülőingatlan (idényes)"
+kozmu: hulladek
+egyseg: db
+# Üdülőingatlan: a közszolgáltatás idényes – a díj az üdülőidény hónapjaira jár (Ht. 47. § (3): az éves díj kb. 50%-a).
+# Feltétel (MOHU ÁSZF): üdülőterületen fekszik ÉS az ingatlan-nyilvántartásban üdülő/hétvégi ház – különben egész évre
+# a lakóingatlan díja jár. Idényen kívül csak emblémás többlethulladék-zsákban rakható ki.
+verziok:
+  - ervenyes_tol: 2025-03-01
+    forras: >-
+      PELSO-KOM Nonprofit Kft. (a MOHU gyűjtést végző alvállalkozója, Fonyód és 54 település) „Közszolgáltatási bruttó
+      ürítési díjak – érvényes: 2025.03.01-től”: üdülőingatlan 80 l edény 189,50 Ft/ürítés (60 l: 197,27; 120 l:
+      260,57). Üdülőidény ápr. 1. – szept. 30.; Fonyódon 2026-ban hétfőnként, júl.–aug. hétfőn és pénteken ürítenek
+      (hulladéknaptár) → 35 ürítés ≈ 6 633 Ft/év. A MOHU negyedévente számláz (15 napos határidő); a díjat itt az idény
+      hat hónapjára egyenletesen osztjuk (1 105,50 Ft/hó), így a 2. és a 3. negyedév egyaránt ≈ 3 317 Ft.
+    ellenorzes:
+      allapot: ellenorizendo
+      datum: 2026-10-07
+      mivel: "pelsokom.hu ürítési díjak + fonyod.hu hulladéknaptár 2026 – valódi számlával még nem összevetve"
+    szabalyok:
+      keret: {tipus: nincs}
+      alapdij:
+        mod: honaponkent
+        honapok: [4, 5, 6, 7, 8, 9]
+    dijak:
+      alap:                    # bruttó Ft
+        alapdij_ho: 1105.50    # 35 ürítés × 189,50 Ft / 6 hónap

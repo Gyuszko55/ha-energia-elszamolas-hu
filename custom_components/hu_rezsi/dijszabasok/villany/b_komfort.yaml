@@ -1,0 +1,30 @@
+azonosito: villany/b_komfort
+nev: "B Komfort – vezérelt, napi 12 óra"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MVM Next hivatalos árlap „Villamosenergia-díjak az egyetemes szolgáltatásban lakossági ügyfeleknek 2022. augusztus 1-jétől” (VE_Lakossági_Árak_2025/1): B Komfort (vezérelt, napi 12 óra felfűtési idővel) – az árlapon csak az MVM Démász
+      területén: kedvezményes energiadíj nettó 2,19 Ft/kWh, lakossági piaci ár 31,80, rendszerhasználati díj 16,18
+      Ft/kWh, alapdíj 39,50 Ft/hó (bruttó 23,330 / 60,935 Ft/kWh). A vezérelt mérő külön felhasználási hely, saját
+      2523 kWh/év kerettel.
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-04
+      mivel: "MVM árlap VE_Lakossági_Árak_2025/1 (2026-10-03)"
+    szabalyok:
+      keret:
+        tipus: napi_aranyos
+        ev_mennyiseg: 2523
+        kerekites: 0
+        osszesitett: true
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        energia_kedvezmenyes: 2.19     # bruttó 23,330 a rendszerhasználati díjjal
+        energia_piaci: 31.80           # bruttó 60,935
+        rendszerhasznalati: 16.18
+        alapdij_ho: 39.50              # bruttó 50,165

@@ -5,26 +5,35 @@ egyseg: kWh
 verziok:
   - ervenyes_tol: 2024-01-01
     forras: >-
-      A v1 díjtáblázatának bruttó árai nettóra visszaszámolva (ÁFA 27%), H-tarifás számla nélkül – ELLENŐRIZENDŐ.
-      A téli ár itt az energia- és a rendszerhasználati díj együtt.
+      MVM Next hivatalos árlap „Villamosenergia-díjak az egyetemes szolgáltatásban lakossági ügyfeleknek 2022. augusztus 1-jétől” (VE_Lakossági_Árak_2025/1): téli (fűtési idény) energiadíj MVM Démász 1,90, E.ON / OPUS TITÁSZ
+      2,34, ELMŰ 2,05, MVM Émász 1,68 Ft/kWh nettó, rendszerhasználati díj 16,18 Ft/kWh, alapdíj 39,50 Ft/hó.
+      A 2523 kWh-s fogyasztási határértéket a fűtési idényben igénybe vett H árszabásra nem kell alkalmazni.
+    ellenorzes:
+      allapot: szamlaval_egyezik
+      datum: 2026-10-04
+      mivel: "hu_rezsi.szamla_osszevetes 2026-10-04: Városi lakás 17 MVM H-számla – 10 forintra, mind ±24 Ft-on belül (az alapdíj idényfüggő: télen 39,50, nyáron az A1 120,50 Ft-ja); MVM árlap VE_Lakossági_Árak_2025/1"
+      validalas:
+        - {hely: Városi lakás, szolgaltato: mvm_demasz, elszamolas: diktalas, szamla_tipusok: [havi, elszamolo], idoszak: "2024-10 – 2026-09", szamlak: 17, forintra: 10, max_elteres_ft: 24}
     szabalyok:
       alapdij:
         mod: idoszakonkent
       idenyszak:
-        - nev: teli            # fűtési idény: kedvezményes H-ár, keret nélkül
+        - nev: teli            # fűtési idény (1.81): kedvezményes H-ár, keret nélkül – a keretbe sem számít bele
           tol: "10-15"
-          ig: "04-15"
+          ig: "04-16"          # a számlák szerint ápr. 15. még téli nap (téli: …–04.15, nyári: 04.16–)
           keret: {tipus: nincs}
           ar: energia_teli
-        - nev: nyari           # az A1 szabályai és árai, a H-mérőre külön kerettel
+        - nev: nyari           # idényen kívül (1.82): az A1 szabályai és árai, a H-mérőre külön 2523 kWh/év kerettel
+                               # (csak az idényen kívüli napokra, az elszámolási évben halmozva), felette piaci ár
           dijszabas: villany/a1
           sajat_keret: true
     dijak:
       alap:                    # NETTÓ Ft
         afa: 27
-        energia_teli: 18.08031   # bruttó 22,962
+        energia_teli: 1.90       # MVM Démász; bruttó a rendszerhasználati díjjal 22,962
+        rendszerhasznalati: 16.18  # csak a téli H-árhoz; nyáron az A1 díjai érvényesek
         alapdij_ho: 39.50        # bruttó 50,165
-      eon: {energia_teli: 18.51969}
-      opus_titasz: {energia_teli: 18.51969}
-      elmu: {energia_teli: 18.22992}
-      elmu_emasz: {energia_teli: 17.85984}
+      eon: {energia_teli: 2.34}            # bruttó 23,520
+      opus_titasz: {energia_teli: 2.34}    # bruttó 23,520
+      elmu: {energia_teli: 2.05}           # bruttó 23,152
+      elmu_emasz: {energia_teli: 1.68}     # MVM Émász terület, bruttó 22,682

@@ -14,7 +14,7 @@ TAR = DijszabasTar.mappabol(DIJSZABASOK)
 
 def _gaz():
     return Fiok(Kozmu.GAZ, "mvm_next", [DijszabasHozzarendeles("gaz/lakossagi", date(2024, 1, 1))], [Csatorna()],
-                eves_bazis=date(2025, 7, 14))
+                eves_bazis=date(2025, 7, 14), reszszamlas=True)
 
 
 def test_profil_egy_ev_osszege():
@@ -101,7 +101,7 @@ def test_mennyisegi_atalany_a1_es_h():
     h = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/h", date(2024, 1, 1))],
              [Csatorna(szerep="h_teli", keret_aktiv=False), Csatorna(szerep="h_nyari")])
     _, qh, fth = atalany_havi(h, TAR, date(2026, 10, 1), date(2026, 11, 1), D(10))
-    assert round(qh, 1) == round(D(10) * 12 / 365 * 31, 1) and D(250) < fth < D(400)  # ~10 kWh + 51 Ft alapdíj
+    assert round(qh, 1) == round(D(10) * 12 / 365 * 31, 1) and D(350) < fth < D(500)  # ~10 kWh + 155 Ft alapdíj (okt. 1. nyári: az A1-é)
 
 
 def test_h_regiszteres_eves_egyenleg_rovid_ev_utan():
@@ -121,7 +121,46 @@ def test_atalany_almero_aranya_levonodik():
     from motor.tipusok import Csatorna as Cs
     viz = Fiok(Kozmu.VIZ, "dakov", [DijszabasHozzarendeles("viz/dakov", date(2024, 1, 1))],
                [Cs(szerep="fo"), Cs(szerep="almero", csatornadij_aktiv=False, levonas_fobol=True)])
-    _, q0, ft0 = atalany_havi(viz, TAR, date(2026, 10, 1), date(2026, 11, 1), D(11))
-    _, q1, ft1 = atalany_havi(viz, TAR, date(2026, 10, 1), date(2026, 11, 1), D(11), D("0.28"))
+    _, q0, ft0 = atalany_havi(viz, TAR, date(2026, 7, 1), date(2026, 8, 1), D(11))
+    _, q1, ft1 = atalany_havi(viz, TAR, date(2026, 7, 1), date(2026, 8, 1), D(11), D("0.28"))
     assert q0 == q1  # a mennyiség ugyanaz (az almérő a főmérő része)
-    assert ft1 < ft0  # de a csatornadíj kevesebb
+    assert ft1 < ft0  # de a locsolási idényben a csatornadíj kevesebb
+    # DAKÖV: az almérő aránya egész évben levonódik (a számlák szerint – a téli részszámla is csatornadíj nélkül számol).
+    _, _, ft_o0 = atalany_havi(viz, TAR, date(2026, 10, 1), date(2026, 11, 1), D(11))
+    _, _, ft_o1 = atalany_havi(viz, TAR, date(2026, 10, 1), date(2026, 11, 1), D(11), D("0.28"))
+    assert ft_o1 < ft_o0
+
+
+def test_tort_ev_egyenleg():
+    """Tört év (beköltözés 2025.10.01., a szolgáltató éves leolvasása 2026.07.14.): az egyenleg időszaka eddig tart,
+    nem a kezdőnap + 12 hónapig, így a várható éves költség is csak erre a ~9,5 hónapra szól."""
+    f = _gaz()
+    f.eves_bazis = date(2025, 10, 1)
+    s = Szamlalo([Pont(datetime(2025, 10, 1), D(2250), True), Pont(datetime(2025, 11, 1), D(2300), True)])
+    teljes = eves_egyenleg(f, TAR, s, datetime(2025, 11, 1), [], reszszamla_db_ev=11)
+    tort = eves_egyenleg(f, TAR, s, datetime(2025, 11, 1), [], reszszamla_db_ev=8, ev_ig=date(2026, 7, 14))
+    assert tort.ev_ig == date(2026, 7, 14) and teljes.ev_ig == date(2026, 10, 1)
+    assert tort.varhato_eves < teljes.varhato_eves
+
+
+def test_nyaralo_profil():
+    """Nyaraló (idényes): áprilistól októberig 700 kWh – a téli hónapokra a profil szerint már csak kevés jut,
+    nem a nyári napi átlag. A profil egy évre 1."""
+    assert abs(_profil_resz(date(2026, 1, 1), date(2027, 1, 1), "nyaralo") - 1) < D("0.0001")
+    f = Fiok(Kozmu.VILLANY, "eon", [DijszabasHozzarendeles("villany/a1", date(2024, 1, 1))], [Csatorna()],
+             eves_bazis=date(2026, 4, 5), reszszamlas=True)
+    s = Szamlalo([Pont(datetime(2026, 4, 5), D(0), True), Pont(datetime(2026, 10, 4), D(700), True)])
+    e = eves_egyenleg(f, TAR, s, datetime(2026, 10, 4), [], reszszamla_db_ev=11, profil="nyaralo")
+    e0 = eves_egyenleg(f, TAR, s, datetime(2026, 10, 4), [], reszszamla_db_ev=11)
+    assert D(750) < e.varhato_fogyasztas < D(800)       # ~0,9 eltelt → ~780 kWh/év
+    assert e0.varhato_fogyasztas > D(1300)             # egyenletes eloszlással a duplája
+
+
+def test_atalany_havi_eves_kerettel_bazis_utan():
+    """Gáz-részszámla (éves keret): az átalány becslése a folyó időszakra akkor is számol, ha az időszak az éves bázis
+    után kezdődik (korábban NincsAdat – a segédszámláló csak az időszak elejétől tartott)."""
+    from motor.egyenleg import atalany_havi
+    f = Fiok(Kozmu.GAZ, "mvm_next", [DijszabasHozzarendeles("gaz/lakossagi", date(2024, 1, 1))], [Csatorna()],
+             eves_bazis=date(2025, 11, 1), reszszamlas=True)
+    napi, q, ft = atalany_havi(f, TAR, date(2026, 8, 1), date(2026, 11, 1), D(8))
+    assert q > D(20) and ft > 0

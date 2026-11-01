@@ -9,13 +9,45 @@ from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
+from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from .tipusok import LEOLVASAS_ELSOBBSEG, Csatorna, Mero
+from .tipusok import LEOLVASAS_ELSOBBSEG, Csatorna, LeolvasasTipus, Mero
 
 # Ennél nagyobb hézagban interpolált érték „becsült”.
 BECSLESI_HEZAG = timedelta(hours=36)
+
+
+def kezdo_allas(mero: Mero) -> Decimal:
+    """A mérő tényleges kezdőállása: a megadott kezdőállás; ha üresen maradt (0), a beépítés napjának (legkorábbi)
+    valódi leolvasása – különben az első hónap fogyasztása a teljes óraállás lenne."""
+    if mero.kezdo_allas:
+        return mero.kezdo_allas
+    aznapi = [lo for lo in mero.leolvasasok if lo.datum == mero.beepitve and lo.tipus != LeolvasasTipus.AUTOMATIKUS]
+    if not aznapi:
+        return mero.kezdo_allas
+    return min(aznapi, key=lambda lo: (lo.idopont, -LEOLVASAS_ELSOBBSEG[lo.tipus])).allas
+
+
+def novekmenyes(sor: list[tuple[datetime, Decimal]]) -> list[tuple[datetime, Decimal]]:
+    """Fogyasztás-szenzor sorozata nullázódás-biztosan: halmozott, csak növő érték (az első pontnál 0). Visszalépésnél
+    ha az új érték az előző felénél kisebb, nullázódás (az új érték már a nullázódás óta mért fogyasztás), különben
+    zaj (0 fogyasztás, az addigi legnagyobb értéktől folytatjuk) – így a nullázódás utáni pontok nem esnek a horgony alá."""
+    ki: list[tuple[datetime, Decimal]] = []
+    osszeg, elozo = Decimal(0), None
+    for t, v in sor:
+        if elozo is not None:
+            if v >= elozo:
+                osszeg += v - elozo
+            elif v < elozo / 2:  # nullázódás
+                osszeg += max(v, Decimal(0))
+            else:  # zaj: az előző (nagyobb) érték marad a viszonyítási alap
+                ki.append((t, osszeg))
+                continue
+        elozo = v
+        ki.append((t, osszeg))
+    return ki
 
 
 class NincsAdat(ValueError):
@@ -66,14 +98,15 @@ class Szamlalo:
         eltolas = Decimal(0)
         merok: list[tuple[Mero, Decimal]] = []
         for mero in sorted(csatorna.merok, key=lambda m: m.beepitve):
+            kezdo = kezdo_allas(mero)
             merok.append((mero, eltolas))
             tesz(nap_kezdete(mero.beepitve), eltolas, 10)
             for lo in mero.leolvasasok:
-                tesz(nap_kezdete(lo.datum), eltolas + lo.allas - mero.kezdo_allas, LEOLVASAS_ELSOBBSEG[lo.tipus])
+                tesz(lo.idopont, eltolas + lo.allas - kezdo, LEOLVASAS_ELSOBBSEG[lo.tipus])
             if mero.kiszerelve is not None:
-                zaro = mero.zaro_allas if mero.zaro_allas is not None else mero.kezdo_allas
-                tesz(nap_kezdete(mero.kiszerelve), eltolas + zaro - mero.kezdo_allas, 10)
-                eltolas += zaro - mero.kezdo_allas
+                zaro = mero.zaro_allas if mero.zaro_allas is not None else kezdo
+                tesz(nap_kezdete(mero.kiszerelve), eltolas + zaro - kezdo, 10)
+                eltolas += zaro - kezdo
 
         alap = cls([p for _, p in horgonyok.values()])
         if not sorozat:
@@ -87,12 +120,14 @@ class Szamlalo:
                     continue
                 for mero, elt in reversed(merok):
                     if nap_kezdete(mero.beepitve) <= t and (mero.kiszerelve is None or t < nap_kezdete(mero.kiszerelve)):
-                        ertek = elt + v * szorzo - mero.kezdo_allas
+                        ertek = elt + v * szorzo - kezdo_allas(mero)
                         if alap._hiheto(t, ertek):
                             pontok.append(Pont(t, ertek, False))
                         break
             return cls(pontok)
 
+        # A szenzor nullázódása (pl. Shelly újraindulás) ne vigye a pontokat a horgony alá (ott eldobnánk őket).
+        sor = novekmenyes(sor)
         sor_idok = [t for t, _ in sor]
 
         def sor_ertek(t: datetime) -> Decimal | None:
@@ -109,7 +144,9 @@ class Szamlalo:
             h = alap.pontok[i]
             sh = sor_ertek(h.ido)
             if sh is None:
-                continue
+                # A szenzor előzménye a horgony után indul (pl. ma felvett fiók): a szenzor első értéke
+                # a horgonyhoz tartozik, onnan számolunk.
+                sh = sor[0][1]
             ertek = h.ertek + (v - sh) * szorzo
             if alap._hiheto(t, ertek):
                 pontok.append(Pont(t, ertek, False))
@@ -156,3 +193,49 @@ class Szamlalo:
         napok = Decimal((ig - tol).total_seconds()) / Decimal(86400)
         pontok.append(Pont(ig, kezdo + napi * napok, False))
         return Szamlalo(pontok)
+
+
+def idenyre_szoritva(szamlalo: Szamlalo, idenyben: Callable[[date], bool]) -> Szamlalo:
+    """H-tarifa regisztere (1.81 téli, 1.82 nyári) csak a saját idénye napjain nő. Két pont között (pl. két diktálás,
+    szenzoradat nélkül) a növekményt ezért csak az idénybe eső napokra osztjuk el – különben a lineáris kitöltés a
+    nyári regiszterből télre (és fordítva) is jutna. Ha a két pont közt nincs (vagy csak) idénybeli nap, marad a lineáris."""
+    pontok = szamlalo.pontok
+    uj: list[Pont] = []
+    for p, q in zip(pontok, pontok[1:]):
+        delta = q.ertek - p.ertek
+        if delta <= 0 or q.ido - p.ido <= timedelta(days=1):
+            continue
+        szakaszok: list[tuple[datetime, datetime, bool]] = []
+        t = p.ido
+        while t < q.ido:
+            kov = min(q.ido, nap_kezdete(t.date() + timedelta(days=1)))
+            bent = idenyben(t.date())
+            if szakaszok and szakaszok[-1][2] == bent:
+                szakaszok[-1] = (szakaszok[-1][0], kov, bent)
+            else:
+                szakaszok.append((t, kov, bent))
+            t = kov
+        osszes = sum(((b - a).total_seconds() for a, b, bent in szakaszok if bent), 0.0)
+        if len(szakaszok) < 2 or osszes <= 0:
+            continue
+        eddig = 0.0
+        for a, b, bent in szakaszok[:-1]:
+            if bent:
+                eddig += (b - a).total_seconds()
+            uj.append(Pont(b, p.ertek + delta * Decimal(str(eddig / osszes)), False))
+    return Szamlalo([*pontok, *uj]) if uj else szamlalo
+
+
+def kijelzett_allas(csatorna: Csatorna, ertek: Decimal) -> Decimal:
+    """A számláló értéke (a csatorna mérőinek összesített fogyasztása, ahogy a Szamlalo.csatornabol építi) → az éppen
+    beépített mérő kijelzett állása: − a korábbi (kiszerelt) mérők fogyasztása + a mostani mérő kezdőállása."""
+    eltolas, utolso = Decimal(0), None
+    for mero in sorted(csatorna.merok, key=lambda m: m.beepitve):
+        utolso = (mero, eltolas)
+        if mero.kiszerelve is not None:
+            zaro = mero.zaro_allas if mero.zaro_allas is not None else kezdo_allas(mero)
+            eltolas += zaro - kezdo_allas(mero)
+    if utolso is None:
+        return ertek
+    mero, elt = utolso
+    return ertek - elt + kezdo_allas(mero)

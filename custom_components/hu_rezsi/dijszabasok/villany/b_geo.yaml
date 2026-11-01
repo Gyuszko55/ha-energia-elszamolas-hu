@@ -1,0 +1,26 @@
+azonosito: villany/b_geo
+nev: "B GEO – hőszivattyús vezérelt (meglévő szerződés)"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MVM Next hivatalos árlap „Villamosenergia-díjak az egyetemes szolgáltatásban lakossági ügyfeleknek 2022. augusztus 1-jétől” (VE_Lakossági_Árak_2025/1): B GEO – az árlapon az ELMŰ és az MVM Émász területén: energiadíj nettó 2,22 Ft/kWh,
+      rendszerhasználati díj 16,18 Ft/kWh, alapdíj 39,50 Ft/hó (bruttó 23,368 Ft/kWh). Új szerződés 2021.09.01. óta
+      nem köthető. A fogyasztási határértéket (2523 kWh) a B GEO árszabásra nem kell alkalmazni: nincs keret, nincs
+      piaci ár.
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-04
+      mivel: "MVM árlap VE_Lakossági_Árak_2025/1 (2026-10-03)"
+    szabalyok:
+      keret: {tipus: nincs}
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        energia_kedvezmenyes: 2.22     # bruttó 23,368 a rendszerhasználati díjjal
+        energia_piaci: 2.22
+        rendszerhasznalati: 16.18
+        alapdij_ho: 39.50              # bruttó 50,165

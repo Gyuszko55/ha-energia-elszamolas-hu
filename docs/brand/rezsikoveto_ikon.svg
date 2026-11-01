@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="haz" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6B544"/>
+      <stop offset="1" stop-color="#DE7A1C"/>
+    </linearGradient>
+  </defs>
+  <!-- ház: lekerekített ötszög -->
+  <path d="M256 34 Q268 34 278 42 L470 206 Q482 216 482 232 L482 444 Q482 478 448 478 L64 478 Q30 478 30 444 L30 232 Q30 216 42 206 L234 42 Q244 34 256 34 Z" fill="url(#haz)"/>
+  <!-- műszer számlap -->
+  <path d="M116 384 A140 140 0 0 1 396 384" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round"/>
+  <!-- skála: zöld – sárga – piros szakasz -->
+  <path d="M116 384 A140 140 0 0 1 166 277" fill="none" stroke="#3FA45B" stroke-width="34" stroke-linecap="round"/>
+  <path d="M346 277 A140 140 0 0 1 396 384" fill="none" stroke="#D9412E" stroke-width="34" stroke-linecap="round"/>
+  <!-- mutató -->
+  <path d="M256 384 L338 286" stroke="#1E2A38" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="256" cy="384" r="30" fill="#1E2A38"/>
+  <circle cx="256" cy="384" r="11" fill="#F6B544"/>
+</svg>

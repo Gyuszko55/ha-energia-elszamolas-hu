@@ -1,0 +1,37 @@
+azonosito: villany/d
+nev: "D – dinamikus (piaci árhoz kötött)"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MVM Next D árszabás (https://www.mvmnext.hu/aram/pages/aloldal.jsp?id=16455187), 2026.08.31-től hatályos,
+      alkalmazása legkorábban 2027.01.01-től: csak A1-es, távlehívható, havi idősoros elszámolású mérőre. A kedvezményes
+      sávhatárig (2 523 kWh/év, napi 6,91 kWh) az A1 kedvezményes ára; felette a naptári hónap negyedórás
+      fogyasztásával súlyozott rugalmas egységár = HUPX negyedórás ár × MNB napi EUR-középárfolyam + kereskedői díj
+      (13,70 Ft/kWh nettó, hirdetmény 2026.09.10-től). Az MVM által közzétett negyedórás rugalmas egységárakat a
+      Rezsikövető magától letölti (d_arak.py). A rendszerhasználati díj és az alapdíj mint az A1-nél.
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-04
+      mivel: "MVM D-árszabás oldal és negyedórás árlista; a HUPX-ból számolt ár az augusztusi listával fillérre egyezik (2026-10-03); valódi D-számla még nincs"
+    szabalyok:
+      keret:
+        tipus: napi_aranyos
+        ev_mennyiseg: 2523
+        kerekites: 0
+        osszesitett: true      # a kedvezményes keret mint az A1-nél (MVM-szabály szerint ELLENŐRIZENDŐ D-számlával)
+      rugalmas: true           # a keret feletti rész ára: motor/rugalmas.py (energia_piaci csak tartalék)
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # NETTÓ Ft (MVM Démász terület)
+        afa: 27
+        energia_kedvezmenyes: 5.25
+        energia_piaci: 31.80           # tartalék, amíg nincs közzétett rugalmas ár
+        rendszerhasznalati: 23.40
+        alapdij_ho: 120.50
+      eon: {energia_kedvezmenyes: 4.39}
+      opus_titasz: {energia_kedvezmenyes: 4.39}
+      elmu: {energia_kedvezmenyes: 5.11}
+      elmu_emasz: {energia_kedvezmenyes: 4.94}

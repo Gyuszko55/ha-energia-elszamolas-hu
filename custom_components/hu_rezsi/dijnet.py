@@ -36,6 +36,24 @@ def szolgaltatok(mappa: Path, minta: str) -> list[str]:
     return sorted(nevek)
 
 
+def fizetett(mappa: Path, minta: str) -> dict[str, dict[str, str | None]]:
+    """Az összes Díjnet-fájl kifizetett számlái számlaszám szerint: {számlaszám: {fizetve, hatarido}} (ISO-dátumok) –
+    a számlák pénzügyi teljesítéséhez (a vezető nullák nélkül is kereshető)."""
+    out: dict[str, dict[str, str | None]] = {}
+    for fajl in mappa.glob(minta):
+        try:
+            for x in _betolt(fajl):
+                szam = str(x.get("invoice_no") or "").strip()
+                if not szam:
+                    continue
+                adat = {"fizetve": str(x["paid_at"])[:10] if x.get("paid_at") else None,
+                        "hatarido": str(x["deadline"])[:10] if x.get("deadline") else None}
+                out[szam] = out[szam.lstrip("0")] = adat
+        except (OSError, yaml.YAMLError) as err:
+            _LOGGER.warning("Díjnet-fájl nem olvasható (%s): %s", fajl, err)
+    return out
+
+
 def szamlak(mappa: Path, minta: str, szolgaltato: str) -> list[tuple[date, Decimal, str]]:
     """(kelt, bruttó összeg, számlaszám) a megadott szolgáltatóra, számlaszám szerint egyedi."""
     lattuk: dict[str, tuple[date, Decimal, str]] = {}

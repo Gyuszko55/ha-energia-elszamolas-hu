@@ -30,6 +30,10 @@ class Tarolo:
     def torol_fiok(self, subentry_id: str) -> None:
         self.adat["fiokok"].pop(subentry_id, None)
 
+    def sziget(self, subentry_id: str) -> dict[str, Any]:
+        """Szigetüzemi rendszer adatai (külön a fiókoktól: a fiók-takarítás nem érinti): kézi leolvasások szerepkörönként."""
+        return self.adat.setdefault("szigetek", {}).setdefault(subentry_id, {"leolvasasok": {}})
+
     async def ment(self) -> None:
         await self._store.async_save(self.adat)
 

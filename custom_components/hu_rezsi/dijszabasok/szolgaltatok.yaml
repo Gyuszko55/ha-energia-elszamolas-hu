@@ -3,9 +3,19 @@ mvm_demasz: {nev: "MVM Démász", kozmu: [villany]}
 eon: {nev: "E.ON", kozmu: [villany]}
 opus_titasz: {nev: "OPUS TITÁSZ", kozmu: [villany]}
 elmu: {nev: "ELMŰ", kozmu: [villany]}
-elmu_emasz: {nev: "ELMŰ-ÉMÁSZ", kozmu: [villany]}
+elmu_emasz: {nev: "MVM Émász", kozmu: [villany]}
 mvm_next: {nev: "MVM Next", kozmu: [gaz]}
 vizmu: {nev: "Helyi vízmű", kozmu: [viz]}
 dakov: {nev: "DAKÖV", kozmu: [viz]}
+alfoldviz: {nev: "ALFÖLDVÍZ Zrt.", kozmu: [viz]}
+drv: {nev: "DRV Zrt. (Dunántúli Regionális Vízmű)", kozmu: [viz]}
 mohu: {nev: "MOHU", kozmu: [hulladek]}
-egyedi: {nev: "Egyedi (kézi díjak)", kozmu: [villany, gaz, viz, hulladek]}
+hvsz: {nev: "HVSZ Zrt.", kozmu: [tavho]}
+fotav: {nev: "FŐTÁV (Budapesti Közművek)", kozmu: [tavho]}
+fovarosi_vizmuvek: {nev: "Fővárosi Vízművek (Díjbeszedő)", kozmu: [viz]}
+tarsashaz: {nev: "Társasház (közös képviselő)", kozmu: [kozos]}
+telekom: {nev: "Magyar Telekom", kozmu: [tavkozles]}
+one: {nev: "One (Vodafone)", kozmu: [tavkozles]}
+digi: {nev: "DIGI", kozmu: [tavkozles]}
+yettel: {nev: "Yettel", kozmu: [tavkozles]}
+egyedi: {nev: "Egyedi (kézi díjak)", kozmu: [villany, gaz, viz, hulladek, tavho, kozos, tavkozles]}

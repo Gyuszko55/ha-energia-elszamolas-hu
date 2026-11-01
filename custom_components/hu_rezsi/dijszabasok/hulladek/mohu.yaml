@@ -7,6 +7,12 @@ verziok:
   - ervenyes_tol: 2024-01-01
     forras: >-
       MOHU Zrt. számlák (Díjnet) 2024-07 – 2026-07: negyedévente 5 772 Ft (jan., ápr., júl., okt.), változatlan.
+    ellenorzes:
+      allapot: szamlaval_egyezik
+      datum: 2026-10-04
+      mivel: "MOHU negyedéves számlák 2024-07 – 2026-07: mind 5 772 Ft"
+      validalas:
+        - {hely: Kertes ház, szolgaltato: mohu, elszamolas: fix, szamla_tipusok: [negyedeves], idoszak: "2024-07 – 2026-07", szamlak: 9, forintra: 9, max_elteres_ft: 0}
     szabalyok:
       keret: {tipus: nincs}
       alapdij:

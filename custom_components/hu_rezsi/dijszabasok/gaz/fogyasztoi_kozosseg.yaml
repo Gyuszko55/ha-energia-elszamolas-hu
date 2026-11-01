@@ -1,0 +1,48 @@
+azonosito: gaz/fogyasztoi_kozosseg
+nev: "Földgáz – fogyasztói közösség, 20 m³/h alatti mérő (A3)"
+kozmu: gaz
+egyseg: MJ
+# A gázóra m³-t mér; a számla MJ-ban: m³ × korrekciós tényező × az adott havi fűtőérték, egész MJ-ra kerekítve.
+# A havi fűtőérték a fiókban rögzíthető (hu_rezsi.futoertek_rogzites); ha nincs, a futoertek_alap számol, „becsült” jelzéssel.
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MVM Next „Földgázdíjak az egyetemes szolgáltatásban lakossági és nem lakossági ügyfeleknek 2025. augusztus 1-jétől”
+      (Gáz_2026/2; az egységárak 2023. október 1-je óta változatlanok), A3 sor – 20 m³/h alatti gázmérővel rendelkező
+      fogyasztói közösségek (közös gázmérős lakóépület): kedvezményes gázdíj nettó 2,373 Ft/MJ (bruttó 3,0), piaci
+      nettó 17,324 Ft/MJ, alapdíj nettó 9 192 Ft/év. Kedvezményes mennyiség: társasház / lakásszövetkezet
+      (lakásszám + 1) × 63 645 MJ/év, családi fogyasztói közösség lakásszám × 63 645 MJ/év (fiók: „Lakások száma”,
+      „Közösség típusa” – a keret szorzója).
+      Keret (MVM lakossági rezsi GYIK – földgáz): diktálásnál (és leolvasásnál, becslésnél, hőmérsékletfüggő
+      részszámlánál) a 2024. augusztus 1-jétől rögzített havi megosztás, a kedvezményes évben (aug. 1. – júl. 31.)
+      halmozva („sávkorrekció”, a ki nem használt keret nem vész el); átalánynál (egyenletes részszámla) éves keret.
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-04
+      mivel: "MVM árlap Gáz_2026/2 (2026-10-03)"
+    szabalyok:
+      atvaltas:
+        tipus: gaz_mj
+        futoertek_alap: 34.61
+        korrekcios_tenyezo_alap: 1
+      keret:
+        tipus: havi_sulyozott
+        ev_mennyiseg: 63645
+        # MJ/hó (az MVM táblázata: január 399, február 372 / szökőévben 359, … MJ/nap). A hónap napjai között
+        # egyenletesen oszlik el; egy számlára a benne lévő napok része jár.
+        havi: [12365, 10421, 8915, 5145, 1827, 635, 512, 565, 1109, 3724, 7490, 10937]
+        kerekites: 0
+        osszesitett: true
+        ev_kezdet: "08-01"     # kedvezményes év: augusztus 1. – július 31.
+        visszamenoleges: false # a ki nem használt keret később jár, a korábbi túllépést nem írja jóvá (MVM GYIK)
+        reszszamla:            # átalány (egyenletes részszámla): éves keret az elszámolási évre
+          tipus: eves
+          ev_mennyiseg: 63645
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                            # NETTÓ Ft/MJ
+        afa: 27
+        energia_kedvezmenyes: 2.373    # bruttó 3,014 Ft/MJ ≈ 105,1 Ft/m³
+        energia_piaci: 17.324          # bruttó 22,002 Ft/MJ ≈ 767,2 Ft/m³
+        alapdij_ho: 766                # 9 192 Ft/év; bruttó 972,82 Ft/hó

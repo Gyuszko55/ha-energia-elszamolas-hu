@@ -28,7 +28,7 @@ erDiagram
 | Mező | Típus | Leírás |
 |---|---|---|
 | `id` | szöveg | Belső azonosító |
-| `nev` | szöveg | Pl. „Hernád” |
+| `nev` | szöveg | Pl. „Kertes ház” |
 | `penznem` | szöveg | `HUF` (rögzített) |
 
 ### Szolgáltatói fiók
@@ -148,7 +148,7 @@ Rétegek, alulról felfelé: **díjfájl (hivatalos) → fiók-felülírás → 
 ## Példa: a mostani éles háztartás
 
 ```yaml
-haztartas: Hernád
+haztartas: Kertes ház
 fiokok:
   - kozmu: villany
     szolgaltato: mvm_demasz

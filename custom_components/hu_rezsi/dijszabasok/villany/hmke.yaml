@@ -11,6 +11,10 @@ verziok:
       ELMŰ 5,11 Ft/kWh). Szaldó (éves nettózás, az üzembe helyezéstől 10 évig): mvmnext.hu HMKE-elszámolás;
       a betáplálási többlet átvételi ára a 4/2011 NFM rendelet szerint, MVM Next szerződésben 1 Ft/kWh – ELLENŐRIZENDŐ.
       Az ÁFA kezelése (a lakossági betáplálás jóváírása) – ELLENŐRIZENDŐ.
+    ellenorzes:
+      allapot: ellenorizendo
+      datum: 2026-10-04
+      mivel: "átvételi árak nem hivatalos forrásból (mvmoptimum.hu blog); szaldós/bruttó HMKE-számlával forintra összevetni"
     szabalyok: {}
     dijak:
       alap:                       # Ft/kWh, a felhasználónak jóváírt összeg

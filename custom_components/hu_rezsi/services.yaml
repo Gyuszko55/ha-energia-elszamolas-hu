@@ -9,6 +9,9 @@ leolvasas_rogzites:
       required: true
       selector:
         date:
+    ido:
+      selector:
+        time:
     allas:
       required: true
       selector:
@@ -23,6 +26,14 @@ leolvasas_rogzites:
       default: false
       selector:
         boolean:
+    diktalt:
+      default: false
+      selector:
+        boolean:
+    evkezdet:
+      default: false
+      selector:
+        boolean:
     megjegyzes:
       selector:
         text:
@@ -30,7 +41,7 @@ leolvasas_rogzites:
       default: vetelezes
       selector:
         select:
-          options: [vetelezes, betaplalas, almero, h_teli, h_nyari]
+          options: [vetelezes, betaplalas, almero, h_teli, h_nyari, zona_csucs, zona_volgy]
           translation_key: csatorna
 leolvasas_torles:
   fields:
@@ -57,6 +68,22 @@ merocsere:
         select:
           options: [vetelezes, almero]
           translation_key: csatorna
+    visszavonas:
+      default: false
+      selector:
+        boolean:
+    regi_zaro_h_teli:
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    regi_zaro_h_nyari:
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    uj_kezdo_h_teli:
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    uj_kezdo_h_nyari:
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
 feluliras:
   fields:
     device_id: *fiok
@@ -113,3 +140,161 @@ reszszamla_torles:
   fields:
     device_id: *fiok
     datum: *datum
+szamla_rogzites:
+  fields:
+    device_id: *fiok
+    kelte:
+      required: true
+      selector:
+        date:
+    osszeg:
+      required: true
+      selector:
+        number: {min: -9999999, max: 9999999, step: 1, mode: box, unit_of_measurement: Ft}
+    tipus:
+      default: resz
+      selector:
+        select:
+          options: [resz, elszamolo, egyeb, eloiras, storno]
+          translation_key: szamla_tipus
+    sorszam:
+      selector:
+        text:
+    sztornozott:
+      selector:
+        text:
+    idoszak_tol:
+      selector:
+        date:
+    idoszak_ig:
+      selector:
+        date:
+    zaro_allas:
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    leolvasott:
+      default: false
+      selector:
+        boolean:
+    futoertek:
+      selector:
+        number: {min: 0, max: 100, step: 0.01, mode: box, unit_of_measurement: MJ/m³}
+    hatarido:
+      selector:
+        date:
+    megjegyzes:
+      selector:
+        text:
+szamla_osszevetes:
+  fields:
+    device_id: *fiok
+    honap:
+      selector:
+        number:
+          min: 1
+          max: 120
+lezartak_ujraszamolasa:
+  fields:
+    device_id: *fiok
+    tol:
+      selector:
+        date:
+szamla_feltoltes:
+  fields:
+    device_id: *fiok
+    file_id:
+      required: true
+      selector:
+        file:
+          accept: ".pdf,.xml,application/pdf,application/xml,text/xml"
+szamla_torles:
+  fields:
+    device_id: *fiok
+    sorszam:
+      required: true
+      selector:
+        text:
+szamlak_ujraolvasasa:
+  fields:
+    device_id: *fiok
+    fajlok:
+      selector:
+        text:
+          multiple: true
+    minden_meroallas:
+      default: false
+      selector:
+        boolean:
+fiok_lezarasa:
+  fields:
+    device_id: *fiok
+    datum:
+      selector:
+        date:
+    zaro_allas:
+      selector:
+        number: {min: 0, max: 99999999, step: 0.001, mode: box}
+    visszavonas:
+      default: false
+      selector:
+        boolean:
+sziget_leolvasas:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: hu_rezsi
+    ido:
+      required: true
+      selector:
+        datetime:
+    szerep:
+      required: true
+      selector:
+        select:
+          options: [fogyasztas, pv, akku_toltes, akku_kisutes, halozat, halozat_akku, export, generator, egyeb_termeles]
+          translation_key: sziget_szerep
+    allas:
+      required: true
+      selector:
+        number: {min: 0, max: 999999999, step: 0.001, mode: box}
+    egyseg:
+      default: kWh
+      selector:
+        select:
+          options: [Wh, kWh, MWh]
+mentes:
+  fields:
+    otthon:
+      selector:
+        config_entry:
+          integration: hu_rezsi
+    szamlak:
+      default: true
+      selector:
+        boolean:
+    megtart:
+      selector:
+        number: {min: 0, max: 1000, step: 1, mode: box}
+visszaallitas:
+  fields:
+    fajl:
+      example: rezsikoveto_mentes_osszes_20261006-120000.zip
+      selector:
+        text:
+    hely:
+      default: 0
+      selector:
+        number: {min: 0, max: 50, step: 1, mode: box}
+    file_id:
+      selector:
+        file:
+          accept: ".zip,application/zip"
+    otthon:
+      selector:
+        text:
+    szamlak:
+      default: true
+      selector:
+        boolean:

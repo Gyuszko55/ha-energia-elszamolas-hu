@@ -1,0 +1,68 @@
+azonosito: tavho/fotav
+nev: "FŐTÁV (BKM) – lakossági távfűtés és melegvíz, hőközponti mérés, részszámlázás"
+kozmu: tavho
+egyseg: m3
+# Budapest, FŐTÁV (Budapesti Közművek Nonprofit Zrt.). Alapdíj légköbméterre (12 egyenlő havi részletben), hődíj
+# GJ-ra; ÁFA 5%. Részszámlázásnál 11 hónapig az előző 12 hónap hőfogyasztásának 1/12-e (fiók: havi GJ), az
+# elszámolási időszak máj. 1. – ápr. 30., az elszámoló májusban jön. A melegvíz felmelegítése: a hőközpontban mért
+# GJ/m³ × a lakás melegvízmérőjén mért m³ (itt 0,32 GJ/m³ – becslés; a ház hőközpontjától függ). A melegvíz víz- és
+# csatornadíja a vízszámlán van.
+verziok:
+  - ervenyes_tol: 2014-10-01
+    forras: >-
+      FŐTÁV lakossági díjtétel-táblázat (2014. október 1-jétől, a BKM díjszabás-oldalán ma is érvényes): fűtési alapdíj
+      nettó 360,36 Ft/lm³/év, vízfelmelegítési alapdíj nettó 27,60 Ft/lm³/év, hődíj (hőközponti hőmennyiségmérés)
+      nettó 2 472 Ft/GJ, ÁFA 5%. Melegvíz: 0,32 GJ/m³ × 2 472 = 791,04 Ft/m³ (becsült fajlagos).
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-07
+      mivel: "budapestikozmuvek.hu díjtáblázat – valódi számlával még nem összevetve; a melegvíz GJ/m³ becslés"
+    szabalyok: &szab
+      keret: {tipus: nincs}
+      ar: hmv_m3
+      mennyiseg_egesz: true    # a melegvízóra egész m³-es állásainak különbsége
+      mennyiseg_minimum: 1     # számlánként legalább 1 m³ melegvíz
+      szamla_kerekites: vegosszeg
+      alapdij:
+        mod: idoszakonkent
+        szorzo: legterfogat           # vízfelmelegítési alapdíj: Ft/lm³/hó × légtérfogat
+      kiegeszito:
+        - {nev: "Fűtési alapdíj", dij: futes_alapdij_lm3, szorzo: legterfogat, afa: 5}
+        - {nev: "Hődíj (részszámla, havi GJ)", dij: hodij_gj, szorzo: futes_gj_ho, afa: 5}
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 5
+        hmv_m3: 791.04
+        alapdij_ho: 2.30       # 27,60 / 12 Ft/lm³/hó
+        futes_alapdij_lm3: 30.03   # 360,36 / 12
+        hodij_gj: 2472.00
+  - ervenyes_tol: 2026-01-01
+    forras: >-
+      Januári rezsistop (12/2026. (II.3.) Korm. rendelet): a 2026. januári fogyasztás hődíja 30%-kal kevesebb, nettó
+      1 730 Ft/GJ (melegvíz 0,32 × 1 730 = 553,60 Ft/m³); az alapdíjat nem érinti.
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-07
+      mivel: "BKM 2026. januári ártábla"
+    szabalyok: *szab
+    dijak:
+      alap:
+        afa: 5
+        hmv_m3: 553.60
+        alapdij_ho: 2.30
+        futes_alapdij_lm3: 30.03
+        hodij_gj: 1730.00
+  - ervenyes_tol: 2026-02-01
+    forras: "2026. februártól ismét a 2014. október 1-jei díjtétel (a januári kedvezmény csak a januári fogyasztásra járt)."
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-07
+      mivel: "BKM díjszabás-oldal (a februári visszaállás következtetés)"
+    szabalyok: *szab
+    dijak:
+      alap:
+        afa: 5
+        hmv_m3: 791.04
+        alapdij_ho: 2.30
+        futes_alapdij_lm3: 30.03
+        hodij_gj: 2472.00

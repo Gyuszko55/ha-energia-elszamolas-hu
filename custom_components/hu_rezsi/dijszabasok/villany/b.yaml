@@ -1,0 +1,41 @@
+azonosito: villany/b
+nev: "B – vezérelt (éjszakai) áram"
+kozmu: villany
+egyseg: kWh
+verziok:
+  - ervenyes_tol: 2024-01-01
+    forras: >-
+      MVM Next villanyszámla, ELMŰ terület, 2026-01-30 (845100000003, 2025.01.07–2026.01.09, „ESZ "B Alap" Lakosság”):
+      energiadíj nettó 2,05 Ft/kWh, átviteli forgalmi díj 4,84 (2025) / 3,39 (2026) + elosztói forgalmi díj 11,34 (2025) /
+      12,79 (2026) Ft/kWh – együtt mindkét évben 16,18 Ft/kWh –, elosztói alapdíj 39,50 Ft/hó, ÁFA 27%. Az összeg (2,05 + 16,18 = 18,23 Ft/kWh) egyezik a H-tarifa téli ELMŰ-árával. A többi elosztói terület
+      B-tarifás ára: MVM Next hivatalos árlap „Villamosenergia-díjak az egyetemes szolgáltatásban lakossági ügyfeleknek 2022. augusztus 1-jétől” (VE_Lakossági_Árak_2025/1) – MVM Démász 1,90, E.ON / OPUS TITÁSZ 2,34,
+      ELMŰ 2,05, MVM Émász 1,68 Ft/kWh nettó kedvezményes energiadíj; piaci 31,80, rendszerhasználati 16,18 mindenhol.
+      Kedvezményes keret (MVM lakossági rezsi GYIK): a vezérelt mérő külön felhasználási hely, saját 2523 kWh/év
+      kerettel; felette a lakossági piaci ár bruttó 60,935 Ft/kWh rendszerhasználati díjjal együtt → nettó energiadíj
+      60,935 / 1,27 − 16,18 = 31,80 Ft/kWh (ugyanannyi, mint az A1 piaci energiadíja). A fenti számlán a fogyasztás a
+      keret alatt maradt, ezért piaci sor nem szerepelt rajta.
+    ellenorzes:
+      allapot: szamlabol
+      datum: 2026-10-04
+      mivel: "MVM villanyszámla 845100000003 (ELMŰ, 2025.01.07–2026.01.09) díjtételei; forintos összevetés még nincs"
+    szabalyok:
+      keret:
+        tipus: napi_aranyos
+        ev_mennyiseg: 2523     # kWh/év, a hagyományos (A) mérőtől külön
+        kerekites: 0
+        tetel_hatar: "08-01"   # MVM: a számla aug. 1-jén két tételre bomlik, a keret tételenként kerekítve (2023–2025 számlák)
+        # Az elszámolási évben (éves elszámoló leolvasástól a következőig) halmozva, mint az A1-nél („sávkorrekció”).
+        osszesitett: true
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # NETTÓ Ft (MVM Démász terület)
+        afa: 27
+        energia_kedvezmenyes: 1.90     # bruttó 22,962
+        energia_piaci: 31.80           # bruttó a rendszerhasználati díjjal: 60,935 Ft/kWh
+        rendszerhasznalati: 16.18      # átviteli + elosztói forgalmi díj, minden területen
+        alapdij_ho: 39.50              # bruttó 50,165
+      eon: {energia_kedvezmenyes: 2.34}            # bruttó 23,520
+      opus_titasz: {energia_kedvezmenyes: 2.34}    # bruttó 23,520
+      elmu: {energia_kedvezmenyes: 2.05}           # bruttó 23,152 (számlával ellenőrizve)
+      elmu_emasz: {energia_kedvezmenyes: 1.68}     # MVM Émász terület, bruttó 22,682

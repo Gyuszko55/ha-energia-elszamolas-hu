@@ -1,0 +1,34 @@
+azonosito: viz/fovarosi_vizmuvek
+nev: "Fővárosi Vízművek + FCSM – lakossági víz és csatorna (Budapest)"
+kozmu: viz
+egyseg: m3
+# Budapest: ivóvíz a Fővárosi Vízművektől, csatorna a Fővárosi Csatornázási Művektől (FCSM) – a lakás-mellékvízmérők
+# számláját a Díjbeszedő Holding állítja ki (DÍJnet), kéthavonta; a mérőt évente egyszer olvassák le, közben diktálni
+# lehet. A melegvízmérőn mért víz víz- és csatornadíja is ide tartozik (a felmelegítés a FŐTÁV-é).
+verziok:
+  - ervenyes_tol: 2013-07-01
+    forras: >-
+      Fővárosi Vízművek „Szolgáltatások díjszabása” (2025, 2026) és FCSM csatornahasználati díj (2025.03.01-től,
+      2026.07.01-től változatlan): ivóvíz bruttó 218,90 Ft/m³ (nettó 172,36), csatornahasználat bruttó 375,49 + áthárított
+      vízterhelési díj 5,80 = 381,29 Ft/m³ (nettó 300,23), alapdíj bruttó 179,95 Ft/hó (vízbekötésenként), lakás-
+      mellékvízmérő ügyviteli díja bruttó 251 Ft/számla (kéthavi számlánál havi 125,50 – az alapdíjba vonva).
+      A lakossági díjak 2013. július 1. óta változatlanok.
+    ellenorzes:
+      allapot: arlapbol
+      datum: 2026-10-07
+      mivel: "vizmuvek.hu és fcsm.hu díjtáblázat – valódi számlával még nem összevetve"
+    szabalyok:
+      keret: {tipus: nincs}
+      mennyiseg_egesz: true
+      mennyiseg_minimum: 1   # számlánként legalább 1 m³ (víz és csatorna) – üdülőnél (sajátos számlázás) nem
+      ar: viz_m3
+      csatornadij: {alapertelmezes: be}
+      szamla_kerekites: vegosszeg
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        viz_m3: 172.36
+        csatorna_m3: 300.23    # csatornahasználat 295,66 + vízterhelési díj 4,57
+        alapdij_ho: 240.51     # alapdíj 141,69 + ügyviteli díj 98,82 (197,64 / 2 hónap)
