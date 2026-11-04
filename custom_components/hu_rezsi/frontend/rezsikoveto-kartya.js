@@ -70,6 +70,9 @@ const nap = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString("hu-HU", { m
 
 const idopont = (iso) => new Date(iso).toLocaleString("hu-HU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
+// Tétlenséget megszakító események (az automatikus bezáráshoz).
+const AKTIVITAS = ["pointerdown", "pointermove", "wheel", "scroll", "keydown", "touchstart", "touchmove"];
+
 // A felugró ablak a dokumentum törzsébe kerül (a kártya rácscellája ne vágja le); a HA témaváltozói a html elemen
 // vannak, így itt is érvényesek.
 class RezsiAiAblak extends HTMLElement {
@@ -79,17 +82,39 @@ class RezsiAiAblak extends HTMLElement {
     this._billentyu = (e) => { if (e.key === "Escape") this.bezar(); };
   }
 
-  nyit(hass, entryId, entitas, otthonNev) {
+  // Automatikus bezárás (a panel beállítása, hu_rezsi/panel_beallitas): a csak megjelenítő ablak ennyi másodperc
+  // tétlenség után bezárul; bármely mozdulat, görgetés (a szövegben is), billentyű újraindítja; rejtett lapnál
+  // szünetel; amíg az AI dolgozik, nem zárul. 0: soha.
+  nyit(hass, entryId, entitas, otthonNev, autoMp = 10) {
     this._hass = hass; this._entry = entryId; this._entitas = entitas || null; this._nev = otthonNev;
     this._t = null; this._hiba = null; this._keszul = false;
+    this._autoMp = Number(autoMp) || 0;
+    this._aktiv = Date.now();
+    this._jel = () => { this._aktiv = Date.now(); };
     document.body.appendChild(this);
     document.addEventListener("keydown", this._billentyu);
+    for (const t of AKTIVITAS) {
+      window.addEventListener(t, this._jel, { capture: true, passive: true });
+      this.shadowRoot.addEventListener(t, this._jel, { capture: true, passive: true });
+    }
+    clearInterval(this._autoIdo);
+    if (this._autoMp > 0) {
+      this._autoIdo = setInterval(() => {
+        if (document.visibilityState !== "visible" || this._keszul) { this._aktiv = Date.now(); return; }
+        if (Date.now() - this._aktiv >= this._autoMp * 1000) this.bezar();
+      }, 1000);
+    }
     this._rajzol();
     this._leker(false);
   }
 
   bezar() {
+    clearInterval(this._autoIdo);
     document.removeEventListener("keydown", this._billentyu);
+    for (const t of AKTIVITAS) {
+      window.removeEventListener(t, this._jel, { capture: true });
+      this.shadowRoot.removeEventListener(t, this._jel, { capture: true });
+    }
     this.remove();
   }
 
@@ -414,7 +439,7 @@ class RezsikovetoKartya extends HTMLElement {
     this.shadowRoot.querySelector(".aigomb")?.addEventListener("click", (e) => {
       e.stopPropagation();
       const ablak = document.createElement("rezsi-ai-ablak");
-      ablak.nyit(this._hass, h.entry_id, this._config.ai_entitas, h.nev);
+      ablak.nyit(this._hass, h.entry_id, this._config.ai_entitas, h.nev, this._adat?.panel_beallitas?.auto_bezaras_mp ?? 10);
     });
     this.shadowRoot.querySelectorAll(".allas[data-id]").forEach((el) => el.addEventListener("click", (e) => this._reszletek(e, el.dataset.id)));
     this.shadowRoot.querySelector(".bent").addEventListener("click", (e) => this._reszletek(e, this._futes().belso_homerseklet || this._futes().futes));

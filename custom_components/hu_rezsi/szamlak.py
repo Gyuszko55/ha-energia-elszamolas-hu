@@ -624,8 +624,8 @@ def alfoldviz_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
 
 # Szám: „20.061” (MVM-nyomtató), „2 930” (végszámla) vagy tagolás nélkül.
 _SZAM = r"-?(?:0|[1-9]\d{0,2}(?:[. ]\d{3})+|[1-9]\d*)"
-# A gyári szám 16 jegyű, a végszámlán vezető nullákkal 18 jegyű is lehet.
-_MVM_SOR = re.compile(r"^\s*(\d{16,18})\s*(\d{4}\.\d{2}\.\d{2})\s*-\s*(\d{4}\.\d{2}\.\d{2})\s*([\d.\s]+?)\s*(Dikt|Leol|Becs|Ell)\.?\s*(.*)$", re.M)
+# A gyári szám általában 16 jegyű (a végszámlán vezető nullákkal 18), de rövidebb is előfordul (pl. 15 jegyű H-mérő): 8–18.
+_MVM_SOR = re.compile(r"^\s*(\d{8,18})\s*(\d{4}\.\d{2}\.\d{2})\s*-\s*(\d{4}\.\d{2}\.\d{2})\s*([\d.\s]+?)\s*(Dikt|Leol|Becs|Ell)\.?\s*(.*)$", re.M)
 
 
 def _ezres(x: str) -> Decimal:

@@ -197,3 +197,33 @@ def test_diagnosztika_kitakar_es_sid_szerint():
         assert titok not in szoveg
     assert ki["fiokok"]["SID1"]["beallitas"]["kozmu"] == "villany"
     assert tarolt["merok"][0]["gyari_szam"] == "GY-123"  # a tárolt adat érintetlen
+
+
+def test_diagnosztika_szamlaszam_kulcs_es_fajlnev_nelkul():
+    """A számlák sorszáma kulcsként, a fájlnevek és a feldolgozott fájlok listája sem kerülhet a diagnosztikába."""
+    from custom_components.hu_rezsi import diagnostics as DG
+
+    tarolt = {
+        "szamlak": {
+            "846000000001": {"kelte": "2026-03-10", "tipus": "elszamolo", "fajl": "Villany_846000000001_20260310.PDF"},
+            "846000000002": {"kelte": "2026-05-12", "tipus": "resz", "kezi": True, "megjegyzes": "Minta Béla fizette"},
+        },
+        "reszszamlak": [{"datum": "2026-04-01", "osszeg": "5000", "sorszam": "846000000003"}],
+        "fizetesek": {"846000000001": {"fizetve": True, "datum": "2026-03-20"}},
+        "feldolgozott_fajlok": ["Dijnet /x/Villany_846000000001_20260310.PDF"],
+        "lezart": [{"tol": "2026-01-01", "ig": "2026-02-01", "osszesen_ft": "1000"}],
+        "szamla_beallitas": {"mappa": "Dijnet /x"},
+        "nyitott_tol": "2026-10-05",
+        "szamla_import_verzio": 7,
+    }
+    sub = SimpleNamespace(title="villany", data={"kozmu": "villany"})
+    koord = SimpleNamespace(fiokok=lambda: {"SID1": sub}, data={}, tarolo=SimpleNamespace(fiok=lambda sid: tarolt), utolso_szamlalok={})
+    ki = asyncio.run(DG.async_get_config_entry_diagnostics(None, SimpleNamespace(runtime_data=koord)))
+    szoveg = repr(ki)
+    for titok in ("846000000001", "846000000002", "846000000003", "Villany_", "Dijnet /x", "Minta Béla"):
+        assert titok not in szoveg
+    t = ki["fiokok"]["SID1"]["tarolt"]
+    assert t["szamlak"] == {"db": 2, "tipusok": {"elszamolo": 1, "resz": 1}, "kezi": 1, "datumok": ["2026-03-10", "2026-05-12"]}
+    assert t["reszszamlak"]["db"] == 1 and t["fizetesek"] == {"db": 1, "datumok": ["2026-03-20", "2026-03-20"]}
+    assert t["feldolgozott_fajlok"]["db"] == 1 and t["szamla_beallitas"] == ["mappa"]
+    assert t["nyitott_tol"] == "2026-10-05" and t["szamla_import_verzio"] == 7

@@ -148,8 +148,8 @@ async def _otthon_mentes(hass: HomeAssistant, entry: ConfigEntry) -> m.OtthonMen
     else:
         tar = await Store(hass, VERZIO, f"{DOMAIN}.{entry.entry_id}").async_load() or {"fiokok": {}}
         negyed = await Store(hass, 1, f"{DOMAIN}_negyedek.{entry.entry_id}").async_load() or {}
-    alar = [{"subentry_id": sid, "subentry_type": s.subentry_type, "title": s.title, "data": dict(s.data)}
-            for sid, s in entry.subentries.items()]
+    alar = m.titkok_nelkul([{"subentry_id": sid, "subentry_type": s.subentry_type, "title": s.title, "data": dict(s.data)}
+                            for sid, s in entry.subentries.items()])
     # A visszaállítás óta megőrzött régi szenzornevek is maradjanak (ha a szenzor még mindig hiányzik).
     nevek = (tar.get("szenzor_nevek") or {}) | _szenzor_nevek(hass, alar)
     return m.OtthonMentes(entry.title, entry.entry_id, alar, tar, negyed, nevek, dict(entry.options))
@@ -280,6 +280,7 @@ async def visszaallit(hass: HomeAssistant, forras: Path, otthon_nevek: list[str]
             kiirt, kihagyott = await hass.async_add_executor_job(m.szamlak_kicsomagol, forras, Path(hass.config.config_dir), nevek)
         hianyzo = sorted({h["entity_id"] for h in m.szenzor_hivatkozasok(o.alarendeltek)} - set(hass.states.async_entity_ids()))
         eredmeny.append({"nev": nev, "eredeti": o.nev, "entry_id": r["result"].entry_id, "fiokok": len(o.alarendeltek),
+                         "email_jelszo_kell": m.jelszo_nelkuli_postafiokok(o.alarendeltek),
                          "szamlak_kiirt": kiirt, "szamlak_mar_megvolt": kihagyott, "hianyzo_szenzorok": len(hianyzo)})
     return {"mentes": manifest.get("keszult"), "verzio": manifest.get("rezsikoveto"), "otthonok": eredmeny}
 
@@ -302,9 +303,13 @@ async def befejezes(hass: HomeAssistant, entry: ConfigEntry) -> None:
         if adat.get("negyedek"):
             await Store(hass, 1, f"{DOMAIN}_negyedek.{entry.entry_id}").async_save(m.negyed_atkulcsol(adat["negyedek"], terkep))
     # A régi azonosító és a jegy eltávolítása (az update listener ekkor még nincs bekötve: nincs újratöltés).
-    for s in entry.subentries.values():
-        if m.REGI_ID in s.data:
-            hass.config_entries.async_update_subentry(entry, s, data={k: v for k, v in s.data.items() if k != m.REGI_ID})
+    # A fiókok e-mailes beállítása a postafiókokra hivatkozik: az új azonosítókra (a postafiók jelszavát a felhasználó
+    # adja meg újra – a mentés nem tartalmazza).
+    for s in list(entry.subentries.values()):
+        if m.REGI_ID in s.data or s.data.get("email_postafiokok"):
+            data = {k: v for k, v in s.data.items() if k != m.REGI_ID}
+            data = m.email_hivatkozas_atkulcsol(data, terkep) or data
+            hass.config_entries.async_update_subentry(entry, s, data=data)
     hass.config_entries.async_update_entry(entry, data={k: v for k, v in entry.data.items() if k != JEGY})
     _LOGGER.info("%s: visszaállítva (%d alárendelt bejegyzés)", entry.title, len(terkep))
 

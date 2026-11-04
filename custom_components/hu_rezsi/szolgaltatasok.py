@@ -309,32 +309,40 @@ async def reszszamla_torles(hass: HomeAssistant, call: ServiceCall) -> None:
 async def szamla_rogzites(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
     """Kézi számla: befizetés, (opcionálisan) záró mérőállás és fűtőérték – mint egy beolvasott számla."""
     koord, sid = _celpont(hass, call.data["device_id"])
-    tarolt = koord.tarolo.fiok(sid)
-    tol, ig = call.data.get("idoszak_tol"), call.data.get("idoszak_ig")
+    valasz = kezi_szamla_rogzitese(koord.tarolo.fiok(sid), call.data)
+    await _ment(koord)
+    return valasz
+
+
+def kezi_szamla_rogzitese(tarolt: dict[str, Any], adat: dict[str, Any]) -> dict[str, Any]:
+    """A kézi számla rögzítése a fiók tárolt adataiba (a hu_rezsi.szamla_rogzites és az e-mailből jött, melléklet
+    nélküli számlaértesítő közös útja). `adat`: a szolgáltatás mezői (kelte, osszeg, tipus, sorszam…). Hibánál
+    ServiceValidationError; a mentés és az újraszámolás a hívó dolga."""
+    tol, ig = adat.get("idoszak_tol"), adat.get("idoszak_ig")
     if (tol is None) != (ig is None) or (tol and ig and ig < tol):
         raise ServiceValidationError("Az időszakhoz a kezdő és a záró nap is kell (a záró nem lehet korábbi).")
-    sorszam = str(call.data.get("sorszam") or "").strip()
+    sorszam = str(adat.get("sorszam") or "").strip()
     if sorszam and sorszam in (tarolt.get("szamlak") or {}):
         raise ServiceValidationError(f"Már van {sorszam} sorszámú számla – előbb töröld (hu_rezsi.szamla_torles).")
-    sztornozott = str(call.data.get("sztornozott") or "").strip()
-    if call.data["tipus"] == "storno" and sztornozott and sztornozott not in (tarolt.get("szamlak") or {}):
+    tipus = adat.get("tipus") or "resz"
+    sztornozott = str(adat.get("sztornozott") or "").strip()
+    if tipus == "storno" and sztornozott and sztornozott not in (tarolt.get("szamlak") or {}):
         raise ServiceValidationError(f"Nincs {sztornozott} sorszámú számla ebben a fiókban – a stornó ennek a fióknak a számláját érvényteleníti.")
-    zaro = call.data.get("zaro_allas")
-    futo = call.data.get("futoertek")
+    zaro = adat.get("zaro_allas")
+    futo = adat.get("futoertek")
     sz = kezi_szamla(
-        tarolt, call.data["kelte"], Decimal(str(call.data["osszeg"])), call.data["tipus"], sorszam,
+        tarolt, adat["kelte"], Decimal(str(adat["osszeg"])), tipus, sorszam,
         (tol, ig) if tol else None, None if zaro is None else Decimal(str(zaro)),
-        call.data["leolvasott"], None if futo is None else Decimal(str(futo)), call.data.get("hatarido"),
+        bool(adat.get("leolvasott", False)), None if futo is None else Decimal(str(futo)), adat.get("hatarido"),
     )
     j = rogzit(tarolt, [sz])
     if not j.szamlak:
         raise ServiceValidationError("A számla nem rögzíthető.")
     tarolt["szamlak"][sz.sorszam]["kezi"] = True
-    if call.data["tipus"] == "storno" and sztornozott:
+    if tipus == "storno" and sztornozott:
         tarolt["szamlak"][sz.sorszam]["sztornozott"] = sztornozott
-    if call.data.get("megjegyzes"):
-        tarolt["szamlak"][sz.sorszam]["megjegyzes"] = call.data["megjegyzes"]
-    await _ment(koord)
+    if adat.get("megjegyzes"):
+        tarolt["szamlak"][sz.sorszam]["megjegyzes"] = adat["megjegyzes"]
     return {
         "sorszam": sz.sorszam,
         "meroallas": j.leolvasasok,
@@ -480,6 +488,16 @@ async def szamlak_ujraolvasasa(hass: HomeAssistant, call: ServiceCall) -> None:
     # A kézzel rögzített számlák (hu_rezsi.szamla_rogzites) a befizetésükkel és a mérőállásukkal maradnak.
     mappas_adatok_torlese(tarolt, call.data["minden_meroallas"])
     await _ment(koord)
+
+
+async def email_atnezes(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    """A háztartás(ok) e-mail fiókjainak átnézése most (különben óránként magától)."""
+    from .email_ha import atnezes_most  # noqa: PLC0415
+
+    try:
+        return await atnezes_most(hass, call.data.get("otthon"))
+    except ValueError as err:
+        raise ServiceValidationError(str(err)) from err
 
 
 async def naplo(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
@@ -744,6 +762,8 @@ def regisztral(hass: HomeAssistant) -> None:
             vol.Optional("fajlok"): vol.All(cv.ensure_list, [cv.string]),
         }),
     )
+    reg(DOMAIN, "email_atnezes", kezelo(email_atnezes), vol.Schema({vol.Optional("otthon"): cv.string}),
+        supports_response=SupportsResponse.OPTIONAL)
     reg(DOMAIN, "naplo", kezelo(naplo), vol.Schema({DEV: cv.string}), supports_response=SupportsResponse.ONLY)
     reg(DOMAIN, "csv_export", kezelo(csv_export), vol.Schema({DEV: cv.string}), supports_response=SupportsResponse.OPTIONAL)
     reg(

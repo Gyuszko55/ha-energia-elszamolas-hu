@@ -153,6 +153,36 @@
             "szunetel_tol": "If the service is suspended (e.g. the property is uninhabited after a death or a disaster, meter sealed): from this day nothing is calculated – no consumption, no standing charge, no per-invoice minimum – and no invoice is expected.",
             "szunetel_ig": "When the service resumes: the last day of the suspension, so the suspended period stays zero. Empty: still suspended."
           }
+        },
+        "email": {
+          "title": "Bills by e-mail – {nev}",
+          "description": "If the supplier sends the bill by e-mail, the tracker checks the selected mailbox(es) hourly (read-only: nothing is deleted or marked as read), saves PDF/XML attachments into this account's bill folder, where they arrive as bills awaiting approval. From notification e-mails without an attachment (Telekom) the amount, number and dates are recorded. If the account has no bill folder, it will be: {mappa}.\n\n**Automatic assignment (recommended):** the tracker reads the attachment and decides by the meter serial number, supplier and utility which account it belongs to – nothing to type. The Advanced section holds the old manual filters (sender, subject, meter, postal code); with automatic assignment they act as a fallback.",
+          "data": {
+            "email_postafiokok": "Search in these mailboxes",
+            "email_auto": "Assign automatically by the bill's content (recommended)"
+          },
+          "data_description": {
+            "email_postafiokok": "Empty: this account's bills are not searched in e-mail.",
+            "email_auto": "Off: only messages from the sender given in Advanced come here."
+          },
+          "sections": {
+            "halado": {
+              "name": "Advanced: manual filters",
+              "description": "Only needed without automatic assignment, or as a fallback.",
+              "data": {
+                "email_feladok": "Sender (address or domain)",
+                "email_targy": "Word in the subject (optional)",
+                "email_mero": "Meter serial number (optional)",
+                "email_irsz": "Postal code of the supply point (optional)"
+              },
+              "data_description": {
+                "email_feladok": "Comma-separated, e.g. \"mvmee.hu, partner@gmail.com\". A domain includes its subdomains. Household electricity bills are sent by MVM Next (mvmee.hu) even in the MVM Démász or E.ON area.",
+                "email_targy": "Only messages whose subject contains this (case-insensitive).",
+                "email_mero": "If bills for several accounts come from the same sender: a message belongs here if this serial number appears in its PDF (or text).",
+                "email_irsz": "Same purpose: the postal code of the supply point on the bill."
+              }
+            }
+          }
         }
       },
       "initiate_flow": {
@@ -163,7 +193,8 @@
         "reconfigure_successful": "Account settings updated."
       },
       "error": {
-        "teruleti_dijszabas": "This tariff is not available with this supplier (distribution area): B Komfort only in the MVM Démász area, B GEO only in the ELMŰ and MVM Émász areas."
+        "teruleti_dijszabas": "This tariff is not available with this supplier (distribution area): B Komfort only in the MVM Démász area, B GEO only in the ELMŰ and MVM Émász areas.",
+        "felado_kell": "Without automatic assignment, enter the sender in Advanced (address or domain) – or turn automatic assignment on."
       }
     },
     "sziget": {
@@ -206,6 +237,64 @@
             "forras_egyeb_termeles": "Cumulative energy counter (kWh/Wh/MWh, total_increasing); several allowed – summed. Empty: manual readings (hu_rezsi.sziget_leolvasas)."
           }
         }
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved."
+      }
+    },
+    "postafiok": {
+      "initiate_flow": {
+        "user": "Add e-mail account"
+      },
+      "entry_type": "E-mail account",
+      "step": {
+        "user": {
+          "title": "Bills from e-mail{levelezo}",
+          "description": "Only two things are needed: your e-mail address and the password. The mail server is worked out from the address.\n\n{lepesek}\n\nThe tracker only reads: nothing is deleted, moved or marked as read. The password stays in Home Assistant (not in the tracker's backup). After saving it looks for the last six months' bills and assigns them to your accounts; anything uncertain is asked on the panel. {jelszo_megjegyzes}",
+          "data": {
+            "email_cim": "E-mail address",
+            "jelszo": "Password (Gmail: app password)"
+          },
+          "data_description": {
+            "jelszo": "Gmail, Yahoo, iCloud: app password (spaces don't matter). Freemail, Citromail: your usual password."
+          },
+          "sections": {
+            "halado": {
+              "name": "Advanced",
+              "description": "Usually nothing to change.",
+              "data": {
+                "nev": "Name",
+                "imap_szerver": "IMAP server",
+                "imap_port": "Port",
+                "imap_ssl": "SSL",
+                "email_napok": "Look-back",
+                "email_kuka": "Also check Trash"
+              },
+              "data_description": {
+                "nev": "Empty: the part of the address before \"@\".",
+                "imap_szerver": "Empty: from the address (Gmail: imap.gmail.com, Freemail: imap.freemail.hu, Citromail: imap.citromail.hu).",
+                "imap_ssl": "Off: connects with STARTTLS (e.g. port 143).",
+                "email_napok": "The hourly check looks at messages not older than this (discovery: the last 180 days).",
+                "email_kuka": "Bill e-mails are often deleted after reading – also read from Trash (the message stays there)."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "hitelesites": "Login failed: wrong address or password. Many providers need a separate app password – see the steps above.",
+        "hitelesites_gmail": "Google refused the login: an app password is needed, not your usual password. Create one at https://myaccount.google.com/apppasswords (2-Step Verification must be on) and paste it.",
+        "hitelesites_yahoo": "Yahoo refused the login: an app password is needed. Create one: https://login.yahoo.com/account/security → Generate app password.",
+        "hitelesites_icloud": "iCloud refused the login: an app-specific password is needed. Create one: https://account.apple.com → Sign-In and Security → App-Specific Passwords.",
+        "hitelesites_outlook": "Microsoft (Outlook, Hotmail) no longer accepts password logins from mail programs. Forward the bill e-mails to a Gmail or Freemail address and use that.",
+        "hitelesites_freemail": "Freemail refused the login: check the address and password, and that mail-program (IMAP) access is enabled in the freemail.hu settings.",
+        "hitelesites_citromail": "Citromail refused the login: check the address and password, and that mail-program (IMAP) access is enabled in the citromail.hu settings.",
+        "nem_tamogatott": "Microsoft (Outlook, Hotmail, Live) no longer accepts password logins from mail programs. Forward the bill e-mails to a Gmail or Freemail address and use that here.",
+        "kapcsolat": "The mail server can't be reached. Check the internet connection and the server name in Advanced.",
+        "szerver_ismeretlen": "Couldn't find your mail server. Look up the IMAP server name in your provider's help and enter it in Advanced.",
+        "cim_hibas": "This doesn't look like an e-mail address.",
+        "ismeretlen": "Unexpected error during login – see the log.",
+        "jelszo_kell": "Enter the password."
       },
       "abort": {
         "reconfigure_successful": "Settings saved."
@@ -881,6 +970,16 @@
           "description": "Index of the backup location (0 = first)."
         }
       }
+    },
+    "email_atnezes": {
+      "name": "Check e-mail for bills now",
+      "description": "Check the household(s)' e-mail accounts now (otherwise done hourly): bill attachments go into the accounts' bill folders, notification e-mails without attachment are recorded as manual bills.",
+      "fields": {
+        "otthon": {
+          "name": "Household",
+          "description": "Only this household's e-mail accounts; empty = all."
+        }
+      }
     }
   },
   "options": {
@@ -905,6 +1004,14 @@
     "hianyzo_forras": {
       "title": "Rezsikövető: missing source sensor",
       "description": "Rezsikövető receives no value from these entities: {entitasok}. Check that they exist and are available, or choose another sensor in the account settings. Until then the account is retried at the normal interval; this notice disappears automatically once a value arrives."
+    },
+    "email_hiba": {
+      "title": "Rezsikövető: can't read the \"{postafiok}\" mailbox",
+      "description": "Can't log in to the \"{postafiok}\" mailbox of {otthon}, so bills arriving by e-mail are not imported.\n\nProblem: {hiba}\n\n**Fix:** Settings → Devices & services → Rezsikövető → {otthon} → \"{postafiok}\" → ⋮ → Reconfigure and enter the password again (Gmail: a new app password at https://myaccount.google.com/apppasswords). The issue disappears once login works; other mailboxes and the accounts keep working."
+    },
+    "jelszo_hianyzik": {
+      "title": "Rezsikövető: enter the mailbox password again ({postafiok})",
+      "description": "The \"{postafiok}\" mailbox of {otthon} has no password – expected after a restore, as backups don't contain it.\n\n**Fix:** Settings → Devices & services → Rezsikövető → {otthon} → \"{postafiok}\" → ⋮ → Reconfigure (Gmail: app password at https://myaccount.google.com/apppasswords)."
     }
   }
 }

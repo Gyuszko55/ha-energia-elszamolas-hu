@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CoreState, HomeAssistant
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from datetime import timedelta
 
 from homeassistant.helpers.event import async_track_time_interval
@@ -14,7 +14,8 @@ from homeassistant.helpers.typing import ConfigType
 from .const import DOMAIN, PLATFORMS
 from .d_arak import DArak
 from .koordinator import RezsiKoordinator
-from . import mentes_ha
+from . import mentes_ha, panel_beallitas
+from .email_ha import EmailFigyelo, issue_id
 from .panel import regisztral_panel
 from .szolgaltatasok import regisztral
 from .tar import dijszabas_tar
@@ -27,6 +28,7 @@ type RezsiConfigEntry = ConfigEntry[RezsiKoordinator]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     regisztral(hass)
+    await panel_beallitas.betolt(hass)  # a panel integráció szintű beállításai (pl. automatikus bezárás)
     # D árszabás: az MVM negyedórás rugalmas árlistája (közös minden otthonnak) és a még közzé nem tett napok
     # HUPX-ból számolt ára. Indulás után, majd 3 óránként ellenőrzi (az MVM-lista letöltése naponta legfeljebb egyszer,
     # a másnapi HUPX-ár délután jelenik meg); új árnál minden otthon újraszámol.
@@ -69,14 +71,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: RezsiConfigEntry) -> boo
 
     entry.async_on_unload(async_at_started(hass, _mappak))
     entry.runtime_data = koord
+    # Számlák e-mailből: óránként és az indulás után (a háttérben) a háztartás e-mail fiókjai.
+    koord.email = EmailFigyelo(hass, entry, koord)
+    koord.email.indit()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await regisztral_panel(hass)  # „Rezsikövető” oldalsáv-menüpont (egyszer)
     lenyomat = _lenyomat(entry)
 
     async def _ujratolt(hass: HomeAssistant, entry: RezsiConfigEntry) -> None:
         # Csak az otthon beállításai (options: fűtés, hőmérséklet az indítókártyához) változtak: nem kell újraszámolni,
-        # a kártya a következő lekéréskor már az újat kapja.
-        if _lenyomat(entry) != lenyomat:
+        # a kártya a következő lekéréskor már az újat kapja. Több, egyszerre történt változásra (pl. az e-mailes
+        # felderítés több fiókot köt be) egy újratöltés elég: a figyelők egy része már a régi koordinátort látja.
+        if _lenyomat(entry) != lenyomat and not getattr(koord, "ujratoltes", False):
+            koord.ujratoltes = True
             await hass.config_entries.async_reload(entry.entry_id)
 
     entry.async_on_unload(entry.add_update_listener(_ujratolt))
@@ -94,4 +101,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: RezsiConfigEntry) -> bo
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: RezsiConfigEntry) -> None:
+    for sid in entry.subentries:
+        ir.async_delete_issue(hass, DOMAIN, issue_id(sid))
     await Tarolo(hass, entry.entry_id).torol()

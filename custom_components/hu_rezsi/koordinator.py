@@ -89,6 +89,7 @@ from .motor.egyenleg import (
     VarhatoElszamolas,
     atalany_havi,
     egy_ev_mulva,
+    teljes_honapok,
     eves_egyenleg,
     havi_alapdij_honapokra,
     honap_mulva,
@@ -276,6 +277,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         # Jóváhagyásra váró (a számlamappába érkezett) számlák előnézete fiókonként: mi változna a jóváhagyással.
         self.elonezet: dict[str, dict[str, Any]] = {}
         self.sziget_allapot: dict[str, dict[str, Any]] = {}  # szigetüzemi rendszerek (kísérleti, sziget_ha)
+        self.email: Any = None  # számlák e-mailből (email_ha.EmailFigyelo) – az __init__ köti be
         self._elonezet_kulcs: dict[str, Any] = {}
         self.ellenorzesek: dict[str, list[dict[str, Any]]] = {}
         self.dijnet_kesz = False  # a Díjnet-fizetések beolvasva (addig a fizetett számlák is kifizetetlennek látszanának)
@@ -1698,20 +1700,124 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             if sorszam not in lista:
                 lista.append(sorszam)
         elif dontes == "uj_dij":
-            sub = self.fiokok()[sid]
-            fiok = self.motor_fiok(sid)
-            tol = date.fromisoformat((x.get("idoszak") or [x["kelte"]])[0][:10]).replace(day=1)
-            e = self.tar.felold(_hozzarendeles(fiok, tol), tol, fiok.szolgaltato, fiok.feluliras)
-            honap = int(sub.data.get(CONF_SZAMLAZAS_HONAP) or 1)
-            afa = Decimal(str(e.dijak.get("afa") or 0))
-            havi = (Decimal(str(sajat_ertek(x))) / honap / (1 + afa / 100)).quantize(Decimal("0.01"))
-            tarolt["feluliras"] = [f for f in tarolt.get("feluliras") or []
-                                   if not (f["kulcs"] == "dijak.alapdij_ho" and f["ervenyes_tol"] == tol.isoformat())]
-            tarolt["feluliras"].append({"kulcs": "dijak.alapdij_ho", "ertek": str(havi), "ervenyes_tol": tol.isoformat()})
+            self._havidij_szamlabol(sid, self.fiokok()[sid], tarolt, x)
         else:
             raise ValueError(f"Ismeretlen döntés: {dontes}")
         await self.tarolo.ment()
         self._hatter_frissites()
+
+    def _havidij_szamlabol(self, sid: str, sub: ConfigSubentry, tarolt: dict[str, Any], x: dict[str, Any]) -> tuple[date, Decimal]:
+        """A számla összege az új havidíj: felülírás dijak.alapdij_ho a számla időszakának kezdetétől (a hónap 1-jétől),
+        ÁFA nélkül, a számlázott hónapokra elosztva. Visszaad: (érvényes ettől, havidíj ÁFA nélkül)."""
+        fiok = self.motor_fiok(sid)
+        tol = date.fromisoformat((x.get("idoszak") or [x["kelte"]])[0][:10]).replace(day=1)
+        e = self.tar.felold(_hozzarendeles(fiok, tol), tol, fiok.szolgaltato, fiok.feluliras)
+        honap = int(sub.data.get(CONF_SZAMLAZAS_HONAP) or 1)
+        afa = Decimal(str(e.dijak.get("afa") or 0))
+        havi = (Decimal(str(sajat_ertek(x))) / honap / (1 + afa / 100)).quantize(Decimal("0.01"))
+        tarolt["feluliras"] = [f for f in tarolt.get("feluliras") or []
+                               if not (f["kulcs"] == "dijak.alapdij_ho" and f["ervenyes_tol"] == tol.isoformat())]
+        tarolt["feluliras"].append({"kulcs": "dijak.alapdij_ho", "ertek": str(havi), "ervenyes_tol": tol.isoformat()})
+        return tol, havi
+
+    # ---- saját díjak (2.2.0b6): a településenként / edényenként eltérő díjak a panelről, felülírásként ----
+    SAJAT_DIJ_MEZOK = {
+        "viz": [("viz_m3", "Ivóvíz", "Ft/m³"), ("csatorna_m3", "Csatorna", "Ft/m³"), ("alapdij_ho", "Alapdíj", "Ft/hó")],
+        "_fix": [("alapdij_ho", "Havidíj", "Ft/hó")],
+    }
+
+    def _sajat_dij_mezok(self, sub: ConfigSubentry) -> list[tuple[str, str, str]]:
+        if beallitas.fix_dijas(sub.data):
+            return self.SAJAT_DIJ_MEZOK["_fix"]
+        return self.SAJAT_DIJ_MEZOK.get(sub.data.get(CONF_KOZMU), [])
+
+    def sajat_dijak(self, sid: str, nap: date | None = None) -> dict[str, Any]:
+        """A fiók díjai (bruttó Ft) a „Saját díjak” űrlaphoz: a mostani érték (díjszabás + felülírás)."""
+        sub = self.fiokok()[sid]
+        mezok = self._sajat_dij_mezok(sub)
+        if not mezok:
+            raise ValueError("Ennél a fióknál nincs saját díj (a díjszabás a szolgáltatóé).")
+        nap = nap or helyi_most().date()
+        fiok = self.motor_fiok(sid)
+        e = self.tar.felold(_hozzarendeles(fiok, nap), nap, fiok.szolgaltato, fiok.feluliras)
+        afa = Decimal(str(e.dijak.get("afa") or 0))
+        kezi = {f["kulcs"] for f in self.tarolo.fiok(sid).get("feluliras") or []}
+        return {"afa": float(afa), "mezok": [
+            {"kulcs": k, "nev": n, "egyseg": u, "kezi": f"dijak.{k}" in kezi,
+             "ertek": float((Decimal(str(e.dijak.get(k) or 0)) * (1 + afa / 100)).quantize(Decimal("0.01")))}
+            for k, n, u in mezok]}
+
+    async def sajat_dijak_ment(self, sid: str, ertekek: dict[str, float], tol: date) -> None:
+        """A megadott bruttó díjak felülírásként (ÁFA nélkül tárolva) a `tol` naptól."""
+        sub = self.fiokok()[sid]
+        engedett = {k for k, _n, _u in self._sajat_dij_mezok(sub)}
+        if not engedett or not set(ertekek) <= engedett:
+            raise ValueError("Ismeretlen díj.")
+        fiok = self.motor_fiok(sid)
+        e = self.tar.felold(_hozzarendeles(fiok, tol), tol, fiok.szolgaltato, fiok.feluliras)
+        afa = Decimal(str(e.dijak.get("afa") or 0))
+        tarolt = self.tarolo.fiok(sid)
+        lista = tarolt.setdefault("feluliras", [])
+        for k, v in ertekek.items():
+            netto = (Decimal(str(v)) / (1 + afa / 100)).quantize(Decimal("0.0001"))
+            lista[:] = [f for f in lista if not (f["kulcs"] == f"dijak.{k}" and f["ervenyes_tol"] == tol.isoformat())]
+            lista.append({"kulcs": f"dijak.{k}", "ertek": str(netto), "ervenyes_tol": tol.isoformat()})
+        lista.sort(key=lambda f: (f["kulcs"], f["ervenyes_tol"]))
+        tarolt["fix_dij_tanulva"] = tarolt.get("fix_dij_tanulva") or {"kezi": True}   # kézi díj után nem tanul
+        await self.tarolo.ment()
+        self._hatter_frissites()
+
+    def _fix_dij_tanul(self, sid: str, sub: ConfigSubentry, tarolt: dict[str, Any]) -> bool:
+        """Fix díjas fiók (MOHU, közös költség): a díj a helyi szolgáltatótól függ (edény, ürítés, település), a beépített
+        díjszabás csak kiindulás. Ha a havidíjat kézzel nem adták meg, és a legutóbbi két teljes időszakos számla
+        ugyanannyi, de eltér a díjszabás díjától, a számlák díja lesz a havidíj – egyszer, értesítéssel (2.2.0b6)."""
+        if not beallitas.fix_dijas(sub.data) or not sub.data.get(CONF_SZAMLAZAS_HONAP) or tarolt.get("fix_dij_tanulva"):
+            return False
+        if any(f.get("kulcs") == "dijak.alapdij_ho" for f in tarolt.get("feluliras") or []):
+            return False                                    # kézzel (vagy a panel gombjával) már megadták
+        honap = int(sub.data[CONF_SZAMLAZAS_HONAP])
+        kihagy = _ervenytelenek(tarolt.get("szamlak") or {})
+
+        def teljes(x: dict[str, Any]) -> bool:
+            i = x.get("idoszak") or []
+            try:
+                return len(i) >= 2 and abs((date.fromisoformat(i[1][:10]) - date.fromisoformat(i[0][:10])).days - honap * 30.4) <= 6
+            except (TypeError, ValueError):
+                return False
+
+        lista = sorted((x["kelte"], k, x) for k, x in (tarolt.get("szamlak") or {}).items()
+                       if x.get("kelte") and k not in kihagy and sajat_ertek(x) and teljes(x))
+        if len(lista) < 2:
+            return False
+        (_, k1, x1), (_, _k2, x2) = lista[-2], lista[-1]
+        v1, v2 = Decimal(str(sajat_ertek(x1))), Decimal(str(sajat_ertek(x2)))
+        if abs(v1 - v2) > 1:
+            return False                                    # változó összeg: nincs egyértelmű díj
+        for _kelte, k_, x_ in reversed(lista[:-2]):         # az azonos összegű számlák sorozatának eleje
+            if abs(Decimal(str(sajat_ertek(x_))) - v2) > 1:
+                break
+            k1, x1 = k_, x_
+        fiok = self.motor_fiok(sid)
+        nap = date.fromisoformat((x2.get("idoszak") or [x2["kelte"]])[0][:10])
+        e = self.tar.felold(_hozzarendeles(fiok, nap), nap, fiok.szolgaltato, fiok.feluliras)
+        if (e.szabalyok.get("alapdij") or {}).get("honapok"):
+            return False                                    # idényes díj (pl. üdülő): a negyedévek eltérnek
+        afa = Decimal(str(e.dijak.get("afa") or 0))
+        varhato = Decimal(str(e.dijak.get("alapdij_ho") or 0)) * (1 + afa / 100) * honap
+        if abs(v2 - varhato) <= 1:
+            return False                                    # a díjszabás díja egyezik a számlákkal
+        tol, havi = self._havidij_szamlabol(sid, sub, tarolt, x1)
+        brutto = (havi * (1 + afa / 100)).quantize(Decimal("1"))
+        tarolt["fix_dij_tanulva"] = {"sorszam": k1, "havi": str(havi), "tol": tol.isoformat()}
+        persistent_notification.async_create(
+            self.hass,
+            f"A(z) {sub.title} díját a számláidból vettem át: {int(v2)} Ft / {honap} hónap = kb. {int(brutto)} Ft/hó "
+            f"({tol.isoformat()}-tól). A beépített díj ({int(varhato)} Ft / {honap} hónap) egy másik településé / "
+            "edényméreté volt. Ha nem ez a díjad, a panelen a fiók kártyáján a „Saját díjak” alatt módosíthatod.",
+            title=f"Rezsikövető – {sub.title}: díj a számlákból", notification_id=f"{DOMAIN}_fixdij_{sid}",
+        )
+        _LOGGER.info("%s: fix díj a számlákból: %s Ft/hó (ÁFA nélkül) %s-tól", sub.title, havi, tol)
+        return True
 
     def _fix_szamla_dij(self, fiok: Fiok, sub: ConfigSubentry, tarolt: dict[str, Any]) -> Decimal | None:
         """Fix díjas fiók egy számlájának várható összege a legutóbbi számla napján érvényes díjjal: havi díj (bruttó, ÁFA-val)
@@ -2867,7 +2973,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         nem_olv = tarolt.get("nem_olvasott_fajlok") or {}
         fajlok = await self.hass.async_add_executor_job(szamlak.uj_fajlok, mappa, latott | {x["fajl"] for x in fuggo}, nem_olv)
         if not fajlok:
-            return valtozott
+            # a korábban rögzített számlákból is (pl. frissítés után, új fájl nélkül)
+            return self._fix_dij_tanul(sid, sub, tarolt) or valtozott
         beolvasott = await self.hass.async_add_executor_job(lambda: [biztos_beolvas(f) for f in fajlok])
         # A részszámlán nincs mérőszám: a mérési pontja köti a mérőhöz (a tárolt térkép a korábbi számlákból).
         szamlak.meresi_pontok_kapcsolasa([x for x in beolvasott if x], tarolt.setdefault("meresi_pontok", {}))
@@ -2894,6 +3001,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                           **{k: meta.get(k) for k in ("kelte", "tipus", "idoszak", "osszeg", "szamlaertek", "elszamolt_kwh")}})
         self.azonnali_fajlok -= {f.name for f in fajlok}
         j = rogzit(tarolt, [x for f, x in zip(fajlok, beolvasott, strict=True) if x and f.name not in varo], szuro, arsz)
+        self._fix_dij_tanul(sid, sub, tarolt)
         tarolt["szamla_import_verzio"] = IMPORT_VERZIO
         tarolt["feldolgozott_fajlok"] = sorted(latott | ({f.name for f, x in zip(fajlok, beolvasott, strict=True) if x} - set(varo)))
         tarolt["nem_olvasott_fajlok"] = await self.hass.async_add_executor_job(
@@ -3007,11 +3115,14 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         napok = (ig - tol).days
         eltelt = min(max((most.date() - tol).days + 1, 0), napok)
         egyseg = EGYSEG.get(sub.data[CONF_KOZMU], "")
+        # Teljes hónapokból álló időszakban a havi = az időszak / hónapok száma (a 30 és a 31 napos hónap átalánya
+        # ugyanannyi); egyébként a napi átalány egy átlagos hónapra – az időszak lehet hosszabb is (pl. az éves leolvasás
+        # után 46 nap), a havi részszámla akkor is ennyi (az éves egyenleg hátralévő részszámlái is ebből).
+        hatarok = teljes_honapok(tol, ig)
+        havi = float(havi_ft) / (len(hatarok) - 1) if hatarok else float(havi_ft) / napok * 365 / 12
         return {
-            "napi": round(float(havi_ft) / napok, 2),
-            # Havi = a napi átalány egy átlagos hónapra – az időszak lehet hosszabb is (pl. az éves leolvasás után 46 nap),
-            # a havi részszámla akkor is ennyi (az éves egyenleg hátralévő részszámlái is ebből).
-            "havi": int(round(float(havi_ft) / napok * 365 / 12)),
+            "napi": round(havi * 12 / 365, 2),
+            "havi": int(round(havi)),
             "idoszak_ft": int(havi_ft),
             "eddig": int(round(float(havi_ft) * eltelt / napok)),
             "napok": napok,

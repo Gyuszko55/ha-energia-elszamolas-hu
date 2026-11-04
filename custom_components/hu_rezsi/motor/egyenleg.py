@@ -382,6 +382,17 @@ def varhato_elszamolas(
     )
 
 
+def teljes_honapok(tol: date, ig: date) -> list[date] | None:
+    """Ha a [tol, ig) teljes hónapokból áll (azonos napon kezdődik és végződik, pl. nov. 1. – dec. 1. vagy
+    09-14 – 10-14), a hónaphatárok listája [tol, …, ig]; egyébként (és 28-a utáni kezdőnapnál) None."""
+    if ig <= tol or tol.day != ig.day or tol.day > 28:
+        return None
+    n = (ig.year - tol.year) * 12 + ig.month - tol.month
+    if n < 1:
+        return None
+    return [date(tol.year + (tol.month - 1 + k) // 12, (tol.month - 1 + k) % 12 + 1, tol.day) for k in range(n + 1)]
+
+
 def atalany_havi(
     fiok: Fiok, tar: DijszabasTar, tol: date, ig: date, havi_mennyiseg: Decimal, almero_arany: Decimal = Decimal(0)
 ) -> tuple[Decimal, Decimal, Decimal]:
@@ -392,6 +403,17 @@ def atalany_havi(
     from .elszamolas import _hozzarendeles, idenyszak
 
     napi = Decimal(havi_mennyiseg) * 12 / 365
+    # Teljes hónapokból álló időszakban (pl. nov. 1. – dec. 1.) a havi átalány hónaponként pontosan jár: a 30 napos
+    # hónap 1 m³-e nem 0,986 m³ (egész m³-es számlázásnál az 0 lenne). A hónap napjaira egyenletesen oszlik el.
+    hatarok = teljes_honapok(tol, ig)
+    # A teljes hónapos időszak halmozott mennyisége napról napra: k. hónap j. napja végén havi × (k + j / napok);
+    # a hónap végén pontosan havi × k (az összeadás Decimal-kerekítése nélkül – egész m³-nél 0,999… → 0 lenne).
+    def _halmozott(nap: date) -> Decimal:
+        for k, (a, b) in enumerate(zip(hatarok, hatarok[1:])):
+            if nap <= b:
+                return Decimal(havi_mennyiseg) * k + (Decimal(havi_mennyiseg) * (nap - a).days / (b - a).days
+                                                       if nap < b else Decimal(havi_mennyiseg))
+        return Decimal(havi_mennyiseg) * (len(hatarok) - 1)
     szerepek = [c.szerep for c in fiok.csatornak]
     idenyek = tar.felold(_hozzarendeles(fiok, tol), tol, fiok.szolgaltato, fiok.feluliras).szabalyok.get("idenyszak") or []
     ertek = {sz: Decimal(0) for sz in szerepek}
@@ -401,14 +423,18 @@ def atalany_havi(
               for sz in szerepek}
     d = tol
     while d < ig:
+        nap_q = (_halmozott(d + timedelta(days=1)) - _halmozott(d)) if hatarok else napi
         if "h_teli" in szerepek:
             cel = f"h_{(idenyszak(d, idenyek) or {}).get('nev')}"
         else:
             cel = szerepek[0]  # az almérő nem kap átalányt (a főmérő része)
         if cel in ertek:
-            ertek[cel] += napi
+            # Teljes hónapos időszakban a főcsatorna minden nap kap: a halmozott értéke pontosan állítható (nem
+            # összeadással). H-tarifánál a két regiszter az idény szerint osztozik – ott összeadás.
+            ertek[cel] = (_halmozott(d + timedelta(days=1)) if hatarok and "h_teli" not in szerepek
+                          else ertek[cel] + nap_q)
         if "almero" in ertek:
-            ertek["almero"] += napi * almero_arany  # a locsolóvíz része: a csatornadíjból levonódik
+            ertek["almero"] += nap_q * almero_arany  # a locsolóvíz része: a csatornadíjból levonódik
         d = d + timedelta(days=1)
         for sz in szerepek:
             pontok[sz].append(Pont(nap_kezdete(d), ertek[sz], True))

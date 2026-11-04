@@ -153,6 +153,36 @@
             "szunetel_tol": "Ha a szolgáltatás szünetel (pl. haláleset vagy katasztrófa miatt lakatlan az ingatlan, a mérő plombálva): ettől a naptól a Rezsikövető semmit nem számol – se fogyasztást, se alapdíjat, se számlánkénti minimumot –, és számlát sem vár (nincs „elmaradt számla” jelzés).",
             "szunetel_ig": "Ha a szolgáltatás újraindult: a szüneteltetés utolsó napja. Így a szünet ideje a múltban is nulla marad. Üresen: a szünetelés tart."
           }
+        },
+        "email": {
+          "title": "E-mailes számlák – {nev}",
+          "description": "Ha a szolgáltató e-mailben küldi a számlát, a Rezsikövető óránként átnézi a kiválasztott e-mail fiók(ok) leveleit (csak olvas: semmit nem töröl, nem jelöl olvasottnak), a PDF/XML mellékletet a fiók számlamappájába menti, onnan jóváhagyásra váró számlaként kerül be. Melléklet nélküli számlaértesítőből (Telekom) az összeg, a sorszám és a dátumok kerülnek be. Ha a fióknak nincs számlamappája, ez lesz: {mappa}.\n\n**Automatikus besorolás (ajánlott):** a Rezsikövető beolvassa a mellékletet, és a mérő gyári száma, a szolgáltató és a közmű alapján dönti el, melyik fiókhoz tartozik – semmit nem kell beírni. A Haladó részben a régi kézi szűrők (feladó, tárgy, mérő, irányítószám) adhatók meg; automatikus besorolás mellett ezek tartaléknak maradnak.",
+          "data": {
+            "email_postafiokok": "Melyik e-mail fiók(ok)ban keressen",
+            "email_auto": "Automatikus besorolás a számla tartalma szerint (ajánlott)"
+          },
+          "data_description": {
+            "email_postafiokok": "Üresen: ennek a fióknak a számláit nem keresi e-mailben.",
+            "email_auto": "Kikapcsolva csak a Haladó részben megadott feladótól jövő levelek kerülnek ide."
+          },
+          "sections": {
+            "halado": {
+              "name": "Haladó: kézi szűrők",
+              "description": "Csak ha az automatikus besorolás ki van kapcsolva, vagy tartaléknak.",
+              "data": {
+                "email_feladok": "Feladó (cím vagy domain)",
+                "email_targy": "Tárgyban szereplő szó (opcionális)",
+                "email_mero": "Mérő gyári száma (opcionális)",
+                "email_irsz": "Felhasználási hely irányítószáma (opcionális)"
+              },
+              "data_description": {
+                "email_feladok": "Vesszővel több is megadható, pl. „mvmee.hu, partner@gmail.com” (ha valaki továbbítja a számlát). A domain az aldomainjeit is jelenti. A lakossági villanyszámlát az MVM Next küldi (mvmee.hu) akkor is, ha az elosztó pl. MVM Démász vagy E.ON.",
+                "email_targy": "Csak az ezt tartalmazó tárgyú levelek (kis- és nagybetű mindegy), pl. „villanyszámla”.",
+                "email_mero": "Ha ugyanattól a feladótól több fiók számlája is jön: annak a levélnek a számlája tartozik ide, amelynek PDF-jében (vagy szövegében) ez a gyári szám szerepel.",
+                "email_irsz": "Ugyanerre: a számlán szereplő felhasználási hely irányítószáma (pl. ha két ingatlan villanyszámlája jön ugyanonnan)."
+              }
+            }
+          }
         }
       },
       "initiate_flow": {
@@ -163,7 +193,8 @@
         "reconfigure_successful": "A fiók beállításai frissültek."
       },
       "error": {
-        "teruleti_dijszabas": "Ez a díjszabás ennél a szolgáltatónál (elosztói területen) nem érhető el: a B Komfort csak MVM Démász, a B GEO csak ELMŰ és MVM Émász területen."
+        "teruleti_dijszabas": "Ez a díjszabás ennél a szolgáltatónál (elosztói területen) nem érhető el: a B Komfort csak MVM Démász, a B GEO csak ELMŰ és MVM Émász területen.",
+        "felado_kell": "Automatikus besorolás nélkül add meg a Haladó részben, melyik feladótól jönnek a számlák (cím vagy domain) – vagy kapcsold be az automatikus besorolást."
       }
     },
     "sziget": {
@@ -206,6 +237,64 @@
             "forras_egyeb_termeles": "Kumulatív energiaszámláló (kWh/Wh/MWh, total_increasing); több is választható – összeadódnak. Üresen: kézi leolvasás (hu_rezsi.sziget_leolvasas)."
           }
         }
+      },
+      "abort": {
+        "reconfigure_successful": "A beállítás mentve."
+      }
+    },
+    "postafiok": {
+      "initiate_flow": {
+        "user": "E-mail fiók hozzáadása"
+      },
+      "entry_type": "E-mail fiók",
+      "step": {
+        "user": {
+          "title": "Számlák e-mailből{levelezo}",
+          "description": "Csak két dolog kell: az e-mail címed és a jelszó. A levelezőszervert a Rezsikövető a címből kitalálja.\n\n{lepesek}\n\nA Rezsikövető csak olvas: semmit nem töröl, nem helyez át, nem jelöl olvasottnak. A jelszó a Home Assistantban marad (a Rezsikövető-mentésbe nem kerül). Mentés után megkeresi az utolsó fél év számláit, és magától a fiókjaidhoz rendeli; amiben nem biztos, azt a Rezsikövető panelen kérdezi meg. {jelszo_megjegyzes}",
+          "data": {
+            "email_cim": "E-mail cím",
+            "jelszo": "Jelszó (Gmailnél alkalmazásjelszó)"
+          },
+          "data_description": {
+            "jelszo": "Gmail, Yahoo, iCloud: alkalmazásjelszó (a szóközök nem számítanak). Freemail, Citromail: a szokásos jelszó."
+          },
+          "sections": {
+            "halado": {
+              "name": "Haladó",
+              "description": "Általában nem kell hozzányúlni.",
+              "data": {
+                "nev": "Név",
+                "imap_szerver": "IMAP-szerver",
+                "imap_port": "Port",
+                "imap_ssl": "SSL",
+                "email_napok": "Visszatekintés",
+                "email_kuka": "A Kukát is nézze át"
+              },
+              "data_description": {
+                "nev": "Üresen: a cím „@” előtti része.",
+                "imap_szerver": "Üresen: a címből (Gmail: imap.gmail.com, Freemail: imap.freemail.hu, Citromail: imap.citromail.hu).",
+                "imap_ssl": "Kikapcsolva STARTTLS-sel kapcsolódik (pl. port 143).",
+                "email_napok": "Az óránkénti átnézés ennyi napnál nem régebbi leveleket néz át (a felderítés az utolsó 180 napot).",
+                "email_kuka": "A számlaleveleket olvasás után gyakran törlik – a Kukából is beolvassa (a levél ott marad)."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "hitelesites": "A bejelentkezés nem sikerült: hibás e-mail cím vagy jelszó. Sok levelezőnél külön alkalmazásjelszó kell – lásd a fenti lépéseket.",
+        "hitelesites_gmail": "A Google nem engedte be: ide alkalmazásjelszó kell, nem a szokásos jelszavad. Készíts egyet itt: https://myaccount.google.com/apppasswords (ehhez a kétlépcsős azonosításnak bekapcsolva kell lennie), és azt másold be.",
+        "hitelesites_yahoo": "A Yahoo nem engedte be: ide alkalmazásjelszó kell. Készíts egyet: https://login.yahoo.com/account/security → Alkalmazásjelszó létrehozása.",
+        "hitelesites_icloud": "Az iCloud nem engedte be: ide alkalmazásspecifikus jelszó kell. Készíts egyet: https://account.apple.com → Bejelentkezés és biztonság → Alkalmazásspecifikus jelszavak.",
+        "hitelesites_outlook": "A Microsoft (Outlook, Hotmail) jelszóval már nem enged be levelezőprogramot. Állíts be továbbítást egy Gmail- vagy Freemail-címre, és azt add meg.",
+        "hitelesites_freemail": "A Freemail nem engedte be: ellenőrizd a címet és a jelszót, és hogy a freemail.hu Beállításaiban engedélyezve van-e a levelezőprogramos (IMAP) hozzáférés.",
+        "hitelesites_citromail": "A Citromail nem engedte be: ellenőrizd a címet és a jelszót, és hogy a citromail.hu Beállításaiban engedélyezve van-e a levelezőprogramos (IMAP) hozzáférés.",
+        "nem_tamogatott": "A Microsoft (Outlook, Hotmail, Live) jelszóval már nem enged be levelezőprogramot. Állíts be ott továbbítást a számlalevelekről egy Gmail- vagy Freemail-címre, és azt add meg itt.",
+        "kapcsolat": "A levelezőszerver nem érhető el. Ellenőrizd az internetkapcsolatot, és a Haladó részben a szerver nevét.",
+        "szerver_ismeretlen": "Nem találtam a levelezőszerveredet. Nézd meg a levelező súgójában az IMAP-szerver nevét, és írd be a Haladó részbe.",
+        "cim_hibas": "Ez nem tűnik e-mail címnek – ellenőrizd (pl. valaki@gmail.com).",
+        "ismeretlen": "Váratlan hiba a bejelentkezéskor – lásd a naplót.",
+        "jelszo_kell": "Add meg a jelszót."
       },
       "abort": {
         "reconfigure_successful": "A beállítás mentve."
@@ -881,6 +970,16 @@
           "description": "A mentési hely sorszáma (0 = az első, a panel Mentési helyek listája szerint)."
         }
       }
+    },
+    "email_atnezes": {
+      "name": "Számlák keresése e-mailben most",
+      "description": "A háztartás(ok) e-mail fiókjainak átnézése most (különben óránként magától történik): a talált számla-mellékletek a fiókok számlamappájába kerülnek, a melléklet nélküli számlaértesítők kézi számlaként rögzülnek.",
+      "fields": {
+        "otthon": {
+          "name": "Otthon",
+          "description": "Csak ennek az otthonnak az e-mail fiókjai; üresen mindé."
+        }
+      }
     }
   },
   "options": {
@@ -905,6 +1004,14 @@
     "hianyzo_forras": {
       "title": "Rezsikövető: hiányzó forrás-szenzor",
       "description": "A Rezsikövető nem kap értéket ezektől az entitásoktól: {entitasok}. Ellenőrizd, hogy léteznek-e és elérhetők-e, vagy válassz másik szenzort a fiók beállításaiban. Addig a fiók számolása a szokásos ütemben, újrapróbálva fut; a jelzés magától eltűnik, amint az érték megjön."
+    },
+    "email_hiba": {
+      "title": "Rezsikövető: nem tudom olvasni a(z) „{postafiok}” e-mail fiókot",
+      "description": "A(z) {otthon} otthon „{postafiok}” e-mail fiókjába nem tudok belépni, ezért az e-mailben érkező számlák most nem kerülnek be.\n\nMi a baj: {hiba}\n\n**Javítás:** Beállítások → Eszközök és szolgáltatások → Rezsikövető → {otthon} → „{postafiok}” → ⋮ → Újrakonfigurálás, és add meg újra a jelszót (Gmailnél új alkalmazásjelszót: https://myaccount.google.com/apppasswords). A jelzés magától eltűnik, amint a belépés sikerül; a többi e-mail fiók és a fiókok számolása addig is működik."
+    },
+    "jelszo_hianyzik": {
+      "title": "Rezsikövető: add meg újra az e-mail fiók jelszavát ({postafiok})",
+      "description": "A(z) {otthon} otthon „{postafiok}” e-mail fiókjához nincs jelszó – visszaállítás után ez így van rendjén, mert a mentés a jelszót nem tartalmazza.\n\n**Javítás:** Beállítások → Eszközök és szolgáltatások → Rezsikövető → {otthon} → „{postafiok}” → ⋮ → Újrakonfigurálás (Gmailnél alkalmazásjelszó: https://myaccount.google.com/apppasswords)."
     }
   }
 }

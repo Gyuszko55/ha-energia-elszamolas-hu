@@ -298,3 +298,9 @@ visszaallitas:
       default: true
       selector:
         boolean:
+email_atnezes:
+  fields:
+    otthon:
+      selector:
+        config_entry:
+          integration: hu_rezsi

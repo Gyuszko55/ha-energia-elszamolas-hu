@@ -96,12 +96,12 @@ def test_mennyisegi_atalany_a1_es_h():
     from motor.egyenleg import atalany_havi
     a1 = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/a1", date(2024, 1, 1))], [Csatorna()])
     napi, q, ft = atalany_havi(a1, TAR, date(2026, 10, 1), date(2026, 11, 1), D(293))
-    assert round(napi, 3) == round(D(293) * 12 / 365, 3) and round(q, 1) == round(D(293) * 12 / 365 * 31, 1)
-    assert D(13500) < ft < D(14500)  # ~299 kWh: 214 a kereten belül, ~85 piaci áron, + alapdíj
+    assert round(napi, 3) == round(D(293) * 12 / 365, 3) and round(q, 1) == D(293)  # teljes hónap: pontosan 293
+    assert D(13300) < ft < D(14500)  # 293 kWh: 214 a kereten belül, ~79 piaci áron, + alapdíj
     h = Fiok(Kozmu.VILLANY, "mvm_demasz", [DijszabasHozzarendeles("villany/h", date(2024, 1, 1))],
              [Csatorna(szerep="h_teli", keret_aktiv=False), Csatorna(szerep="h_nyari")])
     _, qh, fth = atalany_havi(h, TAR, date(2026, 10, 1), date(2026, 11, 1), D(10))
-    assert round(qh, 1) == round(D(10) * 12 / 365 * 31, 1) and D(350) < fth < D(500)  # ~10 kWh + 155 Ft alapdíj (okt. 1. nyári: az A1-é)
+    assert round(qh, 1) == D(10) and D(350) < fth < D(500)  # ~10 kWh + 155 Ft alapdíj (okt. 1. nyári: az A1-é)
 
 
 def test_h_regiszteres_eves_egyenleg_rovid_ev_utan():
@@ -164,3 +164,23 @@ def test_atalany_havi_eves_kerettel_bazis_utan():
              eves_bazis=date(2025, 11, 1), reszszamlas=True)
     napi, q, ft = atalany_havi(f, TAR, date(2026, 8, 1), date(2026, 11, 1), D(8))
     assert q > D(20) and ft > 0
+
+
+def test_atalany_teljes_honap_egesz_m3():
+    """1 m³/hó átalány egész m³-es víz-díjszabással: a 30 napos hónap (nov.) is 1 m³ – korábban 30 × 12/365 = 0,986 m³,
+    lefelé kerekítve 0, így a várható vízdíj novemberben eltűnt. Nem teljes hónapos időszakban napra arányosít."""
+    from motor.egyenleg import atalany_havi, teljes_honapok
+    viz = Fiok(Kozmu.VIZ, "alfoldviz", [DijszabasHozzarendeles("viz/alfoldviz", date(2024, 1, 1))], [Csatorna()])
+    _, q_nov, ft_nov = atalany_havi(viz, TAR, date(2026, 11, 1), date(2026, 12, 1), D(1))
+    _, q_okt, ft_okt = atalany_havi(viz, TAR, date(2026, 10, 1), date(2026, 11, 1), D(1))
+    _, q_feb, ft_feb = atalany_havi(viz, TAR, date(2027, 2, 1), date(2027, 3, 1), D(1))
+    assert q_nov == q_okt == q_feb == D(1)
+    assert ft_nov == ft_okt == ft_feb > 0
+    _, q4, _ = atalany_havi(viz, TAR, date(2026, 9, 1), date(2027, 1, 1), D(1))
+    assert q4 == D(4)
+    _, q_gaz, _ = atalany_havi(viz, TAR, date(2026, 9, 14), date(2026, 10, 14), D(1))  # 14-étől 14-éig
+    assert q_gaz == D(1)
+    _, q46, _ = atalany_havi(viz, TAR, date(2026, 9, 29), date(2026, 11, 14), D(1))  # 46 nap: arányos
+    assert round(q46, 3) == round(D(12) / 365 * 46, 3)
+    assert teljes_honapok(date(2026, 1, 31), date(2026, 2, 28)) is None
+    assert teljes_honapok(date(2026, 11, 1), date(2026, 12, 1)) == [date(2026, 11, 1), date(2026, 12, 1)]

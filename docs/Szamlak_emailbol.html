@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Számlák e-mailből – lépésről lépésre</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --kek: #03a9f4; --sotet: #1c2b36; --szurke: #5f6b73; --halvany: #eef6fb; --zold: #2e7d32; --narancs: #e65100; }
+  * { box-sizing: border-box; }
+  body { font-family: "Roboto", "Noto Sans", "DejaVu Sans", Arial, sans-serif; color: var(--sotet); font-size: 13.5pt; line-height: 1.45; margin: 0; background: #fff; }
+  .lap { max-width: 180mm; margin: 0 auto; }
+  h1 { font-size: 26pt; margin: 0 0 4mm; color: var(--sotet); }
+  .alcim { font-size: 14pt; color: var(--szurke); margin: 0 0 8mm; }
+  h2 { font-size: 18pt; margin: 9mm 0 3mm; display: flex; align-items: center; gap: 4mm; break-after: avoid; }
+  .szam { flex: none; width: 12mm; height: 12mm; border-radius: 50%; background: var(--kek); color: #fff; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 16pt; font-weight: 700; }
+  p { margin: 0 0 3mm; }
+  ol, ul { margin: 0 0 3mm; padding-left: 7mm; }
+  li { margin: 1.5mm 0; }
+  .doboz { background: var(--halvany); border-radius: 3mm; padding: 4mm 5mm; margin: 4mm 0; break-inside: avoid; }
+  .doboz.zold { background: #e8f5e9; }
+  .doboz.narancs { background: #fff3e0; }
+  .doboz b.cim { display: block; font-size: 14pt; margin-bottom: 1.5mm; }
+  figure { margin: 4mm 0 6mm; text-align: center; break-inside: avoid; }
+  figure img { max-width: 100%; max-height: 105mm; border: 0.3mm solid #cfd8dc; border-radius: 2mm; box-shadow: 0 1mm 3mm rgba(0,0,0,.12); }
+  figure.keskeny img { max-width: 80mm; }
+  figcaption { font-size: 11pt; color: var(--szurke); margin-top: 2mm; }
+  .link { font-weight: 700; color: #0277bd; word-break: break-all; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 12pt; background: #eceff1; padding: 0.3mm 1.5mm; border-radius: 1mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 12pt; margin: 3mm 0 5mm; break-inside: auto; }
+  th, td { text-align: left; vertical-align: top; padding: 2.2mm 2.5mm; border-bottom: 0.3mm solid #cfd8dc; }
+  th { background: #eceff1; font-size: 11.5pt; }
+  tr { break-inside: avoid; }
+  .uj-oldal { break-before: page; }
+  .megjegyzes { font-size: 10.5pt; color: var(--szurke); margin-top: 8mm; border-top: 0.3mm solid #cfd8dc; padding-top: 3mm; }
+  .ket { display: flex; gap: 6mm; align-items: flex-start; }
+  .ket > * { flex: 1; }
+  @media screen { body { background: #f4f6f8; } .lap { background: #fff; padding: 12mm 14mm; margin: 8mm auto; box-shadow: 0 1mm 4mm rgba(0,0,0,.1); } }
+</style>
+</head>
+<body>
+<div class="lap">
+
+<h1>📧 Számlák e-mailből</h1>
+<p class="alcim">Lépésről lépésre – hogy a szolgáltatók e-mailben küldött számlái maguktól bekerüljenek a Rezsikövetőbe.</p>
+
+<div class="doboz">
+  <b class="cim">Mire lesz szükséged?</b>
+  <ol>
+    <li>Az <b>e-mail címedre</b>, ahová a számlák (MVM, vízmű, Telekom…) érkeznek.</li>
+    <li>Egy <b>jelszóra</b>: Gmailnél ez egy külön, 16 betűs <b>alkalmazásjelszó</b> (2 perc alatt elkészíted – lásd az 1. lépést), Freemailnél és Citromailnél a szokásos jelszavad.</li>
+    <li>Kb. <b>5 percre</b>.</li>
+  </ol>
+  <p><b>Nyugodt lehetsz:</b> a Rezsikövető csak olvas – semmit nem töröl, nem helyez át, nem jelöl olvasottnak. A jelszó a saját Home Assistantodban marad.</p>
+</div>
+
+<h2><span class="szam">1</span> Gmail: alkalmazásjelszó készítése</h2>
+<p>A Gmail a levelezőprogramoknak nem fogadja el a szokásos jelszavad. Ezért kell egy alkalmazásjelszó:</p>
+<ol>
+  <li>Nyisd meg: <span class="link">https://myaccount.google.com/apppasswords</span></li>
+  <li>Ha azt írja, hogy nem érhető el: előbb kapcsold be a <b>kétlépcsős azonosítást</b> (Google-fiók → Biztonság → Kétlépcsős azonosítás), és nyisd meg újra a fenti oldalt.</li>
+  <li>Adj nevet, például <b>Rezsikövető</b>, és kattints a <b>Létrehozás</b> gombra.</li>
+  <li>A Google egy 16 betűs jelszót mutat, pl. <code>abcd efgh ijkl mnop</code>. <b>Másold ki</b> – csak egyszer látszik. A szóközök nem számítanak.</li>
+</ol>
+<div class="doboz narancs">
+  <b class="cim">Freemail vagy Citromail?</b>
+  <p>Nincs külön jelszó: a szokásos jelszavad kell. Ha később nem enged be, a levelező honlapján, a Beállításokban engedélyezd a „levelezőprogramos (IMAP) hozzáférést”.</p>
+  <p><b>Outlook / Hotmail:</b> a Microsoft jelszóval már nem engedi be a levelezőprogramokat. Állíts be ott továbbítást a számlalevelekről egy Gmail- vagy Freemail-címre, és azt add meg.</p>
+</div>
+
+<h2><span class="szam">2</span> Nyisd meg a Rezsikövető panelt</h2>
+<p>A Home Assistant bal oldali menüjében kattints a <b>Rezsikövető</b> pontra. Az otthonod összesítőjében kattints a <b>📧 Számlák e-mailből</b> gombra.</p>
+<figure><img src="kepek/email/email_01_gomb.png" alt="A Számlák e-mailből gomb az otthon összesítőjében"><figcaption>A gomb az otthon összesítőjében (csak rendszergazda látja)</figcaption></figure>
+
+<h2><span class="szam">3</span> „Mi kell?” – olvasd el, és kattints a Tovább gombra</h2>
+<figure class="keskeny"><img src="kepek/email/email_02_mi_kell_mobil.png" alt="A varázsló első lépése"><figcaption>Az első lépés elmondja, mire lesz szükség</figcaption></figure>
+
+<h2><span class="szam">4</span> Írd be az e-mail címed és a jelszót</h2>
+<p>Amint beírod a címed, a Rezsikövető felismeri a levelezőt, és megmutatja, milyen jelszó kell. Gmailnél gomb is van: <b>Alkalmazásjelszó készítése ↗</b>. Írd be a jelszót, és kattints a <b>Kapcsolódás</b> gombra.</p>
+<figure><img src="kepek/email/email_03_belepes_gmail.png" alt="Belépés Gmail-címmel"><figcaption>Gmail-címnél: az alkalmazásjelszó lépései</figcaption></figure>
+<div class="ket">
+  <figure><img src="kepek/email/email_08_freemail.png" alt="Freemail-címnél"><figcaption>Freemail-címnél: a szokásos jelszó kell</figcaption></figure>
+  <figure><img src="kepek/email/email_04_hibas_jelszo.png" alt="Hibás jelszó"><figcaption>Ha nem jó a jelszó, megmondja, mi a teendő</figcaption></figure>
+</div>
+
+<h2><span class="szam">5</span> Várj egy kicsit: „Keresem a számláidat…”</h2>
+<p>A Rezsikövető belép, és átnézi az utolsó fél év leveleit (a Kukát is). Ez több percig is tarthat; a panel közben magától frissül, és kiírja, mióta fut. Nyugodtan bezárhatod – a háttérben folytatódik.</p>
+<figure class="keskeny"><img src="kepek/email/email_05_kereses_mobil.png" alt="Keresés folyamatban"><figcaption>Keresés folyamatban</figcaption></figure>
+
+<h2><span class="szam">6</span> Kész!</h2>
+<p>Megmutatja, hány számlát talált, és melyik fiókodhoz kötötte be. Innentől óránként magától megnézi a postafiókot.</p>
+<figure class="keskeny"><img src="kepek/email/email_06_kesz_mobil.png" alt="Kész – eredmény"><figcaption>Az eredmény (a képen kitalált adatok)</figcaption></figure>
+
+<h2><span class="szam">7</span> Ha a panel kérdez: egy koppintás</h2>
+<p>A Rezsikövető a számla tartalma (mérő gyári száma, szolgáltató, közmű) alapján dönti el, melyik fiókhoz tartozik. Ha nem biztos, vagy olyan szolgáltatót talál, amelyhez még nincs fiókod, az összesítőben megkérdezi:</p>
+<figure><img src="kepek/email/email_07_kartyak.png" alt="Üzenet, kérdés és ajánlat a panelen"><figcaption>Zöld üzenet, kérdés és fiók-ajánlat a „Számlák e-mailből” blokkban (kitalált adatok)</figcaption></figure>
+<table>
+  <tr><th>Kártya</th><th>Mit tegyél?</th></tr>
+  <tr><td>✉️ Zöld üzenet – „… mostantól e-mailből jönnek …”</td><td>Semmit. A <b>Rendben</b> eltünteti.</td></tr>
+  <tr><td>❓ „Ez a számla melyik fiókhoz tartozik?”</td><td>Koppints a jó fiók nevére. Ha egyik sem, <b>Egyik sem</b> – többet nem kérdezi.</td></tr>
+  <tr><td>➕ „… találtam, de nincs ilyen fiók”</td><td><b>Fiók létrehozása</b> (internet/TV: egy gombnyomás; villany/gáz/víz: a fiók-varázsló előtöltve nyílik) – vagy <b>Nem kell</b>.</td></tr>
+</table>
+
+<h2 class="uj-oldal"><span class="szam">?</span> Ha valami nem működik</h2>
+<table>
+  <tr><th>Mit látsz?</th><th>Mit tegyél?</th></tr>
+  <tr><td>„A Google nem engedte be: ide alkalmazásjelszó kell…”</td><td>A szokásos jelszót adtad meg. Készíts alkalmazásjelszót (1. lépés), és azt írd be.</td></tr>
+  <tr><td>„nem tudok belépni (jelszó?)” a panelen</td><td>A jelszó megváltozott, vagy a Google visszavonta (pl. Google-jelszócsere után). Készíts újat, majd: Beállítások → Eszközök és szolgáltatások → Rezsikövető → az otthon → az e-mail fiók → ⋮ → <b>Újrakonfigurálás</b>.</td></tr>
+  <tr><td>„Nem találtam a levelezőszerveredet”</td><td>A levelező súgójában keresd az „IMAP-szerver” nevét, és írd be a <b>Haladó</b> részbe.</td></tr>
+  <tr><td>Outlook / Hotmail: „jelszóval már nem enged be”</td><td>Továbbítás egy Gmail- vagy Freemail-címre, és azt add meg.</td></tr>
+  <tr><td>Freemail / Citromail nem enged be</td><td>A levelező honlapján, a Beállításokban engedélyezd az IMAP-hozzáférést.</td></tr>
+  <tr><td>„… levelet nem tudtam fiókhoz rendelni”</td><td>Ha van kérdés-kártya, válaszolj rá. Ha nincs: nézd meg a fiók mérőszámát (fiók beállításai → Mérő).</td></tr>
+  <tr><td>Visszaállítás után: „add meg újra a jelszót”</td><td>A mentés biztonsági okból nem tartalmazza a jelszót: <b>Újrakonfigurálás</b>, és írd be újra.</td></tr>
+  <tr><td>Semmi nem jön, hiba sincs</td><td>Nézd meg a szolgáltató ügyfélportálján, hogy kértél-e e-számlát, és melyik címre jön.</td></tr>
+</table>
+<figure><img src="kepek/email/email_11_hiba.png" alt="Bejelentkezési hiba a panelen"><figcaption>Így jelzi a panel, ha nem tud belépni a postafiókba</figcaption></figure>
+
+<div class="doboz">
+  <b class="cim">A Home Assistant beállításaiból is megy</b>
+  <p>Beállítások → Eszközök és szolgáltatások → Rezsikövető → <b>E-mail fiók hozzáadása</b>. Itt is csak a cím és a jelszó kell; a szerver a címből jön, a <b>Haladó</b> rész össze van csukva.</p>
+</div>
+<figure><img src="kepek/email/email_10_urlap_hiba.png" alt="E-mail fiók hozzáadása a beállításokban, Gmail-hibaüzenettel"><figcaption>A beállítások űrlapja – hibás Gmail-jelszónál ugyanaz az érthető üzenet</figcaption></figure>
+
+<p class="megjegyzes">Rezsikövető 2.2.0 · A képek a Rezsikövető próba-rendszeréből készültek, kitalált adatokkal; a postafiók-keresés eredménye szimulált. A Freemail/Citromail IMAP-hozzáférésének engedélyezését a levelezők hivatalos súgójából nem tudtuk ellenőrizni – ha a leírás eltér, a levelező saját súgója a mérvadó.</p>
+</div>
+</body>
+</html>

@@ -30,6 +30,16 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 | Tervek – adatmodell, díjszabás-formátum, elszámoló motor, ütemterv | fejlesztő | [`docs/terv/`](docs/terv/) |
 | Változások | mindenki | [CHANGELOG](CHANGELOG.md) |
 
+## Újdonságok a 2.2.0-ban (2026. november 4.)
+
+- **Számlák e-mailből:** a Rezsikövető maga kiolvassa a postafiókból a szolgáltatók e-mailes számláit (csak olvas, semmit nem töröl), és a számla tartalma – mérő gyári száma, mérési pont, szolgáltató – alapján a jó fiókba sorolja. Beállítás a panelen a **📧 Számlák e-mailből** gombbal, pár kattintással. Útmutató: [kézikönyv 9.8](docs/KEZIKONYV.md#98-számlák-e-mailből--lépésről-lépésre) és [Számlák e-mailből (PDF)](docs/Szamlak_emailbol.pdf).
+- **Saját díjak a fiókkártyán:** a víz- és a fix díjas fiókoknál (hulladék, közös költség, internet/TV/telefon) a településenként vagy edényméret szerint eltérő díjak a saját számláról, bruttóban, „érvényes ettől” dátummal – a Fejlesztői eszközök nélkül.
+- **A fix díj a számlákból:** ha a havidíjat kézzel nem adtad meg, és a legutóbbi két teljes időszakos számla ugyanannyi, de eltér a beépített díjtól (pl. MOHU), a Rezsikövető a számlák díját veszi át, értesítéssel.
+- **A díjeltérés gombjai a kártyán is:** „Ez az új havidíj” / „Egyszeri eltérés – rendben”.
+- **Javítások:** MVM-áramszámla 15 jegyű mérőszámmal is (a kimaradt számlák a *Számlák újraolvasása* művelettel olvastathatók be újra); a havi átalány teljes hónapban pontosan jár; a részletező ablakok 10 másodperc tétlenség után maguktól bezárulnak (állítható).
+
+Minden változás: [CHANGELOG](CHANGELOG.md).
+
 ## Mit tud
 
 - **Fiókok felületről** (Beállítások → Eszközök és szolgáltatások → Rezsikövető): villany (A1, H-tarifa két regiszterrel), gáz, víz (fő- és locsolási almérővel), fix díjas szolgáltatás. Egy háztartásban tetszőleges számú fiók, több háztartás is.
@@ -42,7 +52,7 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 - **MVM sávkorrekció:** a kedvezményes keret (mérőnként 2 523 kWh/év, napi arányosan) az A1, a B (vezérelt) és a H-tarifa nyári (1.82) regiszterén jár, felette lakossági piaci ár. A keret az elszámolási évben – az éves elszámoló leolvasástól a következő éves elszámoló leolvasásig – halmozódik, ahogy az MVM számláz: a korábban ki nem használt keret később jóváíródik, de a következő elszámolási évre nem vihető át. A H-tarifa téli (1.81) fogyasztására nincs keret, és a keretbe sem számít bele.
 - **Átalányos (részszámlás) fiókok:** havi fizetendő, „ha ma lenne az elszámolás”, várható éves/félévi egyenleg, az átalány összevetése a valódi fogyasztással.
 - **Többhavi, utólagos számlázás:** kéthavi víz (DAKÖV), negyedéves szemétszállítás (MOHU).
-- **Számlák** automatikusan egy mappából (pl. a Díjnet-integráció letöltései), feltöltéssel a panelről (PDF/XML), bemásolással vagy kézzel. Felismeri: MVM Next áram és gáz, DAKÖV, MOHU.
+- **Számlák** automatikusan egy mappából (pl. a Díjnet-integráció letöltései), e-mailből, feltöltéssel a panelről (PDF/XML), bemásolással vagy kézzel. Felismeri: MVM Next áram és gáz, DAKÖV, ALFÖLDVÍZ, HVSZ (távhő), MOHU, Magyar Telekom, One.
 - **Éves összevetés grafikon:** a kártya grafikon-ikonjára felugró ablak – havi fogyasztás vagy költség az előző év ugyanazon hónapjaival, összesítéssel és táblázattal. Ritka (pl. éves) gázleolvasásnál a havi bontást egy profil-szenzor (pl. a kazán becsült gázfogyasztása) adja.
 - **Automatikus mérő-korrekció:** a szenzor (pl. Shelly) és a valódi óra eltérését a leolvasásokból becsli és kiigazítja; a kézi eltolás-ugrást nem veszi fogyasztásnak.
 - **Automatikus kezdőpont:** üresen hagyott kezdőállásnál a szenzor HA-statisztikájából, ennek hiányában a mostani értékéből indul – mesterséges 0 óraállás nélkül.

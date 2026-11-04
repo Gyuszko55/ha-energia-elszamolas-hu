@@ -1,10 +1,14 @@
 # Szolgáltató-kulcsok: a díjfájlok „dijak” alatti sorai ezekre hivatkoznak.
-mvm_demasz: {nev: "MVM Démász", kozmu: [villany]}
-eon: {nev: "E.ON", kozmu: [villany]}
-opus_titasz: {nev: "OPUS TITÁSZ", kozmu: [villany]}
-elmu: {nev: "ELMŰ", kozmu: [villany]}
-elmu_emasz: {nev: "MVM Émász", kozmu: [villany]}
-mvm_next: {nev: "MVM Next", kozmu: [gaz]}
+# email_feladok: a számlát küldő e-mail feladó (domain vagy teljes cím) – a fiók „E-mailes számlák” lépésének
+# javasolt értéke. A lakossági villanyszámlát bármely elosztói területen (Démász, E.ON, OPUS TITÁSZ, ELMŰ, Émász) az
+# egyetemes szolgáltató MVM Next küldi, ahogy a gázszámlát is: onlineugyfelszolgalat@mvmee.hu → „mvmee.hu”.
+# Ahol nincs biztos, jól ismert feladó, üresen marad (a felhasználó írja be).
+mvm_demasz: {nev: "MVM Démász", kozmu: [villany], email_feladok: [mvmee.hu]}
+eon: {nev: "E.ON", kozmu: [villany], email_feladok: [mvmee.hu]}
+opus_titasz: {nev: "OPUS TITÁSZ", kozmu: [villany], email_feladok: [mvmee.hu]}
+elmu: {nev: "ELMŰ", kozmu: [villany], email_feladok: [mvmee.hu]}
+elmu_emasz: {nev: "MVM Émász", kozmu: [villany], email_feladok: [mvmee.hu]}
+mvm_next: {nev: "MVM Next", kozmu: [gaz], email_feladok: [mvmee.hu]}
 vizmu: {nev: "Helyi vízmű", kozmu: [viz]}
 dakov: {nev: "DAKÖV", kozmu: [viz]}
 alfoldviz: {nev: "ALFÖLDVÍZ Zrt.", kozmu: [viz]}
@@ -14,7 +18,7 @@ hvsz: {nev: "HVSZ Zrt.", kozmu: [tavho]}
 fotav: {nev: "FŐTÁV (Budapesti Közművek)", kozmu: [tavho]}
 fovarosi_vizmuvek: {nev: "Fővárosi Vízművek (Díjbeszedő)", kozmu: [viz]}
 tarsashaz: {nev: "Társasház (közös képviselő)", kozmu: [kozos]}
-telekom: {nev: "Magyar Telekom", kozmu: [tavkozles]}
+telekom: {nev: "Magyar Telekom", kozmu: [tavkozles], email_feladok: [telekom.hu]}
 one: {nev: "One (Vodafone)", kozmu: [tavkozles]}
 digi: {nev: "DIGI", kozmu: [tavkozles]}
 yettel: {nev: "Yettel", kozmu: [tavkozles]}

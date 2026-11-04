@@ -27,6 +27,8 @@ MAPPA = "rezsikoveto_mentes"
 FAJLNEV_MINTA = re.compile(r"^rezsikoveto_mentes_[0-9A-Za-z_\-]+\.zip$")
 SZAMLA_KITERJESZTESEK = {".pdf", ".xml"}
 REGI_ID = "_visszaallitas_regi_id"  # az alárendelt bejegyzés adataiban, amíg az új otthon első indulása át nem kulcsol
+# Ami soha nem kerül a mentésbe: az e-mail fiók jelszava (visszaállítás után a felhasználó újra megadja).
+TITKOS_KULCSOK = {"jelszo"}
 
 
 class MentesHiba(ValueError):
@@ -171,12 +173,32 @@ def otthon_szamlai(otthon: OtthonMentes, szamlak: list[str]) -> list[str]:
 def atkulcsol(tar: dict[str, Any], terkep: dict[str, str]) -> dict[str, Any]:
     """A fiókonként / szigetüzemenként kulcsolt adatok átkulcsolása a régi alárendelt azonosítókról az újakra.
     Ami a térképben nincs (pl. a mentéskor már törölt fiók maradványa), kimarad."""
-    ki = {k: v for k, v in tar.items() if k not in ("fiokok", "szigetek")}
-    for resz in ("fiokok", "szigetek"):
+    ki = {k: v for k, v in tar.items() if k not in ("fiokok", "szigetek", "postafiokok")}
+    for resz in ("fiokok", "szigetek", "postafiokok"):
         if resz in tar:
             ki[resz] = {terkep[sid]: adat for sid, adat in (tar.get(resz) or {}).items() if sid in terkep}
     ki.setdefault("fiokok", {})
     return ki
+
+
+def titkok_nelkul(alarendeltek: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Az alárendelt bejegyzések a mentéshez: az e-mail fiók jelszava nélkül."""
+    return [a | {"data": {k: v for k, v in (a.get("data") or {}).items() if k not in TITKOS_KULCSOK}} for a in alarendeltek]
+
+
+def jelszo_nelkuli_postafiokok(alarendeltek: list[dict[str, Any]]) -> list[str]:
+    """A jelszó nélküli e-mail fiókok neve (visszaállítás után ezeknél újra meg kell adni a jelszót)."""
+    return [a.get("title") or "" for a in alarendeltek if a.get("subentry_type") == "postafiok" and not (a.get("data") or {}).get("jelszo")]
+
+
+def email_hivatkozas_atkulcsol(data: dict[str, Any], terkep: dict[str, str]) -> dict[str, Any] | None:
+    """A fiók e-mailes beállításában a postafiók-hivatkozások a régi azonosítókról az újakra (ami nincs a térképben,
+    kimarad). Nincs mit átírni: None."""
+    regi = data.get("email_postafiokok")
+    if not regi:
+        return None
+    uj = [terkep[x] for x in regi if x in terkep]
+    return None if uj == regi else data | {"email_postafiokok": uj}
 
 
 def negyed_atkulcsol(negyedek: dict[str, Any], terkep: dict[str, str]) -> dict[str, Any]:

@@ -54,6 +54,14 @@ const CSAT = { vetelezes: "", h_teli: "H téli", h_nyari: "H nyári", zona_csucs
 const ELSZ_MOD = { diktalas: "diktálás", atalany: "átalány", tavleolvasas: "távleolvasás" };
 const UTEM = { 1: "havonta", 2: "kéthavonta", 3: "negyedévente", 4: "négyhavonta", 6: "félévente", 12: "évente" };
 
+// Automatikus bezárás: a csak megjelenítő ablakok (és a fiókkártya lenyitott Részletek része) ennyi másodperc
+// tétlenség után bezárulnak (panel-beállítás: hu_rezsi/panel_beallitas, alapból 10, 0 = soha). Az űrlapos ablakok
+// (mérőállás, számla, törlés, javítás, lezárás, mentés és beállítások, szenzor-hozzárendelés, e-mail varázsló) soha;
+// ha ezek közül bármelyik nyitva van (pl. egy megjelenítő ablakból nyílt), az időzítés szünetel.
+const OLVASO_ABLAKOK = new Set(["grafdlg", "reklamdlg", "evesdlg", "teteldlg", "kimutdlg", "fszdlg", "ddlg", "beallit"]);
+const AKTIVITAS = ["pointerdown", "pointermove", "wheel", "scroll", "keydown", "touchstart", "touchmove"];
+const SZERK_MEZO = "input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea";
+
 class HuRezsiPanel extends HTMLElement {
   // Rendszergazda? A nem rendszergazda mindent lát, de csak mérőállást és fizetést rögzíthet (a szerver is ezt engedi).
   get _admin() { return !!this._hass?.user?.is_admin; }
@@ -67,6 +75,18 @@ class HuRezsiPanel extends HTMLElement {
     // Több otthonnál fülek: a kiválasztott otthon (böngészőnként megjegyezve; tárolás nélkül is működik).
     try { this._aktivHaz = localStorage.getItem("hu_rezsi_otthon"); } catch (e) { this._aktivHaz = null; }
     this._hiba = null;
+    // Automatikus bezárás: tétlenség mérése (a görgetés az ablakok belsejében is – a shadow-gyökéren elkapva).
+    this._aktiv = Date.now();
+    this._jel = () => { this._aktiv = Date.now(); };
+    for (const t of AKTIVITAS) this.shadowRoot.addEventListener(t, this._jel, { capture: true, passive: true });
+    // Megjelenítő ablakban beírt / módosított mező (pl. a folyószámla kézi tétele): az ablak már nem zárul magától.
+    this.shadowRoot.addEventListener("input", (ev) => {
+      const d = ev.target.closest?.("dialog");
+      if (d && ev.target.matches?.(SZERK_MEZO)) d.dataset.szerkesztett = "1";
+    }, true);
+    this.shadowRoot.addEventListener("close", (ev) => {
+      if (ev.target.localName === "dialog") { delete ev.target.dataset.szerkesztett; this._aktiv = Date.now(); }
+    }, true);
     // ⓘ buborék: egy közös elem, kattintásra a gomb alatt; máshova kattintva / görgetéskor bezárul.
     this._nyitottSzamla = new Set();
     // Számla-sor: koppintásra lenyílnak a részletei (a kijelölő négyzet nem nyit).
@@ -151,7 +171,48 @@ class HuRezsiPanel extends HTMLElement {
     if (mb) mb.narrow = v;
   }
 
+  connectedCallback() {
+    for (const t of AKTIVITAS) window.addEventListener(t, this._jel, { capture: true, passive: true });
+    clearInterval(this._autoIdo);
+    this._aktiv = Date.now();
+    this._autoIdo = setInterval(() => this._autoBezaras(), 1000);
+  }
+
+  // A beállított mp (a panel adataiból; amíg nincs adat, az alapérték).
+  get _autoMp() {
+    const v = this._adat?.panel_beallitas?.auto_bezaras_mp;
+    return v == null ? 10 : Number(v) || 0;
+  }
+
+  _autoBezaras() {
+    const mp = this._autoMp;
+    if (!mp) return;
+    if (document.visibilityState !== "visible") { this._aktiv = Date.now(); return; } // rejtett lapnál szünetel
+    if (Date.now() - this._aktiv < mp * 1000) return;
+    const r = this.shadowRoot;
+    const nyitott = [...r.querySelectorAll("dialog[open]")];
+    const fokusz = r.activeElement;
+    if (nyitott.length) {
+      if (nyitott.some((d) => !OLVASO_ABLAKOK.has(d.id))) return; // űrlap nyitva (akár egy megjelenítőből nyílt)
+      const d = nyitott[nyitott.length - 1];
+      if (d.dataset.szerkesztett || (fokusz && d.contains(fokusz) && fokusz.matches(SZERK_MEZO)) || d.querySelector("#fszkeziszerk")) return;
+      d.close();
+      this._aktiv = Date.now();
+      return;
+    }
+    // A fiókkártya lenyitott Részletek része – kivéve, ha számla van kijelölve, menü nyitva vagy mezőben gépelnek.
+    if (this._nyitva.size && !this._jelolt.size && !this._menuSid && !(fokusz && fokusz.matches(SZERK_MEZO))) {
+      this._nyitva.clear();
+      this._aktiv = Date.now();
+      this._rajzol();
+    }
+  }
+
   disconnectedCallback() {
+    clearInterval(this._autoIdo);
+    clearTimeout(this._emailFigyIdo);
+    this._emailFigyIdo = null;
+    for (const t of AKTIVITAS) window.removeEventListener(t, this._jel, { capture: true });
     clearInterval(this._idozito);
     if (this._lathato) document.removeEventListener("visibilitychange", this._lathato);
   }
@@ -198,6 +259,7 @@ class HuRezsiPanel extends HTMLElement {
       this._hiba = e.message || String(e);
     }
     this._rajzol();
+    if (this._emailFut()) this._emailFigyel();
   }
 
   // ---------------------------------------------------------------- megjelenítés
@@ -210,7 +272,7 @@ class HuRezsiPanel extends HTMLElement {
       <div class="fej">
         <ha-menu-button></ha-menu-button>
         <div class="cim">Rezsikövető</div>
-        ${this._hass?.user?.is_admin ? `<button class="ikongomb" id="mentesgomb" title="Mentés és visszaállítás"><ha-icon icon="mdi:backup-restore"></ha-icon></button>` : ""}
+        ${this._hass?.user?.is_admin ? `<button class="ikongomb" id="mentesgomb" title="Beállítások, mentés és visszaállítás"><ha-icon icon="mdi:backup-restore"></ha-icon></button>` : ""}
         <button class="ikongomb" id="frissit" title="Frissítés (új panelváltozatnál újratölt)${window.huRezsiPanel?.verzio ? ` · betöltött változat: ${new Date(window.huRezsiPanel.verzio).toLocaleString("hu-HU")}` : ""}"><ha-icon icon="mdi:refresh"></ha-icon></button>
       </div>
       <div class="tartalom">
@@ -286,6 +348,56 @@ class HuRezsiPanel extends HTMLElement {
         this._osszevetesNyit(fiokok.find((f) => f.sid === el.dataset.graf));
       }),
     );
+    this.shadowRoot.querySelectorAll("[data-emailatnez]").forEach((el) =>
+      el.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        el.disabled = true;
+        el.textContent = "Átnézés folyamatban…";
+        try {
+          const v = await this._hass.callWS({ type: "hu_rezsi/email_atnezes", entry_id: el.dataset.emailatnez });
+          const pfk = Object.values(v.otthonok || {}).flatMap((o) => Object.values(o.postafiokok || {}));
+          const hibak = pfk.filter((p) => p.hiba);
+          if (hibak.length) window.alert(`Nem sikerült átnézni: ${hibak.map((p) => `${p.nev}: ${p.hiba}`).join("\n")}`);
+        } catch (e) {
+          window.alert(`Nem sikerült: ${e.message || e}`);
+        }
+        this._betolt();
+      }),
+    );
+    this.shadowRoot.querySelectorAll("[data-emailnyit]").forEach((el) => el.addEventListener("click", () => this._emailNyit(el.dataset.emailnyit)));
+    this.shadowRoot.querySelectorAll("[data-emailkeres]").forEach((el) =>
+      el.addEventListener("click", async () => {
+        const [entry_id, sid] = el.dataset.emailkeres.split("|");
+        el.disabled = true;
+        el.textContent = "Keresem…";
+        try {
+          await this._hass.callWS({ type: "hu_rezsi/email_felderites", entry_id, sid });
+        } catch (e) {
+          window.alert(`Nem sikerült: ${e.message || e}`);
+        }
+        this._betolt();
+        this._emailFigyel();
+      }),
+    );
+    this.shadowRoot.querySelectorAll("[data-emailvalasz]").forEach((el) =>
+      el.addEventListener("click", async () => {
+        // „azon”, nem „id”: az id a WebSocket-üzenet saját sorszáma, azt a HA felülírná.
+        const [entry_id, tipus, azon, ertek] = el.dataset.emailvalasz.split("|");
+        el.closest(".emailkartya, .emailuzenet, .emailgombok")?.querySelectorAll("button").forEach((b) => (b.disabled = true));
+        try {
+          const v = await this._hass.callWS({ type: "hu_rezsi/email_valasz", entry_id, tipus, azon, ertek });
+          if (v?.navigal) {
+            window.alert("A fiók-varázsló előtöltve vár: a megnyíló oldalon az otthonod ⋮ menüjében válaszd a „Fiók hozzáadása” pontot (a közmű és a szolgáltató már be lesz állítva; a mérő adatait add meg). A számlái ezután maguktól ide jönnek.");
+            history.pushState(null, "", v.navigal);
+            window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+            return;
+          }
+        } catch (e) {
+          window.alert(`Nem sikerült: ${e.message || e}`);
+        }
+        this._kesoBetolt(1500);
+      }),
+    );
     this.shadowRoot.querySelectorAll("[data-kimutatas]").forEach((el) =>
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -317,6 +429,9 @@ class HuRezsiPanel extends HTMLElement {
         this._rajzol();
       }, { once: true });
     }
+    this.shadowRoot.querySelectorAll("[data-sajatdij]").forEach((el) =>
+      el.addEventListener("click", () => this._sajatDijNyit(fiokok.find((f) => f.sid === el.dataset.sajatdij))),
+    );
     const bd = this.shadowRoot.getElementById("beallit");
     this.shadowRoot.getElementById("beallitbezar").addEventListener("click", () => bd.close());
     bd.addEventListener("click", (ev) => ev.target === bd && bd.close());
@@ -331,6 +446,7 @@ class HuRezsiPanel extends HTMLElement {
     this._lezarKezelo();
     this._javitasKezelo();
     this._mentesKezelo();
+    this._emailKezelo();
     requestAnimationFrame(() => this._hosszuMagyarazat());
   }
 
@@ -482,6 +598,7 @@ class HuRezsiPanel extends HTMLElement {
           <div><div class="cimke">Havi átlag ${info("Az átalány napra leosztott része, illetve a több hónapra számlázott díjak (víz) havi része. A hónapnál rövidebb vagy hosszabb időszak (pl. az éves leolvasás után a diktálásig) díja egy átlagos hónapra arányosítva. A fix díjas szemétszállítás csak az esedékesség hónapjában szerepel, a teljes számlaösszeggel.")}</div><div class="nagy masodlagos">${ft(h.osszesen.varhato)}</div></div>
         </div>
         ${h.hianyzo_szenzorok ? `<div class="banner szenzorhiany">${h.hianyzo_szenzorok} használt szenzor nem található ebben a rendszerben (pl. visszaállítás után) – ezek a fiókok nem kapnak mérést. ${this._hass?.user?.is_admin ? `<button type="button" class="linkgomb" data-szenzorok="${h.entry_id}">Szenzorok hozzárendelése ›</button>` : ""}</div>` : ""}
+        ${this._emailBlokk(h)}
         ${this._folyoszamlaSor(h)}
         ${this._esedekesLista(h)}
         ${this._szigetOsszesito(h)}
@@ -553,6 +670,62 @@ class HuRezsiPanel extends HTMLElement {
   }
 
   // A szolgáltató közös folyószámlája (MVM): a legutóbbi számla szerinti egyenleg, és mi lesz, ha a talált hibákat javítják.
+  // Számlák e-mailből – közérthetően: mi van bekötve, mikor nézte utoljára, mit talált, és a teendők (kérdés: melyik
+  // fiókhoz tartozik; ajánlat: nincs ilyen fiók; üzenet: mi kapcsolódott be). Rendszergazdának a „📧 Számlák
+  // e-mailből” gomb (vezetett beállítás), „Átnézés most”, „Keresés újra”, és a kézi szűrős fiókoknál az átállás.
+  _emailBlokk(h) {
+    const e = h.email;
+    const pfk = e?.postafiokok || [];
+    const gomb = !this._admin ? "" : pfk.length
+      ? `<button type="button" class="emailnyit masodik" data-emailnyit="${esc(h.entry_id)}" title="Még egy e-mail cím (pl. a párodé)">+ E-mail cím</button>`
+      : `<button type="button" class="emailnyit" data-emailnyit="${esc(h.entry_id)}"><span aria-hidden="true">📧</span> Számlák e-mailből</button>`;
+    if (!pfk.length) return this._admin ? `<div class="emailsor emailures">${gomb}<span class="kicsi">Add meg az e-mail címed, és a szolgáltatók e-mailben küldött számlái maguktól bekerülnek.</span></div>` : "";
+    const ido = (x) => (x ? new Date(x).toLocaleString("hu-HU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null);
+    const HIBA = { hitelesites: "nem tudok belépni (jelszó?)", jelszo_hianyzik: "add meg újra a jelszót", kapcsolat: "a levelezőszerver nem érhető el" };
+    const sorok = pfk.map((p) => {
+      const kotes = (p.bekotott || []).map((b) => `${esc(b.nev)}${b.mod === "kezi" ? ' <span class="kicsi">(kézi szűrő)</span>' : ""}`).join(", ");
+      let allapot;
+      if (p.felderites_fut) {
+        const perc = p.felderites_kezdet ? Math.floor((Date.now() - new Date(p.felderites_kezdet)) / 60000) : null;
+        allapot = `<span class="emailfut"><span class="porgo" aria-hidden="true"></span> Keresem a számláidat…</span>
+          <div class="kicsi">A fél év leveleit nézem át, ez több percig is tarthat${perc === null ? "" : perc < 1 ? " – most indult" : ` – ${perc} perce fut`}.</div>`;
+      }
+      else if (p.hiba) allapot = `<span class="figyszoveg" title="${esc(p.hiba)}">${HIBA[p.hiba_tipus] || "hiba"}</span>${p.utolso_sikeres ? ` <span class="kicsi">(utoljára sikeres: ${ido(p.utolso_sikeres)})</span>` : ""}`;
+      else if (!p.fiokok) allapot = `<span class="kicsi">még egy fiókhoz sincs bekötve</span>`;
+      else if (!p.utolso_atnezes) allapot = `<span class="kicsi">hamarosan átnézem</span>`;
+      else allapot = `utoljára ${ido(p.utolso_atnezes)} · ${p.utolso_talalt ? `<b>${p.utolso_talalt} új számla</b>` : "nincs új számla"}${p.nem_besorolhato
+        ? ` · <span class="figyszoveg" title="${esc((p.talalatok || []).filter((t) => t.tipus === "nem_besorolhato").map((t) => `${t.datum}: ${t.ok} (${t.fiok})`).join("\n"))}">${p.nem_besorolhato} levelet nem tudtam fiókhoz rendelni</span>` : ""}`;
+      const f = p.felderites;
+      const fsz = f && !p.felderites_fut ? (f.hiba ? "" : `<div class="kicsi">Legutóbbi keresés (${ido(f.ido)}): az utolsó fél évben ${f.talalt || 0} számlát találtam.</div>`) : "";
+      const lista = (p.talalatok || []).filter((t) => t.tipus !== "nem_besorolhato").map((t) => `${t.datum} · ${t.fiok}: ${t.fajl || `${t.sorszam} (${t.osszeg} Ft, értesítő)`}`).join("\n");
+      const kezi = (p.bekotott || []).some((b) => b.mod === "kezi");
+      return `<div class="emailpf"${lista ? ` title="Legutóbb talált:\n${esc(lista)}"` : ""}><div><b>${esc(p.nev)}</b>${p.cim ? ` <span class="kicsi">${esc(p.cim)}</span>` : ""}: ${allapot}</div>
+        ${kotes ? `<div class="kicsi">Innen jönnek: ${kotes}</div>` : ""}${fsz}
+        ${this._admin ? `<div class="emailgombok"><button type="button" class="linkgomb" data-emailatnez="${esc(h.entry_id)}"${e.fut ? " disabled" : ""}>${e.fut ? "Folyamatban…" : "Átnézés most"}</button>
+          <button type="button" class="linkgomb" data-emailkeres="${esc(h.entry_id)}|${esc(p.sid)}"${p.felderites_fut ? " disabled" : ""}>Keresés újra</button>
+          ${kezi ? `<button type="button" class="linkgomb" data-emailvalasz="${esc(h.entry_id)}|auto|${esc(p.sid)}|" title="A számlák a tartalmuk (mérő, szolgáltató) szerint kerülnek a fiókokhoz; a feladó-szűrő tartaléknak marad">Automatikus besorolás bekapcsolása</button>` : ""}</div>` : ""}</div>`;
+    });
+    const uz = (e.uzenetek || []);
+    const uzenetek = uz.length ? `<div class="emailuzenet" role="status"><ha-icon icon="mdi:email-check-outline"></ha-icon><div>${uz.map((u) => `<div>${esc(u.szoveg)}</div>`).join("")}</div>${this._admin
+      ? `<button type="button" data-emailvalasz="${esc(h.entry_id)}|uzenet||">Rendben</button>` : ""}</div>` : "";
+    const KOZMU_T = { villany: "villanyszámla", gaz: "gázszámla", viz: "vízszámla", tavho: "távhőszámla", hulladek: "hulladékszámla", tavkozles: "számla" };
+    const pelda = (k) => [k.mero ? `mérő: ${esc(k.mero)}` : null, k.kelte ? nap(k.kelte) : null, k.osszeg != null ? ft(k.osszeg) : null,
+      k.db > 1 ? `${k.db} számla` : null].filter(Boolean).join(" · ");
+    const kerdesek = this._admin ? (e.kerdesek || []).map((k) => `<div class="emailkartya" role="group" aria-label="Kérdés">
+        <div class="ekcim"><ha-icon icon="mdi:help-circle-outline"></ha-icon><b>Ez a számla melyik fiókhoz tartozik?</b></div>
+        <div>${esc(k.nev)}${pelda(k) ? ` <span class="kicsi">(${pelda(k)})</span>` : ""}${k.ok === "mas_mero" ? `<div class="kicsi">A mérő gyári száma egyik fiókénál sem szerepel – mérőcsere, vagy egy másik ingatlan számlája?</div>` : ""}</div>
+        <div class="gombok ekgombok">${k.jeloltek.map((j) => `<button type="button" class="fo" data-emailvalasz="${esc(h.entry_id)}|kerdes|${esc(k.id)}|${esc(j.sid)}">${esc(j.nev)}</button>`).join("")}
+          <button type="button" data-emailvalasz="${esc(h.entry_id)}|kerdes|${esc(k.id)}|egyik_sem">Egyik sem</button></div></div>`).join("") : "";
+    const ajanlatok = this._admin ? (e.ajanlatok || []).map((a) => `<div class="emailkartya" role="group" aria-label="Ajánlat">
+        <div class="ekcim"><ha-icon icon="mdi:file-plus-outline"></ha-icon><b>${esc(a.targy || a.nev)} találtam, de nincs ilyen fiók.</b></div>
+        <div class="kicsi">${pelda(a) || esc(KOZMU_T[a.kozmu] || "")}${a.kozmu !== "tavkozles" ? " – a fiók-varázsló előtöltve nyílik (a mérő adatait ott kell megadni)." : " – a fiók egy gombnyomással elkészül, a számlák ide jönnek."}</div>
+        <div class="gombok ekgombok"><button type="button" class="fo" data-emailvalasz="${esc(h.entry_id)}|ajanlat|${esc(a.id)}|letrehoz">Fiók létrehozása</button>
+          <button type="button" data-emailvalasz="${esc(h.entry_id)}|ajanlat|${esc(a.id)}|nem_kell">Nem kell</button></div></div>`).join("") : "";
+    return `<div class="emailblokk"><div class="emailfej"><ha-icon icon="mdi:email-search-outline"></ha-icon><span>Számlák e-mailből</span>${gomb}</div>
+      ${sorok.join("")}${uzenetek}${kerdesek}${ajanlatok}</div>`;
+  }
+
+
   _folyoszamlaSor(h) {
     const fo = h.folyoszamla;
     if (!fo || (!fo.erdekes && !fo.hibak_db)) return "";
@@ -1006,7 +1179,9 @@ class HuRezsiPanel extends HTMLElement {
             : `következő ${f.esedekes && (f.esedekes.kovetkezo_osszeg || f.esedekes.kovetkezo_osszeg_brutto != null || !s.kovetkezo_datum) ? `${nap(f.esedekes.kovetkezo_datum)} körül, <span class="esedekesmajd">${f.esedekes.kovetkezo_osszeg_brutto != null && !f.esedekes.kovetkezo_osszeg ? "nincs fizetendő (túlfizetésből)" : `kb. ${ft(f.esedekes.kovetkezo_osszeg)}`}</span>` : s.kovetkezo_datum ? `${nap(s.kovetkezo_datum)} körül, <span class="esedekesmajd">kb. ${ft(s.kovetkezo_osszeg)}</span>` : "–"}`}${
             !f.fix_dij && (f.uton_szamlak?.length || f.diktalt_szamla || !f.reszszamlas) ? ` <button type="button" class="linkgomb" data-tetel="${f.sid}" data-entry="${this._entryId(f.sid)}">tételesen ›</button>` : ""}</div>
           ${f.beszamitas && !kovB ? `<div class="kicsi turfizetes">Túlfizetés: ${ft(f.beszamitas.turfizetes)}${f.beszamitas.levonva ? ` · a várható számlából levonva ${ft(f.beszamitas.levonva)} · marad ${ft(f.beszamitas.marad)}` : ""}${f.beszamitas.kozos ? " (közös folyószámla)" : ""}</div>` : ""}
-          ${s.figyelmeztetes ? `<div class="kicsi figyszoveg">${esc(s.figyelmeztetes)}</div>` : ""}</div></div>`);
+          ${s.figyelmeztetes ? `<div class="kicsi figyszoveg">${esc(s.figyelmeztetes)}</div>` : ""}
+          ${s.dij_elteres && this._admin ? `<div class="ellgombok"><button type="button" class="linkgomb" data-dijelt="${esc(`${f.sid}|${s.dij_elteres.sorszam}`)}" data-dontes="uj_dij">Ez az új havidíj (${ft(Math.round(s.dij_elteres.osszeg / s.dij_elteres.honap))}/hó)</button>
+            <button type="button" class="linkgomb" data-dijelt="${esc(`${f.sid}|${s.dij_elteres.sorszam}`)}" data-dontes="egyszeri">Egyszeri eltérés – rendben</button></div>` : ""}</div></div>`);
     }
     const nyitva = this._nyitva.has(f.sid);
     return `
@@ -1020,6 +1195,7 @@ class HuRezsiPanel extends HTMLElement {
         <div class="gombok">
           <button data-reszlet="${f.sid}">${nyitva ? "Kevesebb" : "Részletek"}</button>
           ${f.device_id && this._admin ? `<button data-szamla="${f.sid}">${f.kozmu === "kozos" ? "Új előírás" : "Új számla"}</button>` : ""}
+          ${this._admin && !f.megszunt && (f.fix_dij || f.kozmu === "viz") ? `<button data-sajatdij="${f.sid}" title="A saját (település, edényméret szerinti) díjaid">Saját díjak</button>` : ""}
           ${!f.fix_dij && f.device_id && !f.megszunt ? `<button class="fo" data-leolvas="${f.sid}">Mérőállás</button>` : ""}
         </div>
         ${nyitva ? this._reszletek(f) : ""}
@@ -2769,6 +2945,40 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     d.showModal();
   }
 
+  // „Saját díjak” (2.2.0b6): a fiók díjai bruttóban, felülírásként mentve (víz: ivóvíz, csatorna, alapdíj; fix díjas: havidíj)
+  async _sajatDijNyit(f) {
+    if (!f) return;
+    const r = this.shadowRoot, d = r.getElementById("dijablak"), form = r.getElementById("dijform"), hiba = r.getElementById("dijhiba");
+    r.getElementById("dijcim").textContent = `Saját díjak – ${f.nev}`;
+    hiba.textContent = "";
+    r.getElementById("dijmezok").innerHTML = `<div class="kicsi">Betöltés…</div>`;
+    form.tol.value = new Date().toISOString().slice(0, 7) + "-01";
+    if (!d.open) d.showModal();
+    let adat;
+    try { adat = await this._hass.callWS({ type: "hu_rezsi/sajat_dijak", entry_id: this._entryId(f.sid), sid: f.sid }); }
+    catch (err) { r.getElementById("dijmezok").innerHTML = ""; hiba.textContent = err.message || String(err); return; }
+    r.getElementById("dijmezok").innerHTML = adat.mezok.map((m) => `<label class="mezo">${esc(m.nev)} (${esc(m.egyseg)}, bruttó)${m.kezi ? ' <span class="cimkeszalag">saját</span>' : ""}
+      <input type="number" name="${esc(m.kulcs)}" min="0" step="0.01" inputmode="decimal" value="${m.ertek || ""}" placeholder="a számládról"></label>`).join("");
+    const megse = r.getElementById("dijmegse");
+    megse.onclick = () => d.close();
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      hiba.textContent = "";
+      const ertekek = {};
+      for (const m of adat.mezok) {
+        const v = form[m.kulcs].value;
+        if (v === "") continue;
+        if (Number(v) !== m.ertek || !m.kezi) ertekek[m.kulcs] = Number(v);
+      }
+      if (!Object.keys(ertekek).length) { d.close(); return; }
+      try {
+        await this._hass.callWS({ type: "hu_rezsi/sajat_dijak", entry_id: this._entryId(f.sid), sid: f.sid, ertekek, tol: form.tol.value });
+        d.close();
+        this._betolt?.();
+      } catch (err) { hiba.textContent = err.message || String(err); }
+    };
+  }
+
   _reszletek(f) {
     const tabla = (fej, sorok, osztaly = "") =>
       sorok.length
@@ -2889,11 +3099,19 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
   _dialogus() {
     return `
       <dialog id="mentesdlg" class="szeles" aria-labelledby="mentescim">
-        <div class="dfej"><h3 id="mentescim">Mentés és visszaállítás</h3>
+        <div class="dfej"><h3 id="mentescim">Beállítások, mentés és visszaállítás</h3>
           <button class="ikongomb" id="mentesbezar" title="Bezárás"><ha-icon icon="mdi:close"></ha-icon></button></div>
         <div class="kicsi">Egyetlen zip-fájl: az otthonok beállításai (fiókok, szigetüzem), mérőállások, számlaadatok, fizetések,
           lezárt időszakok, a használt szenzorok neve – kérésre a számla-PDF-ek is. Visszaállításkor mindig <b>új otthon</b> jön létre
           (meglévőt nem ír felül), akár egy másik Home Assistantban is; utána a hiányzó szenzorok újra hozzárendelhetők.</div>
+        <details id="panelbeall" class="mentesblokk"><summary>Panel beállításai</summary>
+          <div class="mentessor">
+            <label>Részletező ablakok automatikus bezárása (másodperc, 0 = soha)<input type="number" id="autobezaras" min="0" max="600" step="1" inputmode="numeric"></label>
+            <button type="button" id="autobezarasment">Mentés</button>
+          </div>
+          <div class="kicsi">A csak megjelenítő ablakok (Részletek, Számlák kimutatása, Folyószámla, Éves összevetés, tételes bontás, D tarifa elemzés, Entitások) ennyi másodperc tétlenség után maguktól bezárulnak; mozdulat, görgetés vagy billentyű újraindítja. Az űrlapok (mérőállás, számla, mentés, beállítások) soha nem zárulnak be maguktól. Minden felhasználóra és minden otthonra érvényes (az indítókártya ablakára is).</div>
+          <div id="autobezarasered" class="kicsi"></div>
+        </details>
         <h4>Mentés most</h4>
         <div class="mentessor">
           <label>Otthon<select id="mentesotthon"></select></label>
@@ -3129,6 +3347,20 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           <button type="button" class="veszely tele" id="lezarok">Lezárás</button>
         </div>
       </dialog>
+      <dialog id="emaildlg" class="emaildlg" aria-labelledby="emailcim">
+        <div class="dfej"><h3 id="emailcim">📧 Számlák e-mailből</h3>
+          <button class="ikongomb" id="emailbezar" title="Bezárás"><ha-icon icon="mdi:close"></ha-icon></button></div>
+        <div id="emailbody"></div>
+      </dialog>
+      <dialog id="dijablak">
+        <h3 id="dijcim">Saját díjak</h3>
+        <div class="kicsi">A díj településenként, edényméret vagy ürítési gyakoriság szerint eltér: írd be a saját számládon szereplő <b>bruttó</b> díjakat. Az „érvényes ettől” naptól számol velük (a korábbi időszak marad).</div>
+        <form id="dijform"><div id="dijmezok"></div>
+          <label class="mezo">Érvényes ettől<input type="date" name="tol" required></label>
+          <div class="kicsi hiba" id="dijhiba"></div>
+          <div class="gombok"><button type="button" id="dijmegse">Mégse</button><button type="submit" class="fo">Mentés</button></div>
+        </form>
+      </dialog>
       <dialog id="beallit">
         <h3 id="beallitcim">Entitások</h3>
         <div class="kicsi">Koppints egy entitásra a beállításaihoz (név, ikon, láthatóság).</div>
@@ -3138,6 +3370,162 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           <button type="button" class="fo" id="beallitbezar">Bezárás</button>
         </div>
       </dialog>`;
+  }
+
+  // ---------------------------------------------------------------- számlák e-mailből: vezetett beállítás
+
+  _emailNyit(entry_id) {
+    this._em = { entry_id, lepes: 1, email: "", lv: null, hiba: null, sid: null };
+    this._emailRajzol();
+    const d = this.shadowRoot.getElementById("emaildlg");
+    if (!d.open) d.showModal();
+  }
+
+  _emailRajzol() {
+    const g = this._em, body = this.shadowRoot.getElementById("emailbody");
+    if (!g || !body) return;
+    const lepesjel = `<ol class="emlepesek" aria-label="Lépések">${["Mi kell?", "Belépés", "Keresés", "Kész"].map((n, i) =>
+      `<li class="${i + 1 === g.lepes ? "aktiv" : i + 1 < g.lepes ? "kesz" : ""}"${i + 1 === g.lepes ? ' aria-current="step"' : ""}>${n}</li>`).join("")}</ol>`;
+    const lv = g.lv;
+    const sugo = lv && g.email.includes("@") ? `<div class="emsugo"><b>${esc(lv.nev || "Levelező")}</b>${lv.nem_tamogatott ? "" : lv.alkalmazasjelszo ? ": ide <b>alkalmazásjelszó</b> kell, nem a szokásos jelszavad." : lv.ismert ? ": a szokásos jelszavad kell." : ": ismeretlen levelező – ha nem sikerül, a Haladó részben add meg a szervert."}
+        <ol>${(lv.lepesek || []).map((x) => `<li>${esc(x).replace(/(https:\/\/[^\s)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')}</li>`).join("")}</ol>
+        ${lv.link && lv.alkalmazasjelszo && !lv.nem_tamogatott ? `<a class="emlink" href="${esc(lv.link)}" target="_blank" rel="noopener">Alkalmazásjelszó készítése ↗</a>` : ""}</div>` : "";
+    let html;
+    if (g.lepes === 1) {
+      html = `<p>Ha a szolgáltatóid (MVM, vízmű, Telekom…) e-mailben küldik a számlát, a Rezsikövető ki tudja olvasni őket a postafiókodból – utána <b>maguktól bekerülnek</b>, nem kell feltöltened.</p>
+        <p><b>Ehhez két dolog kell:</b></p>
+        <ol class="emnagy"><li>Az <b>e-mail címed</b>, ahová a számlák jönnek.</li>
+          <li>Egy <b>jelszó</b>: Gmailnél <b>alkalmazásjelszó</b> (2 perc alatt elkészíted, a következő lépés megmutatja hogyan), Freemailnél a szokásos jelszavad.</li></ol>
+        <p class="kicsi">A Rezsikövető csak olvas: semmit nem töröl, nem helyez át, nem jelöl olvasottnak. A jelszó a saját Home Assistantodban marad.</p>
+        <div class="gombok"><button type="button" class="fo" data-emlepes="2">Tovább</button></div>`;
+    } else if (g.lepes === 2) {
+      html = `<label>E-mail cím<input type="email" id="emcim" autocomplete="email" inputmode="email" placeholder="pl. kovacs.anna@gmail.com" value="${esc(g.email)}"></label>
+        ${sugo}
+        <label>Jelszó${lv?.alkalmazasjelszo ? " (alkalmazásjelszó)" : ""}<input type="password" id="emjelszo" autocomplete="off" placeholder="${lv?.alkalmazasjelszo ? "pl. abcd efgh ijkl mnop" : ""}"></label>
+        <details class="emhalado"${g.halado ? " open" : ""}><summary>Haladó</summary>
+          <label>Név (a panelen így látod)<input type="text" id="emnev" placeholder="${esc((g.email.split("@")[0]) || "pl. Saját")}"></label>
+          <label>IMAP-szerver<input type="text" id="emszerver" placeholder="${esc(lv?.szerver || "imap.pelda.hu")}" value="${esc(g.szerver || "")}"></label>
+          <label>Port<input type="number" id="emport" min="1" max="65535" value="${g.port || 993}"></label>
+        </details>
+        ${g.hiba ? `<div class="dhiba emhiba" role="alert">${esc(g.hiba).replace(/(https:\/\/[^\s)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')}</div>` : ""}
+        <div class="gombok"><button type="button" data-emlepes="1">Vissza</button><button type="button" class="fo" id="emkuld"${g.kuldes ? " disabled" : ""}>${g.kuldes ? "Belépés…" : "Kapcsolódás"}</button></div>`;
+    } else if (g.lepes === 3) {
+      html = `<div class="emkeres"><span class="porgo nagy" aria-hidden="true"></span><div><b>Keresem a számláidat…</b>
+        <div class="kicsi">Az utolsó fél év leveleit nézem át (a Kukát is), és a számlákat a fiókjaidhoz rendelem. Ez több percig is tarthat – nyugodtan bezárhatod, a háttérben folytatódik.</div></div></div>
+        <div class="gombok"><button type="button" id="emhatter">Bezárás (fut tovább)</button></div>`;
+    } else {
+      const f = g.eredmeny?.felderites, e = g.eredmeny?.email;
+      const ossz = (f?.osszekotve || []), mar = (f?.mar_bekotve || []);
+      html = f?.hiba ? `<p class="figyszoveg">A keresés nem sikerült: ${esc(f.hiba)}</p>` : f ? `<p class="emkesz">✓ Kész! Az utolsó fél évben <b>${f.talalt || 0} számlát</b> találtam.</p>
+        ${ossz.length ? `<p>Mostantól e-mailből jönnek:</p><ul>${ossz.map((x) => `<li><b>${esc(x.nev)}</b> – ${esc((x.tipusok || []).join(", "))}</li>`).join("")}</ul>` : ""}
+        ${mar.length ? `<p class="kicsi">Már be volt kötve: ${mar.map((x) => esc(x.nev)).join(", ")}.</p>` : ""}
+        ${(e?.kerdesek || []).length ? `<p>❓ ${(e.kerdesek || []).length} számláról nem tudom biztosan, melyik fiókhoz tartozik – a panelen egy gombnyomással eldöntheted.</p>` : ""}
+        ${(e?.ajanlatok || []).length ? `<p>➕ Olyan szolgáltató számláit is találtam, amelyhez még nincs fiók – a panelen felveheted.</p>` : ""}
+        ${!f.talalt ? `<p class="kicsi">Nem találtam számlát. Ha a szolgáltató csak most kezd e-mailben számlázni, semmi teendőd: óránként újra megnézem.</p>` : ""}`
+        : `<p>A keresés a háttérben tovább fut – az eredményt a panelen, az otthon összesítőjében látod.</p>`;
+      html += `<div class="gombok"><button type="button" class="fo" id="emkesz">Rendben</button></div>`;
+    }
+    body.innerHTML = lepesjel + html;
+    body.querySelector("#emcim")?.focus({ preventScroll: true });
+  }
+
+  _emailKezelo() {
+    const r = this.shadowRoot, d = r.getElementById("emaildlg");
+    if (!d) return;
+    const bezar = () => { d.close(); this._em = null; this._betolt(); };
+    r.getElementById("emailbezar").addEventListener("click", bezar);
+    d.addEventListener("cancel", () => { this._em = null; setTimeout(() => this._betolt(), 0); });
+    const body = r.getElementById("emailbody");
+    let idozito;
+    body.addEventListener("input", (ev) => {
+      if (ev.target.id !== "emcim") return;
+      this._em.email = ev.target.value.trim();
+      clearTimeout(idozito);
+      idozito = setTimeout(async () => {
+        if (!this._em?.email.includes("@")) return;
+        try {
+          this._em.lv = await this._hass.callWS({ type: "hu_rezsi/postafiok_felismeres", email: this._em.email });
+          this._em.halado = this._em.halado || (this._em.lv.cim_jo && !this._em.lv.ismert);
+        } catch (e) { return; }
+        const jelszo = r.getElementById("emjelszo")?.value || "", aktiv = r.activeElement?.id, poz = r.getElementById("emcim")?.selectionStart;
+        this._emailRajzol();
+        r.getElementById("emjelszo").value = jelszo;
+        if (aktiv) { const el = r.getElementById(aktiv); el?.focus(); if (aktiv === "emcim" && poz != null) el.setSelectionRange(poz, poz); }
+      }, 450);
+    });
+    body.addEventListener("click", async (ev) => {
+      const lep = ev.target.closest("[data-emlepes]");
+      if (lep) { this._em.lepes = Number(lep.dataset.emlepes); this._em.hiba = null; this._emailRajzol(); return; }
+      if (ev.target.closest("#emhatter")) { bezar(); return; }
+      if (ev.target.closest("#emkesz")) { bezar(); return; }
+      if (!ev.target.closest("#emkuld")) return;
+      const g = this._em;
+      g.email = r.getElementById("emcim").value.trim();
+      const jelszo = r.getElementById("emjelszo").value;
+      const nev = r.getElementById("emnev")?.value.trim(), szerver = r.getElementById("emszerver")?.value.trim(), port = Number(r.getElementById("emport")?.value || 993);
+      g.szerver = szerver; g.port = port;
+      if (!g.email.includes("@")) { g.hiba = "Írd be az e-mail címed."; this._emailRajzol(); return; }
+      if (!jelszo) { g.hiba = "Írd be a jelszót."; this._emailRajzol(); r.getElementById("emjelszo").focus(); return; }
+      g.kuldes = true; g.hiba = null;
+      this._emailRajzol();
+      r.getElementById("emjelszo").value = jelszo;
+      try {
+        const v = await this._hass.callWS({ type: "hu_rezsi/postafiok_hozzaad", entry_id: g.entry_id, email_cim: g.email, jelszo,
+          ...(nev ? { nev } : {}), ...(szerver ? { imap_szerver: szerver } : {}), ...(port && port !== 993 ? { imap_port: port } : {}) });
+        g.kuldes = false;
+        if (v.hiba) {
+          g.hiba = v.szoveg; g.halado = g.halado || v.halado;
+          this._emailRajzol();
+          r.getElementById("emjelszo").value = jelszo;
+          return;
+        }
+        g.sid = v.sid; g.lepes = 3;
+        this._emailRajzol();
+        this._emailVar();
+      } catch (e) {
+        g.kuldes = false; g.hiba = `Nem sikerült: ${e.message || e}`;
+        this._emailRajzol();
+      }
+    });
+  }
+
+  // A felderítés végéig a panel adatait lekérdezi (az otthon közben újratöltődik); újrarajzolás nélkül, hogy a
+  // nyitott ablak megmaradjon.
+  async _emailVar() {
+    const g = this._em, kezd = Date.now();
+    while (this._em === g && g.lepes === 3) {
+      await new Promise((ok) => setTimeout(ok, 2500));
+      if (this._em !== g) return;
+      let adat;
+      try { adat = await this._hass.callWS({ type: "hu_rezsi/adatok" }); } catch (e) { continue; }
+      this._adat = adat;
+      const h = adat.haztartasok.find((x) => x.entry_id === g.entry_id);
+      const p = h?.email?.postafiokok?.find((x) => x.sid === g.sid);
+      if (p && p.felderites && !p.felderites_fut) {
+        g.eredmeny = { felderites: p.felderites, email: h.email };
+        g.lepes = 4;
+      } else if (Date.now() - kezd > 240000) {
+        g.lepes = 4;
+      } else continue;
+      this._emailRajzol();
+    }
+  }
+
+  // „Keresés újra” után: a felderítés végéig néhány másodpercenként frissít (szerkesztés alatt nem).
+  _emailFut() {
+    return (this._adat?.haztartasok || []).some((h) => h.email?.fut || (h.email?.postafiokok || []).some((p) => p.felderites_fut));
+  }
+
+  // Amíg valamelyik postafiókban keresés vagy átnézés fut, 5 mp-enként újratölt (időkorlát nélkül: a fél év
+  // átnézése több percig is tarthat); a _betolt a végén magától nem ütemez újat. Megnyitáskor is elindul.
+  _emailFigyel() {
+    if (this._emailFigyIdo) return;
+    this._emailFigyIdo = setTimeout(async () => {
+      this._emailFigyIdo = null;
+      if (!this.isConnected) return;
+      if (this._szerkesztesAlatt()) this._emailFigyel();
+      else await this._betolt();
+    }, 5000);
   }
 
   _dialogusNyit(f) {
@@ -3484,8 +3872,22 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     el("mentesbezar").addEventListener("click", () => d.close());
     d.addEventListener("click", (ev) => ev.target === d && d.close());
     const ered = (html) => { el("mentesered").innerHTML = html; };
+    el("autobezarasment").addEventListener("click", async () => {
+      const gomb = el("autobezarasment"); // az esemény célpontja await után a shadow DOM-ban már nem elérhető
+      gomb.disabled = true;
+      try {
+        const v = await this._hass.callWS({ type: "hu_rezsi/panel_beallitas", beallitas: { auto_bezaras_mp: Number(el("autobezaras").value || 0) } });
+        if (this._adat) this._adat.panel_beallitas = v;
+        el("autobezaras").value = v.auto_bezaras_mp;
+        el("autobezarasered").innerHTML = `<span class="ok">✓ Mentve:</span> ${v.auto_bezaras_mp ? `${v.auto_bezaras_mp} másodperc` : "soha nem zárul be magától"}.`;
+      } catch (err) {
+        el("autobezarasered").innerHTML = `<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`;
+      }
+      gomb.disabled = false;
+    });
     el("mentesmost").addEventListener("click", async (ev) => {
-      ev.target.disabled = true;
+      const gomb = ev.currentTarget;  // az await után az ev már nem megbízható (a lista újrarajzolása közben)
+      gomb.disabled = true;
       ered("Mentés készül…");
       try {
         const otthon = el("mentesotthon").value;
@@ -3497,8 +3899,11 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         await this._mentesLista();
       } catch (err) {
         ered(`<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`);
+      } finally {
+        gomb.disabled = false;
+        const most = el("mentesmost");
+        if (most) most.disabled = false;
       }
-      ev.target.disabled = false;
     });
     // Mentési helyek: a táblázat a this._mentesB (beállítás) másolatát szerkeszti, a „Beállítások mentése” küldi el.
     el("helytabla").addEventListener("input", (ev) => {
@@ -3524,7 +3929,8 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     el("utemgyak").addEventListener("change", () => { el("utemnapcimke").hidden = el("utemgyak").value !== "heti"; });
     el("beallitasment").addEventListener("click", async (ev) => {
       if (!this._mentesB) return;
-      ev.target.disabled = true;
+      const gomb = ev.currentTarget;
+      gomb.disabled = true;
       try {
         const b = { helyek: this._mentesB.helyek, utemezes: { gyakorisag: el("utemgyak").value, nap: +el("utemnap").value, ido: el("utemido").value, szamlak: el("utemszamlak").checked } };
         this._mentesB = await this._hass.callWS({ type: "hu_rezsi/mentes_beallitas", beallitas: b });
@@ -3532,8 +3938,9 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         await this._mentesLista();
       } catch (err) {
         ered(`<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`);
+      } finally {
+        gomb.disabled = false;
       }
-      ev.target.disabled = false;
     });
     el("menteslista").addEventListener("click", async (ev) => {
       const le = ev.target.closest("[data-letolt]"), vi = ev.target.closest("[data-visszaallit]");
@@ -3593,15 +4000,17 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         .filter(({ i, sor }) => i.value.trim() !== sor.entity_id)
         .map(({ i, sor }) => ({ sid: sor.sid, kulcs: sor.kulcs, idx: sor.idx, uj: i.value.trim() }));
       if (!csere.length) { sd.close(); return; }
-      ev.target.disabled = true;
+      const gomb = ev.currentTarget;
+      gomb.disabled = true;
       try {
         const v = await this._hass.callWS({ type: "hu_rezsi/szenzor_csere", entry_id: this._szenzorEntry, csere });
         el("szenzorered").innerHTML = `<span class="ok">✓ ${v.modositott} fiók módosítva</span> – az otthon újraszámol.`;
         setTimeout(() => { sd.close(); this._betolt(); }, 2000);
       } catch (err) {
         el("szenzorered").innerHTML = `<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`;
+      } finally {
+        gomb.disabled = false;
       }
-      ev.target.disabled = false;
     });
     this.shadowRoot.addEventListener("click", (ev) => {
       const t = ev.target.closest?.("[data-szenzorok]");
@@ -3614,6 +4023,8 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     const hazak = this._adat?.haztartasok || [];
     r.getElementById("mentesotthon").innerHTML = `<option value="">Minden otthon</option>${hazak.map((h) => `<option value="${esc(h.entry_id)}">${esc(h.nev)}</option>`).join("")}`;
     r.getElementById("mentesered").innerHTML = "";
+    r.getElementById("autobezaras").value = this._autoMp;
+    r.getElementById("autobezarasered").innerHTML = "";
     if (!d.open) d.showModal();
     try {
       this._helyJeloltek = await this._hass.callWS({ type: "hu_rezsi/mentes_helyek" });
@@ -3682,7 +4093,8 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
       const v = await this._hass.callWS({ type: "call_service", domain: "hu_rezsi", service: "visszaallitas", return_response: true, service_data: forras });
       const e = v.response || {};
       r.getElementById("mentesered").innerHTML = `<span class="ok">✓ Visszaállítva:</span> ${(e.otthonok || []).map((o) =>
-        `${esc(o.nev)} (${o.fiokok} fiók/rendszer${o.szamlak_kiirt ? `, ${o.szamlak_kiirt} számla-fájl visszaírva` : ""}${o.szamlak_mar_megvolt ? `, ${o.szamlak_mar_megvolt} már megvolt` : ""})${o.hianyzo_szenzorok
+        `${esc(o.nev)} (${o.fiokok} fiók/rendszer${o.szamlak_kiirt ? `, ${o.szamlak_kiirt} számla-fájl visszaírva` : ""}${o.szamlak_mar_megvolt ? `, ${o.szamlak_mar_megvolt} már megvolt` : ""})${(o.email_jelszo_kell || []).length
+          ? ` – <span class="figyszoveg">add meg újra az e-mail fiók jelszavát (${(o.email_jelszo_kell || []).map(esc).join(", ")}): Beállítások → Eszközök és szolgáltatások → Rezsikövető → ${esc(o.nev)} → az e-mail fiók → Újrakonfigurálás</span>` : ""}${o.hianyzo_szenzorok
           ? ` – <span class="figyszoveg">${o.hianyzo_szenzorok} szenzor nem található</span> <button type="button" class="linkgomb" data-szenzorok="${esc(o.entry_id)}">Szenzorok hozzárendelése ›</button>` : ""}`).join("; ")}`;
       await this._mentesLista();
       setTimeout(() => this._betolt(), 3000);
@@ -3977,6 +4389,51 @@ const STILUS = `
   .evmeg { margin: 4px 0 8px 18px; padding: 0; font-size: 13px; } .evmeg li { margin-bottom: 4px; }
   .evdoboz { border-left: 3px solid var(--warning-color, #ff9800); background: rgba(255, 152, 0, 0.1); padding: 6px 10px; margin: 6px 0; font-size: 13px; }
   #evesev { font: inherit; font-size: 13px; padding: 2px 4px; max-width: 220px; }
+  .emailblokk { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--divider-color); border-radius: 10px; font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .emailfej { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--secondary-text-color); }
+  .emailfej > span { flex: 1; font-weight: 500; }
+  .emailfej ha-icon, .emailures ha-icon { --mdc-icon-size: 18px; }
+  .emailnyit { font: inherit; font-weight: 500; font-size: 14px; border-radius: 18px; padding: 6px 14px; cursor: pointer;
+    border: 1px solid var(--primary-color); background: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .emailnyit.masodik { background: none; color: var(--primary-color); }
+  .emailpf { display: flex; flex-direction: column; gap: 2px; }
+  .emailgombok { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .emailfut { display: inline-flex; align-items: center; gap: 6px; color: var(--primary-color); }
+  .porgo { width: 14px; height: 14px; border: 2px solid var(--divider-color); border-top-color: var(--primary-color); border-radius: 50%;
+    display: inline-block; animation: forog 0.9s linear infinite; flex: none; }
+  .porgo.nagy { width: 32px; height: 32px; border-width: 4px; }
+  @keyframes forog { to { transform: rotate(360deg); } }
+  .emailuzenet { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(var(--rgb-success-color, 67, 160, 71), .12); }
+  .emailuzenet > div { flex: 1; }
+  .emailuzenet ha-icon { color: var(--success-color, #43a047); --mdc-icon-size: 20px; }
+  .emailuzenet button, .ekgombok button { font: inherit; font-size: 14px; border-radius: 16px; padding: 6px 14px; cursor: pointer;
+    border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); }
+  .ekgombok button.fo { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+  .emailkartya { padding: 10px 12px; border-left: 4px solid var(--primary-color); border-radius: 8px; background: var(--secondary-background-color, rgba(127,127,127,.08));
+    display: flex; flex-direction: column; gap: 6px; }
+  .ekcim { display: flex; align-items: center; gap: 8px; }
+  .ekcim ha-icon { color: var(--primary-color); --mdc-icon-size: 20px; }
+  .ekgombok { justify-content: flex-start; flex-wrap: wrap; margin-top: 2px; }
+  dialog.emaildlg { width: min(520px, 94vw); max-height: 92vh; }
+  .emaildlg p, .emaildlg li { font-size: 15px; line-height: 1.45; }
+  .emnagy li { margin: 6px 0; }
+  .emlepesek { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 12px; counter-reset: lep; }
+  .emlepesek li { flex: 1; font-size: 12px !important; text-align: center; padding: 4px 2px; border-bottom: 3px solid var(--divider-color); color: var(--secondary-text-color); counter-increment: lep; }
+  .emlepesek li::before { content: counter(lep) ". "; }
+  .emlepesek li.aktiv { border-color: var(--primary-color); color: var(--primary-text-color); font-weight: 600; }
+  .emlepesek li.kesz { border-color: var(--success-color, #43a047); }
+  .emsugo { padding: 10px 12px; margin: 0 0 12px; border-radius: 8px; background: var(--secondary-background-color, rgba(127,127,127,.08)); font-size: 14px; }
+  .emsugo ol { margin: 6px 0; padding-left: 20px; }
+  .emsugo li { font-size: 14px !important; margin: 4px 0; }
+  .emlink { display: inline-block; margin-top: 4px; font-weight: 500; color: var(--primary-color); }
+  .emhalado { margin: 0 0 12px; }
+  .emhalado summary { cursor: pointer; color: var(--secondary-text-color); font-size: 14px; margin-bottom: 8px; }
+  .emhiba a { color: inherit; }
+  .emkeres { display: flex; align-items: center; gap: 16px; padding: 12px 0; }
+  .emkesz { font-size: 17px !important; color: var(--success-color, #43a047); }
+  .emailsor { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; font-size: 14px; color: var(--secondary-text-color); }
+  .emailsor ha-icon { --mdc-icon-size: 18px; }
+  .emailsor .emailpf { color: var(--primary-text-color); }
   .linkgomb { background: none; border: 0; padding: 0 2px; color: var(--primary-color); cursor: pointer; font: inherit; text-decoration: underline; }
   .teteltabla { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
   .teteltabla th, .teteltabla td { padding: 5px 8px; border-bottom: 1px solid var(--divider-color); text-align: right; white-space: nowrap; }

@@ -4,6 +4,30 @@ DOMAIN = "hu_rezsi"
 PLATFORMS = ["sensor"]
 FIOK = "fiok"  # alárendelt bejegyzés (config subentry) típusa
 SZIGET = "sziget"  # szigetüzemi energiarendszer (kísérleti) – külön alárendelt típus, nem fiók
+POSTAFIOK = "postafiok"  # e-mail fiók (IMAP) a számlák beolvasásához – külön alárendelt típus, nem fiók
+
+# E-mail fiók (postafiók subentry) mezői. A jelszó a bejegyzés adataiban van (mint más integrációknál), de a
+# diagnosztikából és a Rezsikövető-mentésből kimarad – visszaállítás után újra meg kell adni.
+CONF_EMAIL_CIM = "email_cim"  # e-mail cím / felhasználónév
+CONF_JELSZO = "jelszo"  # alkalmazásjelszó (Gmail)
+CONF_IMAP_SZERVER = "imap_szerver"
+CONF_IMAP_PORT = "imap_port"
+CONF_IMAP_SSL = "imap_ssl"
+CONF_EMAIL_NAPOK = "email_napok"  # visszatekintés (nap)
+CONF_EMAIL_KUKA = "email_kuka"  # a Kukát is átnézi (a leveleket olvasás után gyakran törlik)
+# Fiók: e-mailes számlák
+CONF_EMAIL_POSTAFIOKOK = "email_postafiokok"  # a háztartás mely e-mail fiókjaiban keressen (postafiók-azonosítók)
+CONF_EMAIL_FELADOK = "email_feladok"  # feladó címek / domainek (vesszővel)
+CONF_EMAIL_TARGY = "email_targy"  # opcionális: a tárgyban szereplő szó
+CONF_EMAIL_MERO = "email_mero"  # opcionális: a mérő gyári száma (ha egy szolgáltató levelei több fiókot fednek le)
+CONF_EMAIL_IRSZ = "email_irsz"  # opcionális: a felhasználási hely irányítószáma (ugyanerre)
+CONF_EMAIL_AUTO = "email_auto"  # tartalom szerinti besorolás: a melléklet beolvasása dönt (mérő, szolgáltató), nem a feladó
+EMAIL_ATNEZES_ORA = 1  # óránként
+EMAIL_INDULAS_MP = 120  # a HA elindulása után ennyivel (a háttérben)
+
+# A panel integráció szintű (otthontól független) beállításai – hu_rezsi/panel_beallitas.
+PANEL_AUTO_BEZARAS = "auto_bezaras_mp"  # a csak megjelenítő ablakok bezárása ennyi mp tétlenség után (0: soha)
+PANEL_AUTO_BEZARAS_ALAP = 10
 
 # Fiók (subentry) mezői
 CONF_KOZMU = "kozmu"

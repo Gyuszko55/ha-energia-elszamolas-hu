@@ -225,3 +225,15 @@ def test_azonos_napi_azonos_osszegu_szamlak_kulon_befizetes():
     t2["reszszamlak"] = [{"datum": "2026-08-05", "osszeg": "9990"}]
     si.rogzit(t2, [a])
     assert len(t2["reszszamlak"]) == 1
+
+
+def test_mvm_mero_15_jegyu_gyari_szam():
+    """A 15 jegyű gyári számú (pl. H-tarifás) mérő sora is illeszkedik – 2.2.0b5 előtt csak 16–18 jegyű, így a
+    számla mérő nélkül maradt, és a fiókszűrő „más mérő”-nek vette (kitalált számokkal)."""
+    from custom_components.hu_rezsi.szamlak import _MVM_SOR
+
+    sor = "1234567890123452025.10.18-2026.04.140 5.441Dikt5.4411 5.441"
+    m = _MVM_SOR.search(sor)
+    assert m and m.group(1) == "123456789012345" and m.group(2) == "2025.10.18" and m.group(5) == "Dikt"
+    regi = "12345678901234562025.10.18-2026.04.1417 17 Dikt0 1 0"               # 16 jegyű: továbbra is jó
+    assert _MVM_SOR.search(regi).group(1) == "1234567890123456"

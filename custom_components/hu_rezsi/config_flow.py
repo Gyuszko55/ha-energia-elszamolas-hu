@@ -16,6 +16,7 @@ from homeassistant.config_entries import (
     SubentryFlowResult,
 )
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers.selector import (
     BooleanSelector,
     DateSelector,
@@ -29,11 +30,15 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
     TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
 )
 
 from pathlib import Path
 
-from . import dijnet, szamlak
+import re
+
+from . import dijnet, email_szamlak, szamlak
 from .beallitas import ELSZAMOLAS_MODOK, fix_dijas
 from .gaz_atalany import SZOBASZAMOK, TUZHELYEK
 from .const import (
@@ -97,6 +102,20 @@ from .const import (
     DOMAIN,
     FIOK,
     SZIGET,
+    POSTAFIOK,
+    CONF_EMAIL_AUTO,
+    CONF_EMAIL_CIM,
+    CONF_EMAIL_FELADOK,
+    CONF_EMAIL_IRSZ,
+    CONF_EMAIL_KUKA,
+    CONF_EMAIL_MERO,
+    CONF_EMAIL_NAPOK,
+    CONF_EMAIL_POSTAFIOKOK,
+    CONF_EMAIL_TARGY,
+    CONF_IMAP_PORT,
+    CONF_IMAP_SSL,
+    CONF_IMAP_SZERVER,
+    CONF_JELSZO,
 )
 from .tar import dijszabas_tar
 
@@ -167,7 +186,7 @@ class RezsiConfigFlow(ConfigFlow, domain=DOMAIN):
     @classmethod
     @callback
     def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
-        return {FIOK: FiokFlow, SZIGET: SzigetFlow}
+        return {FIOK: FiokFlow, SZIGET: SzigetFlow, POSTAFIOK: PostafiokFlow}
 
 
 class OtthonBeallitasFlow(OptionsFlow):
@@ -202,19 +221,27 @@ class FiokFlow(ConfigSubentryFlow):
         self._adat: dict[str, Any] = {}
         self._szerkesztes = False
         self._mutatott: set[str] = set()
+        self._elotoltes: dict[str, Any] = {}
 
     # ------------------------------------------------------------------ belépési pontok
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        # A panel „Fiók létrehozása” gombja (e-mailben talált, fiók nélküli szolgáltató) előtöltést hagy: közmű,
+        # szolgáltató, és a végén az e-mailes számlák (tartalom szerinti besorolással) ebből a postafiókból.
+        elo = (self.hass.data.get(DOMAIN, {}).get("elotoltes") or {}).get(self._get_entry().entry_id) or {}
         if user_input is not None:
             self._adat = dict(user_input)
+            if elo and elo.get(CONF_KOZMU) == self._adat.get(CONF_KOZMU):
+                self._elotoltes = elo
+                if elo.get(CONF_SZOLGALTATO):
+                    self._adat[CONF_SZOLGALTATO] = elo[CONF_SZOLGALTATO]
             return await self.async_step_szolgaltatas()
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required("nev"): TextSelector(),
-                    vol.Required(CONF_KOZMU, default="villany"): SelectSelector(
+                    vol.Required("nev", **({"default": elo["nev"]} if elo.get("nev") else {})): TextSelector(),
+                    vol.Required(CONF_KOZMU, default=elo.get(CONF_KOZMU) or "villany"): SelectSelector(
                         SelectSelectorConfig(options=KOZMUVEK, translation_key="kozmu", mode=SelectSelectorMode.LIST)
                     ),
                 }
@@ -270,8 +297,66 @@ class FiokFlow(ConfigSubentryFlow):
         sema = await self._szamlak_sema()
         if user_input is not None:
             self._atvesz(sema, user_input)
+            if self._postafiokok():  # e-mailes számlák: csak ha a háztartásnak van e-mail fiókja
+                return await self.async_step_email()
             return self._kesz()
         return self.async_show_form(step_id="szamlak", data_schema=sema, description_placeholders={"nev": self._adat.get("nev", "")})
+
+    async def async_step_email(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """E-mailes számlák: mely e-mail fiók(ok)ban keressen. Alapból a számla tartalma dönt (a melléklet
+        beolvasása: mérő gyári száma, szolgáltató); a Haladó részben a régi kézi szűrők (feladó, tárgy, mérő,
+        irányítószám) – tartalom szerinti besorolás nélkül ezek kellenek, mellette tartaléknak maradnak."""
+        pfk = self._postafiokok()
+        sema = await self._email_sema(pfk)
+        hibak: dict[str, str] = {}
+        if user_input is not None:
+            lapos = {k: v for k, v in user_input.items() if k != "halado"} | dict(user_input.get("halado") or {})
+            if lapos.get(CONF_EMAIL_POSTAFIOKOK) and not lapos.get(CONF_EMAIL_AUTO) and not email_szamlak.lista(lapos.get(CONF_EMAIL_FELADOK)):
+                hibak["base"] = "felado_kell"
+            else:
+                kulcsok = {CONF_EMAIL_POSTAFIOKOK, CONF_EMAIL_AUTO, CONF_EMAIL_FELADOK, CONF_EMAIL_TARGY, CONF_EMAIL_MERO, CONF_EMAIL_IRSZ}
+                self._mutatott |= kulcsok
+                self._adat = {k: v for k, v in self._adat.items() if k not in kulcsok} | {k: v for k, v in lapos.items() if v not in (None, "")}
+                if lapos.get(CONF_EMAIL_POSTAFIOKOK) and not self._adat.get(CONF_SZAMLA_MAPPA):
+                    # Számlamappa nélkül a mellékleteknek saját mappa (a mappa-feldolgozás innen olvassa be).
+                    self._adat[CONF_SZAMLA_MAPPA] = self._alap_mappa()
+                    self._mutatott.add(CONF_SZAMLA_MAPPA)
+                return self._kesz()
+        return self.async_show_form(
+            step_id="email", data_schema=self.add_suggested_values_to_schema(sema, user_input) if user_input else sema,
+            errors=hibak, description_placeholders={"nev": self._adat.get("nev", ""), "mappa": self._adat.get(CONF_SZAMLA_MAPPA) or self._alap_mappa()},
+        )
+
+    def _postafiokok(self) -> dict[str, str]:
+        """A háztartás e-mail fiókjai (azonosító → név)."""
+        return {sid: s.title for sid, s in self._get_entry().subentries.items() if s.subentry_type == POSTAFIOK}
+
+    def _alap_mappa(self) -> str:
+        """Alapértelmezett számlamappa az e-mailes számláknak: Szamlak/<fióknév>, ha más fiók még nem használja."""
+        from .email_ha import alap_mappa  # noqa: PLC0415
+
+        sajat = self._get_reconfigure_subentry().subentry_id if self._szerkesztes else None
+        return alap_mappa(self.hass, self._adat.get("nev") or "fiok", sajat)
+
+    async def _email_sema(self, pfk: dict[str, str]) -> vol.Schema:
+        tar = await dijszabas_tar(self.hass)
+        javasolt = ", ".join((tar.szolgaltatok.get(self._adat.get(CONF_SZOLGALTATO)) or {}).get("email_feladok") or [])
+        regi = [x for x in self._adat.get(CONF_EMAIL_POSTAFIOKOK) or [] if x in pfk]
+        # Új fióknál (és a szűrő nélkülinél) a tartalom szerinti besorolás az alap; a kézi szűrős régi fiók marad kézi.
+        kezi = bool(email_szamlak.lista(self._adat.get(CONF_EMAIL_FELADOK)))
+        auto = self._adat.get(CONF_EMAIL_AUTO, not kezi)
+        halado = vol.Schema({
+            vol.Optional(CONF_EMAIL_FELADOK, **self._javasolt(CONF_EMAIL_FELADOK, javasolt)): TextSelector(),
+            vol.Optional(CONF_EMAIL_TARGY, **self._javasolt(CONF_EMAIL_TARGY)): TextSelector(),
+            vol.Optional(CONF_EMAIL_MERO, **self._javasolt(CONF_EMAIL_MERO)): TextSelector(),
+            vol.Optional(CONF_EMAIL_IRSZ, **self._javasolt(CONF_EMAIL_IRSZ)): TextSelector(),
+        })
+        return vol.Schema({
+            vol.Optional(CONF_EMAIL_POSTAFIOKOK, default=regi): SelectSelector(SelectSelectorConfig(
+                options=[SelectOptionDict(value=k, label=v) for k, v in pfk.items()], multiple=True, mode=SelectSelectorMode.LIST)),
+            vol.Required(CONF_EMAIL_AUTO, default=bool(auto)): BooleanSelector(),
+            vol.Required("halado"): section(halado, {"collapsed": not (kezi and not auto)}),
+        })
 
     def _kesz(self) -> SubentryFlowResult:
         # A most nem kérdezett, díjszabástól függő mezők régi értéke ne maradjon meg (pl. díjszabás-váltás után).
@@ -280,6 +365,12 @@ class FiokFlow(ConfigSubentryFlow):
             return self.async_update_and_abort(
                 self._get_entry(), self._get_reconfigure_subentry(), title=self._adat["nev"], data=adat
             )
+        if self._elotoltes and self._elotoltes.get("pf") in self._postafiokok():
+            # A panelről indított fiók: az e-mailes számlák ebből a postafiókból, tartalom szerint.
+            adat[CONF_EMAIL_POSTAFIOKOK] = sorted(set(adat.get(CONF_EMAIL_POSTAFIOKOK) or []) | {self._elotoltes["pf"]})
+            adat.setdefault(CONF_EMAIL_AUTO, True)
+            adat.setdefault(CONF_SZAMLA_MAPPA, self._alap_mappa())
+            (self.hass.data.get(DOMAIN, {}).get("elotoltes") or {}).pop(self._get_entry().entry_id, None)
         return self.async_create_entry(title=self._adat["nev"], data=adat)
 
     # ------------------------------------------------------------------ sémák
@@ -523,3 +614,79 @@ class SzigetFlow(ConfigSubentryFlow):
                 EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)
             )
         return self.async_show_form(step_id="forrasok", data_schema=vol.Schema(mezok), description_placeholders={"nev": self._adat.get("nev", "")})
+
+
+class PostafiokFlow(ConfigSubentryFlow):
+    """E-mail fiók (IMAP) a számlák beolvasásához. Látható mező csak kettő: e-mail cím és (alkalmazás)jelszó; a
+    szerver, a port és az SSL a cím domainjéből jön (Gmail, Freemail, Citromail, Yahoo, iCloud; ismeretlennél
+    „imap.<domain>”), a név a cím „@” előtti része. A Haladó rész (összecsukva): név, szerver, port, SSL,
+    visszatekintés, Kuka – ismeretlen szervernél kinyitva.
+
+    Mentés előtt bejelentkezéssel ellenőrzi (a panel varázslójával közös úton: email_ha). Csak olvas: semmit nem
+    töröl, nem helyez át, nem jelöl olvasottnak. Új postafiók után a felderítés megkeresi a számlákat."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._regi: dict[str, Any] = {}
+        self._szerkesztes = False
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        from .email_ha import bejelentkezes_ellenorzes, postafiok_adat  # noqa: PLC0415
+
+        hibak: dict[str, str] = {}
+        bemenet: dict[str, Any] = {}
+        halado_nyitva = False
+        if user_input is not None:
+            bemenet = {k: v for k, v in user_input.items() if k != "halado"} | dict(user_input.get("halado") or {})
+            regi = self._regi if self._szerkesztes else {}
+            if regi and email_szamlak.cim_domain(bemenet.get(CONF_EMAIL_CIM, "")) != email_szamlak.cim_domain(regi.get(CONF_EMAIL_CIM, "")) \
+                    and bemenet.get(CONF_IMAP_SZERVER) == regi.get(CONF_IMAP_SZERVER):
+                bemenet.pop(CONF_IMAP_SZERVER, None)  # más levelezőre váltott: a szerver az új címből
+            adat, nev = postafiok_adat(bemenet, regi)
+            if hiba := await bejelentkezes_ellenorzes(self.hass, adat, nev):
+                hibak["base"] = hiba
+                lv = email_szamlak.levelezo(adat[CONF_EMAIL_CIM])
+                halado_nyitva = hiba in ("kapcsolat", "szerver_ismeretlen") or not lv["ismert"]
+                bemenet.setdefault(CONF_IMAP_SZERVER, adat[CONF_IMAP_SZERVER])
+            elif self._szerkesztes:
+                return self.async_update_and_abort(self._get_entry(), self._get_reconfigure_subentry(), title=nev, data=adat)
+            else:
+                return self.async_create_entry(title=nev, data=adat)
+        alap = {**self._regi, **bemenet}
+        alap.pop(CONF_JELSZO, None)  # a jelszót soha nem töltjük vissza az űrlapba
+        cim = alap.get(CONF_EMAIL_CIM, "")
+        lv = email_szamlak.levelezo(cim) if cim else None
+
+        def javasolt(kulcs: str, ertek: Any) -> dict[str, Any]:
+            return {"description": {"suggested_value": ertek}} if ertek not in (None, "") else {}
+
+        halado = vol.Schema({
+            vol.Optional("nev", **javasolt("nev", alap.get("nev"))): TextSelector(),
+            vol.Optional(CONF_IMAP_SZERVER, **javasolt(CONF_IMAP_SZERVER, alap.get(CONF_IMAP_SZERVER))): TextSelector(),
+            vol.Optional(CONF_IMAP_PORT, default=alap.get(CONF_IMAP_PORT, email_szamlak.ALAP_PORT)): NumberSelector(
+                NumberSelectorConfig(min=1, max=65535, step=1, mode=NumberSelectorMode.BOX)),
+            vol.Optional(CONF_IMAP_SSL, default=alap.get(CONF_IMAP_SSL, True)): BooleanSelector(),
+            vol.Optional(CONF_EMAIL_NAPOK, default=alap.get(CONF_EMAIL_NAPOK, email_szamlak.ALAP_NAPOK)): NumberSelector(
+                NumberSelectorConfig(min=1, max=400, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="nap")),
+            vol.Optional(CONF_EMAIL_KUKA, default=alap.get(CONF_EMAIL_KUKA, True)): BooleanSelector(),
+        })
+        mezok: dict[Any, Any] = {
+            vol.Required(CONF_EMAIL_CIM, default=cim): TextSelector(TextSelectorConfig(type=TextSelectorType.EMAIL)),
+            (vol.Optional(CONF_JELSZO) if self._szerkesztes and self._regi.get(CONF_JELSZO) else vol.Required(CONF_JELSZO)):
+                TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            vol.Required("halado"): section(halado, {"collapsed": not halado_nyitva}),
+        }
+        return self.async_show_form(
+            step_id="user", data_schema=vol.Schema(mezok), errors=hibak,
+            description_placeholders={
+                "levelezo": f" – {lv['nev']}" if lv and lv["nev"] else "",
+                "lepesek": email_szamlak.lepesek_szoveg(lv["kulcs"] if lv else "alap"),
+                "jelszo_megjegyzes": "Üresen hagyva a régi jelszó marad." if self._szerkesztes and self._regi.get(CONF_JELSZO) else "",
+            },
+        )
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        sub = self._get_reconfigure_subentry()
+        self._regi = {**sub.data, "nev": sub.title}
+        self._szerkesztes = True
+        return await self.async_step_user()

@@ -23,6 +23,7 @@ from homeassistant.util import dt as dt_util
 from .gaz_atalany import havi_mj
 from .beallitas import elszamolas_mod, fix_dijas, idoszak_mod, reszszamlas
 from . import fizetes
+from . import panel_beallitas
 from . import szamlak as szamlak_mod
 from .motor.dijszabas import ELLENORZES_ALLAPOTOK, VALIDALAS_ELSZAMOLAS, VALIDALAS_HMKE, VALIDALAS_SZAMLA
 from .const import (
@@ -448,8 +449,11 @@ def ws_adatok(hass: HomeAssistant, connection: websocket_api.ActiveConnection, m
             "szigetek": [koord.sziget_allapot[sid] for sid in koord.config_entry.subentries if sid in getattr(koord, "sziget_allapot", {})],
             # Hiányzó szenzorok (pl. visszaállítás után új rendszerben): a panel a hozzárendelő táblázatot ajánlja.
             "hianyzo_szenzorok": _hianyzo_szenzorok(hass, entry),
+            # Számlák e-mailből: postafiókonként az utolsó átnézés, a talált számlák és a hiba (None: nincs e-mail fiók).
+            "email": koord.email.panel_adat() if getattr(koord, "email", None) else None,
         })
-    connection.send_result(msg["id"], {"haztartasok": haztartasok, "ma": date.today().isoformat()})
+    connection.send_result(msg["id"], {"haztartasok": haztartasok, "ma": date.today().isoformat(),
+                                       "panel_beallitas": panel_beallitas.aktualis(hass)})
 
 
 def _nem_szamlazott(a: Any) -> int:
@@ -507,7 +511,8 @@ def ws_kartya(hass: HomeAssistant, connection: websocket_api.ActiveConnection, m
         # Az otthon fűtés- és hőmérséklet-beállítása (Konfigurálás); üresen a kártyán nincs hőmérséklet és füst.
         futes = {k: entry.options[k] for k in OTTHON_BEALLITASOK if entry.options.get(k)}
         hazak.append({"entry_id": entry.entry_id, "nev": entry.title, "fiokok": fiokok, "futes": futes or None})
-    connection.send_result(msg["id"], {"haztartasok": hazak, "ma": ma.isoformat(), "kesz": kesz})
+    connection.send_result(msg["id"], {"haztartasok": hazak, "ma": ma.isoformat(), "kesz": kesz,
+                                       "panel_beallitas": panel_beallitas.aktualis(hass)})
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/folyoszamla", vol.Required("sid"): str,
@@ -691,6 +696,118 @@ async def ws_fuggo_dontes(hass: HomeAssistant, connection: websocket_api.ActiveC
     connection.send_result(msg["id"], eredmeny)
 
 
+@websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/email_atnezes", vol.Optional("entry_id"): str})
+@websocket_api.require_admin  # levelezőszerverhez kapcsolódik és fájlt ír: csak rendszergazda
+@websocket_api.async_response
+async def ws_email_atnezes(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """„Átnézés most”: az otthon (vagy minden otthon) e-mail fiókjainak átnézése; postafiókonként az eredmény."""
+    from .email_ha import atnezes_most  # noqa: PLC0415
+
+    try:
+        eredmeny = await atnezes_most(hass, msg.get("entry_id"))
+    except ValueError as err:
+        connection.send_error(msg["id"], "nincs_otthon", str(err))
+        return
+    connection.send_result(msg["id"], eredmeny)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/panel_beallitas", vol.Optional("beallitas"): dict})
+@websocket_api.async_response
+async def ws_panel_beallitas(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """A panel integráció szintű beállításai (pl. automatikus bezárás): olvasni mindenki, írni csak rendszergazda."""
+    if "beallitas" not in msg:
+        connection.send_result(msg["id"], await panel_beallitas.betolt(hass))
+        return
+    if not connection.user.is_admin:
+        connection.send_error(msg["id"], websocket_api.ERR_UNAUTHORIZED, "Csak rendszergazda módosíthatja.")
+        return
+    try:
+        connection.send_result(msg["id"], await panel_beallitas.ment(hass, msg["beallitas"]))
+    except ValueError as err:
+        connection.send_error(msg["id"], "hibas_ertek", str(err))
+
+
+def _email_otthon(hass: HomeAssistant, entry_id: str) -> Any:
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
+        raise ValueError("Nincs ilyen (betöltött) otthon.")
+    return entry
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/postafiok_felismeres", vol.Required("email"): str})
+@websocket_api.require_admin
+@callback
+def ws_postafiok_felismeres(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Az e-mail cím levelezője (a panel varázslójának súgójához): név, szerver, alkalmazásjelszó kell-e, link."""
+    from . import email_szamlak as es  # noqa: PLC0415
+
+    lv = es.levelezo(msg["email"])
+    connection.send_result(msg["id"], lv | {"cim_jo": bool(es.CIM_MINTA.match(msg["email"].strip())), "lepesek": es.lepesek(lv["kulcs"])})
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hu_rezsi/postafiok_hozzaad", vol.Required("entry_id"): str, vol.Required("email_cim"): str,
+    vol.Required("jelszo"): str, vol.Optional("nev"): str, vol.Optional("imap_szerver"): str, vol.Optional("imap_port"): vol.Coerce(int),
+    vol.Optional("imap_ssl"): bool,
+})
+@websocket_api.require_admin  # jelszót tárol és levelezőszerverhez kapcsolódik: csak rendszergazda
+@websocket_api.async_response
+async def ws_postafiok_hozzaad(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """„Számlák e-mailből” varázsló: bejelentkezés-próba, majd új E-mail fiók (alárendelt bejegyzés) és felderítés."""
+    from .email_ha import postafiok_letrehoz  # noqa: PLC0415
+
+    try:
+        entry = _email_otthon(hass, msg["entry_id"])
+    except ValueError as err:
+        connection.send_error(msg["id"], "nincs_otthon", str(err))
+        return
+    bemenet = {k: msg[k] for k in ("email_cim", "jelszo", "nev", "imap_szerver", "imap_port", "imap_ssl") if k in msg}
+    connection.send_result(msg["id"], await postafiok_letrehoz(hass, entry, bemenet))
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/email_felderites", vol.Required("entry_id"): str, vol.Optional("sid"): str})
+@websocket_api.require_admin  # levelezőszerverhez kapcsolódik és fiókot módosít: csak rendszergazda
+@websocket_api.async_response
+async def ws_email_felderites(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """„Keresés újra”: az utolsó 180 nap számláinak felkutatása és besorolása (a háttérben indul)."""
+    try:
+        entry = _email_otthon(hass, msg["entry_id"])
+        figyelo = entry.runtime_data.email
+        if msg.get("sid") and msg["sid"] not in {s for s, x in entry.subentries.items() if x.subentry_type == "postafiok"}:
+            raise ValueError("Nincs ilyen e-mail fiók.")
+    except (ValueError, AttributeError) as err:
+        connection.send_error(msg["id"], "nincs_otthon", str(err))
+        return
+    indult = []
+    for sid in [msg["sid"]] if msg.get("sid") else [s for s, x in entry.subentries.items() if x.subentry_type == "postafiok"]:
+        if sid in figyelo.felderites_fut:
+            continue  # már fut
+        figyelo.felderites_fut.add(sid)  # a panel azonnal „keresem…”-et mutat; a felderítés maga veszi át
+        figyelo.felderites_kezdet[sid] = dt_util.now().replace(microsecond=0).isoformat()
+        indult.append(sid)
+        entry.async_create_background_task(hass, figyelo.felderit(sid, mar_jelolt=True), "hu_rezsi e-mail felderítés")
+    connection.send_result(msg["id"], {"indult": indult})
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hu_rezsi/email_valasz", vol.Required("entry_id"): str,
+    vol.Required("tipus"): vol.In(["kerdes", "ajanlat", "uzenet", "auto"]), vol.Optional("azon", default=""): str,
+    vol.Optional("ertek", default=""): str,
+})
+@websocket_api.require_admin  # fiókot módosít / hoz létre: csak rendszergazda
+@websocket_api.async_response
+async def ws_email_valasz(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """A panel e-mailes kártyáinak gombjai: melyik fiókhoz tartozik, fiók létrehozása / nem kell, nyugtázás,
+    átállás tartalom szerinti besorolásra."""
+    try:
+        entry = _email_otthon(hass, msg["entry_id"])
+        eredmeny = await entry.runtime_data.email.valasz(msg["tipus"], msg["azon"], msg["ertek"])
+    except (ValueError, AttributeError) as err:
+        connection.send_error(msg["id"], "hiba", str(err))
+        return
+    connection.send_result(msg["id"], eredmeny)
+
+
 @websocket_api.websocket_command({
     vol.Required("type"): "hu_rezsi/varhato_tetelek", vol.Required("entry_id"): str, vol.Required("sid"): str,
     vol.Optional("tol"): str, vol.Optional("ig"): str,
@@ -790,6 +907,31 @@ async def ws_dij_elteres(hass: HomeAssistant, connection: websocket_api.ActiveCo
         connection.send_error(msg["id"], "hiba", str(err))
         return
     connection.send_result(msg["id"], {"ok": True})
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hu_rezsi/sajat_dijak", vol.Required("entry_id"): str, vol.Required("sid"): str,
+    vol.Optional("ertekek"): {str: vol.All(vol.Coerce(float), vol.Range(min=0, max=1_000_000))},
+    vol.Optional("tol"): str,
+})
+@websocket_api.async_response
+async def ws_sajat_dijak(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """„Saját díjak” (2.2.0b6): ertekek nélkül a fiók mostani díjai (bruttó); ertekek + tol: mentés felülírásként
+    (csak rendszergazda)."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
+        connection.send_error(msg["id"], "nincs_otthon", "Nincs ilyen otthon.")
+        return
+    k = entry.runtime_data
+    try:
+        if "ertekek" in msg:
+            if not connection.user.is_admin:
+                connection.send_error(msg["id"], "unauthorized", "A díjak módosításához rendszergazda kell.")
+                return
+            await k.sajat_dijak_ment(msg["sid"], msg["ertekek"], date.fromisoformat(msg.get("tol") or dt_util.now().date().isoformat()))
+        connection.send_result(msg["id"], k.sajat_dijak(msg["sid"]))
+    except (ValueError, KeyError) as err:
+        connection.send_error(msg["id"], "hiba", str(err))
 
 
 @websocket_api.websocket_command({
@@ -987,9 +1129,13 @@ async def regisztral_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_eves_kimutatas)
     websocket_api.async_register_command(hass, ws_fizetes)
     websocket_api.async_register_command(hass, ws_dij_elteres)
+    websocket_api.async_register_command(hass, ws_sajat_dijak)
     websocket_api.async_register_command(hass, ws_szamla_javitas)
     websocket_api.async_register_command(hass, ws_hatarido)
     websocket_api.async_register_command(hass, ws_mentesek)
+    websocket_api.async_register_command(hass, ws_email_atnezes)
+    for parancs in (ws_panel_beallitas, ws_postafiok_felismeres, ws_postafiok_hozzaad, ws_email_felderites, ws_email_valasz):
+        websocket_api.async_register_command(hass, parancs)
     websocket_api.async_register_command(hass, ws_ai_tajekoztato)  # kísérleti
     for parancs in (ws_mentes_beallitas, ws_mentes_helyek, ws_ha_mentesek, ws_ha_mentesbol, ws_szenzor_lista, ws_szenzor_csere):
         websocket_api.async_register_command(hass, parancs)
