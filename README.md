@@ -6,7 +6,7 @@
 </p>
 
 > [!WARNING]
-> **A main ágon most a 2.3.0 béta (2.3.0b8) van.** A stabil változat a **2.2.1** – a HACS ezt telepíti, amíg a béta változatok megjelenítését be nem kapcsolod (HACS → Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta új funkciói (AI-beolvasó, saját beolvasó) kísérletiek; hibát a GitHub Issues-ban jelezz.
+> **A main ágon most a 2.3.0 béta (2.3.0b9) van.** A stabil változat a **2.2.1** – a HACS ezt telepíti, amíg a béta változatok megjelenítését be nem kapcsolod (HACS → Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta új funkciói (AI-beolvasó, saját beolvasó) kísérletiek; hibát a GitHub Issues-ban jelezz.
 
 
 # Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
@@ -39,7 +39,7 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 > Béta – a HACS-ban a béta változatok megjelenítésével telepíthető.
 
 - **Tablet és mobil: lapozós nézet.** Fiókonként egy lap (Fiókok), vagy minden fiók témánként egy táblázatban / kártyán (Témák: Számlák, Fogyasztás, Egyenleg, Mérők) – görgetés helyett. Útmutató: [kézikönyv 7.0](docs/KEZIKONYV.md#70-lapozós-nézet-fiókok-és-témák-230-béta).
-- **Ismeretlen számla kiolvasása AI-val (kísérleti)** – a személyes adatok kitakarásával, jóváhagyással; az első számlából **saját beolvasó** készül, a szolgáltató következő számláit már AI nélkül olvassa. Útmutató: [kézikönyv 9.9](docs/KEZIKONYV.md#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-béta-kísérleti).
+- **Ismeretlen számla kiolvasása AI-val (kísérleti)** – a személyes adatok kitakarásával, jóváhagyással; az első számlából **saját beolvasó** készül, a szolgáltató következő számláit már AI nélkül olvassa. Útmutató: [AI-os számlaolvasó – részletes leírás](docs/AI_szamlaolvaso.md) és [kézikönyv 9.9](docs/KEZIKONYV.md#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-béta-kísérleti).
 - **Mérők:** a saját szenzor szerinti mostani állás és a korrekciós szorzó; **korrekciós leolvasás** a Mérőállás ablakban (nem diktálás, nem időszakhatár).
 
 ## Újdonságok a 2.2.0-ban (2026. november 4.)

@@ -117,7 +117,8 @@ class HuRezsiPanel extends HTMLElement {
       if (nyit) this._nyitottSzamla.add(k); else this._nyitottSzamla.delete(k);
     });
     this.shadowRoot.addEventListener("click", (ev) => {
-      const gomb = ev.composedPath().find((el) => el.classList?.contains("info"));
+      // csak a ⓘ gomb (data-info) – a figyelmeztetés-sor <li class="info"> nem buborék
+      const gomb = ev.composedPath().find((el) => el.classList?.contains("info") && el.dataset?.info !== undefined);
       if (gomb) {
         ev.stopPropagation();
         this._buborek(gomb);

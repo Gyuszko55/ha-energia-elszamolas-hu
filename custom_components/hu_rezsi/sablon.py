@@ -122,7 +122,7 @@ def _felirat(szoveg: str, a: int) -> str | None:
     return f
 
 
-def _mezo_minta(szoveg: str, ertek_formak: list[str], tipus: str) -> str | None:
+def _mezo_minta(szoveg: str, ertek_formak: list[str], tipus: str, foglalt: set[str] | None = None) -> str | None:
     """Egy mező mintája: felirat + rugalmas köz + (érték típusa). A legrövidebb egyértelmű feliratot választja."""
     jeloltek = []
     cap = {"datum": "({DATUM})", "osszeg": "({SZAM})"}.get(tipus, tipus)
@@ -133,7 +133,8 @@ def _mezo_minta(szoveg: str, ertek_formak: list[str], tipus: str) -> str | None:
         minta = _altalanosit(f)
         # A jó felirat kettősponttal végződik, és nincs benne változó rész (dátum, szám); azonos rangnál az első.
         rang = (0 if f.rstrip().endswith(":") else 1, minta.count("{"), i)
-        jeloltek.append((rang, minta + r"[ \t]*" + cap))
+        if (teljes := minta + r"[ \t]*" + cap) not in (foglalt or set()):  # egy felirat csak egy mezőé (azonos dátumú mezők)
+            jeloltek.append((rang, teljes))
     return min(jeloltek)[1] if jeloltek else None
 
 
@@ -310,10 +311,10 @@ def keszit(adat: dict[str, Any], sima: str, tabla: str, ma: date | None = None) 
     }
     for szoveg_nev, szoveg in (("tabla", tabla), ("sima", sima)):
         for k in MEZOK_DATUM:
-            if adat.get(k) and k not in sab["mezok"] and (m := _mezo_minta(szoveg, _datum_formak(adat[k]), "datum")):
+            if adat.get(k) and k not in sab["mezok"] and (m := _mezo_minta(szoveg, _datum_formak(adat[k]), "datum", {x["minta"] for x in sab["mezok"].values()})):
                 sab["mezok"][k] = {"minta": m, "szoveg": szoveg_nev, "tipus": "datum"}
         for k in MEZOK_SZAM:
-            if adat.get(k) is not None and k not in sab["mezok"] and (m := _mezo_minta(szoveg, _szam_formak(adat[k]), "osszeg")):
+            if adat.get(k) is not None and k not in sab["mezok"] and (m := _mezo_minta(szoveg, _szam_formak(adat[k]), "osszeg", {x["minta"] for x in sab["mezok"].values()})):
                 sab["mezok"][k] = {"minta": m, "szoveg": szoveg_nev, "tipus": "osszeg"}
         if adat.get("sorszam") and "sorszam" not in sab["mezok"] and (m := _mezo_minta(szoveg, [adat["sorszam"]], _sorszam_minta(adat["sorszam"]))):
             sab["mezok"]["sorszam"] = {"minta": m, "szoveg": szoveg_nev, "tipus": "szoveg"}

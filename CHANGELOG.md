@@ -1,5 +1,12 @@
 # Változások
 
+## Rezsikövető 2.3.0b9 – béta, 2026-11-04
+
+- Részletes, képes leírás az AI-os számlaolvasóról: [docs/AI_szamlaolvaso.md](docs/AI_szamlaolvaso.md).
+- Javítás: a figyelmeztetés-sorra (pl. a „Kiolvasás AI-val” gombra) kattintva egy üres („undefined”) buborék jelent meg.
+- Javítás (saját beolvasó): ha két mező értéke azonos (pl. a kelte és az időszak vége ugyanaz a nap), a második mező
+  nem ülhet az első feliratára – egy felirat csak egy mezőé.
+
 ## Rezsikövető 2.3.0b8 – béta, 2026-11-04
 
 > Béta: a HACS-ban a béta változatok megjelenítésével telepíthető. Az új funkciók (AI-beolvasó, saját beolvasó)

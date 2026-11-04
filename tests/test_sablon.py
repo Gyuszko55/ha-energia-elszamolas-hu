@@ -126,3 +126,12 @@ def test_koordinator_sablon_keszit(tmp_path: Path):
     rossz = dict(JOVAHAGYOTT, fizetendo=19651)  # a forrásszámlán nem ezt adná: nem mentjük
     e = k._sablon_keszit(rossz, SZAMLA, SZAMLA, [])
     assert not e["mentve"] and "fizetendo" in e["uzenet"]
+
+
+def test_azonos_datumu_mezok_kulon_feliratot_kapnak():
+    """Ha a kelte és az időszak vége ugyanaz a nap, az időszak vége nem ülhet a „Számla kelte:” feliratra."""
+    sz = SZAMLA.replace("Számla kelte: 2026.10.05", "Számla kelte: 2026.09.30")
+    adat = dict(JOVAHAGYOTT, kelte="2026-09-30")
+    s = S.keszit(adat, sz, sz)
+    assert "kelte" in s["mezok"]["kelte"]["minta"] and "kelte" not in s["mezok"]["idoszak_ig"]["minta"]
+    assert S.onproba(s, adat, sz, sz) == []

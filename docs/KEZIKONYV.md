@@ -949,6 +949,8 @@ Ha a fióknak még nincs **számlamappája**, a Rezsikövető létrehoz egyet (`
 
 ### 9.9 Ismeretlen számla kiolvasása AI-val, saját beolvasó (2.3.0 béta, kísérleti)
 
+> Részletes, képes leírás: [AI-os számlaolvasó](AI_szamlaolvaso.md).
+
 Ha a Rezsikövető egy PDF-számlát nem ismer fel (más szolgáltató, pl. egy helyi vízmű), a választott **AI** kiolvassa belőle az adatokat, te ellenőrzöd és jóváhagyod – és a számla ugyanúgy bekerül, mint egy felismert.
 
 **Kell hozzá:** egy **AI Task** entitás a Home Assistantban (Beállítások → Eszközök és szolgáltatások → pl. *Google Generative AI*, *OpenAI* vagy helyi *Ollama*). Ugyanaz lehet, amit az AI-tájékoztató használ.
