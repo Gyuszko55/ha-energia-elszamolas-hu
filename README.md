@@ -1,4 +1,7 @@
 <p align="center">
+
+> [!WARNING]
+> **A main ágon most a 2.3.0 béta (2.3.0b8) van.** A stabil változat a **2.2.1** – a HACS ezt telepíti, amíg a béta változatok megjelenítését be nem kapcsolod (HACS → Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta új funkciói (AI-beolvasó, saját beolvasó) kísérletiek; hibát a GitHub Issues-ban jelezz.
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo_sotet.png">
     <img src="docs/brand/logo.png" alt="Rezsikövető" width="420">
