@@ -1106,7 +1106,7 @@ Fix díjas fióknál (pl. MOHU, közös költség) a beépített díj (pl. a MOH
 - a havidíjat **kézzel még nem adtad meg** (sem Saját díjakkal, sem felülírással), és
 - a **legutóbbi két teljes időszakos számla ugyanannyi**, de eltér a beépített díjtól,
 
-akkor a Rezsikövető a számlák díját veszi át – az azonos összegű számlák sorozatának elejétől –, és értesítést küld: „A(z) … díját a számláidból vettem át: … Ft / 3 hónap = kb. … Ft/hó”. Ez egyszer történik; ha nem ez a díjad, a **Saját díjak** alatt módosíthatod. Idényes (üdülő-) díjnál nem tanul, mert ott a negyedévek eltérnek.
+akkor a Rezsikövető a számlák díját veszi át – az azonos összegű számlák sorozatának elejétől –, és értesítést küld: „A(z) … díját a számláidból vettem át: … Ft / 3 hónap = kb. … Ft/hó”. Ez egyszer történik; ha nem ez a díjad, a **Saját díjak** alatt módosíthatod. Idényes (üdülő-) díjnál nem tanul, mert ott a negyedévek eltérnek. A **mérő nélküli gáznál (gázátalány)** sem: ott a díj az országos egységár × a havi átalány-MJ (a szobaszám és a tűzhely szerint), nem havidíj – ennél a fióknál a Saját díjak gomb sem jelenik meg. (A 2.2.0 tévesen ide is tanult, ami több százezres várható díjat adott; a 2.2.1 ezt magától visszavonja.)
 
 ### 13.3 Ha a számla eltér a havidíjtól
 
