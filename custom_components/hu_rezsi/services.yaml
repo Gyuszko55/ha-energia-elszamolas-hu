@@ -34,6 +34,10 @@ leolvasas_rogzites:
       default: false
       selector:
         boolean:
+    korrekcio:
+      default: false
+      selector:
+        boolean:
     megjegyzes:
       selector:
         text:

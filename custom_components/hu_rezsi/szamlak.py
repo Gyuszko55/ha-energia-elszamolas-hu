@@ -1059,6 +1059,38 @@ def fizetesi_mod(szoveg: str) -> str:
     return m.group(1).strip() if m else ""
 
 
+# Számlasablonok (2.3.0b2): az integráció tölti be (config/hu_rezsi_sablonok); a beépített beolvasók után próbálja.
+SABLONOK: list[dict[str, Any]] = []
+
+
+def sablonnal(sima: str, tabla: str, fajl: str) -> Szamla | None:
+    """A mentett sablonok közül az első, amelyik felismeri a számlát és minden kötelező mezőt kiolvas."""
+    if not SABLONOK:
+        return None
+    try:
+        from . import ai_beolvaso, sablon  # noqa: PLC0415 – körkörös import elkerülése
+    except ImportError:
+        import ai_beolvaso  # noqa: PLC0415
+        import sablon  # noqa: PLC0415
+    for s in SABLONOK:
+        try:
+            adat = sablon.alkalmaz(s, sima, tabla)
+        except Exception as err:  # noqa: BLE001 – egy hibás (pl. kézzel szerkesztett) sablon ne állítsa meg a többit
+            _LOGGER.warning("Hibás számlasablon (%s): %s", s.get("azonosito"), err)
+            continue
+        if adat is None:
+            continue
+        if hiany := sablon.hianyzo(adat):
+            _LOGGER.warning("%s: a(z) %s sablon felismerte, de hiányzik: %s – a beolvasó elavult lehet (AI-val újra kiolvasható)",
+                            fajl, s.get("azonosito"), ", ".join(hiany))
+            continue
+        try:
+            return ai_beolvaso.szamlava(adat, fajl, None, forras=f"sablon:{s['azonosito']}")
+        except ValueError as err:
+            _LOGGER.warning("%s: a(z) %s sablon adata nem alakítható: %s", fajl, s.get("azonosito"), err)
+    return None
+
+
 def beolvas_fajl(fajl: Path) -> Szamla | None:
     """Egy fájl → Számla (vagy None, ha nem ismert formátum). A PDF-ből a fizetési mód is (beszedésnél a határidőn
     fizetettnek vesszük)."""
@@ -1126,7 +1158,8 @@ def _beolvas_fajl(fajl: Path) -> Szamla | None:
             sima = pdf_szoveg(fajl, "plain")
             layout = pdf_szoveg(fajl)
             return (alfoldviz_szoveg(layout, fajl.name) or dakov_szoveg(layout, fajl.name) or mvm_aram_szoveg(sima, fajl.name)
-                    or mvm_gaz_szoveg(sima, fajl.name) or telekom_pdf(layout, fajl.name) or one_pdf(sima, fajl.name))
+                    or mvm_gaz_szoveg(sima, fajl.name) or telekom_pdf(layout, fajl.name) or one_pdf(sima, fajl.name)
+                    or sablonnal(sima, layout, fajl.name))
     except Exception as err:  # noqa: BLE001 – egy hibás fájl ne állítsa meg a többit
         _LOGGER.warning("Számla nem olvasható (%s): %s", fajl, err)
     return None

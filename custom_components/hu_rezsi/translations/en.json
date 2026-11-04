@@ -560,6 +560,10 @@
           "name": "Start of settlement year",
           "description": "A new settlement year starts on this day (e.g. after a final invoice and new contract), even if it is closer than 10 months to another annual reading."
         },
+        "korrekcio": {
+          "name": "Correction reading only",
+          "description": "Own reading only to adjust the sensor-based meter value and the correction factor: not a submitted reading, not a settlement reading and not a billing period boundary."
+        },
         "ido": {
           "name": "Time",
           "description": "Time of the reading. Empty: for today's own reading the moment of recording, for earlier days the start of the day."

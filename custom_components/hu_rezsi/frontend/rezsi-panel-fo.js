@@ -6,6 +6,7 @@ const FT = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0 });
 // Várható (még nem érkezett) számla forrása – a számlakimutatásban.
 const FORRAS_NEV = { meres: "saját mérés", diktalas: "diktált állás", atalany: "átalány", fix: "fix díj", elszamolas: "várható elszámolás" };
 const SZAM = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 1 });
+const SZAM3 = new Intl.NumberFormat("hu-HU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const ft = (x) => (x === null || x === undefined ? "–" : `${FT.format(x)} Ft`);
 const TUZHELY = { "2_langu": "2 lángú tűzhely", "3_4_langu": "3–4 lángú tűzhely", "4_langu_elektromos_sutovel": "4 lángú tűzhely elektromos sütővel", "5_langu": "5+ lángú tűzhely", garzon: "garzon gáztűzhely" };
 const honapNev = (x) => (x ? new Date(x).toLocaleDateString("hu-HU", { year: "numeric", month: "long" }) : "–");
@@ -46,6 +47,7 @@ const elozoNap = (iso) => {
 // ⓘ gomb: a magyarázat buborékban (helytakarékos). A szöveg HTML (csak saját, számított adat kerül bele).
 const info = (html) =>
   `<button type="button" class="info" aria-label="Magyarázat" data-info="${esc(html)}"><ha-icon icon="mdi:information-outline"></ha-icon></button>`;
+const elojelFt = (x) => (x === null || x === undefined ? "–" : `<span class="${x < 0 ? "minusz" : x > 0 ? "plusz" : ""}">${x < 0 ? "−" : x > 0 ? "+" : ""}${ft(Math.abs(x))}</span>`);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const IKON = { villany: "mdi:flash", gaz: "mdi:fire", viz: "mdi:water", tavho: "mdi:radiator", hulladek: "mdi:trash-can-outline", kozos: "mdi:office-building-outline", tavkozles: "mdi:router-wireless" };
 const KOZMU = { villany: "Villany", gaz: "Gáz", viz: "Víz", tavho: "Távhő", hulladek: "Hulladékszállítás", kozos: "Közös költség", tavkozles: "Internet, TV, telefon" };
@@ -74,6 +76,13 @@ class HuRezsiPanel extends HTMLElement {
     this._jelolt = new Set(); // törlésre kijelölt számlák: "sid|sorszám"
     // Több otthonnál fülek: a kiválasztott otthon (böngészőnként megjegyezve; tárolás nélkül is működik).
     try { this._aktivHaz = localStorage.getItem("hu_rezsi_otthon"); } catch (e) { this._aktivHaz = null; }
+    // Tablet/notebook nézet (2.3.0b3): eszközönként megjegyezve – „auto” (900 px felett tablet), „mobil”, „tablet”;
+    // a tabletnézeten belül „fiok” (fiókonkénti lapok) vagy „tema” (témánkénti táblázatok); a kiválasztott lap otthononként.
+    try {
+      this._nezetBeall = localStorage.getItem("hu_rezsi_nezet") || "auto";
+      this._tabletMod = localStorage.getItem("hu_rezsi_tablet_mod") || "fiok";
+      this._lap = JSON.parse(localStorage.getItem("hu_rezsi_lap") || "{}") || {};
+    } catch (e) { this._nezetBeall = "auto"; this._tabletMod = "fiok"; this._lap = {}; }
     this._hiba = null;
     // Automatikus bezárás: tétlenség mérése (a görgetés az ablakok belsejében is – a shadow-gyökéren elkapva).
     this._aktiv = Date.now();
@@ -86,6 +95,10 @@ class HuRezsiPanel extends HTMLElement {
     }, true);
     this.shadowRoot.addEventListener("close", (ev) => {
       if (ev.target.localName === "dialog") { delete ev.target.dataset.szerkesztett; this._aktiv = Date.now(); }
+      // Nyitott ablak alatt elhalasztott újrarajzolás (méretváltás, korrekció visszajelzése) – a bezárás után.
+      if (this._rajzolVar) setTimeout(() => {
+        if (this._rajzolVar && !this.shadowRoot.querySelector("dialog[open]")) { this._rajzolVar = false; this._rajzol(); }
+      }, 0);
     }, true);
     // ⓘ buborék: egy közös elem, kattintásra a gomb alatt; máshova kattintva / görgetéskor bezárul.
     this._nyitottSzamla = new Set();
@@ -155,6 +168,13 @@ class HuRezsiPanel extends HTMLElement {
     this._hass = hass;
     const mb = this.shadowRoot.querySelector("ha-menu-button");
     if (mb) mb.hass = hass;
+    // A Mérők lap „Saját szenzor szerint most” cellái élőben (a panel többi része nem rajzolódik újra).
+    for (const el of this.shadowRoot.querySelectorAll(".szelo")) {
+      const v = Number(hass.states?.[el.dataset.eid]?.state), alap = el.dataset.alap === "" ? null : Number(el.dataset.alap);
+      const ertek = alap == null || isNaN(v) || v < alap ? Number(el.dataset.allas) : Number(el.dataset.allas) + Number(el.dataset.szorzo) * (v - alap);
+      const uj = szam(Math.round(ertek * 10) / 10, el.dataset.egys);
+      if (el.textContent !== uj) el.textContent = uj;
+    }
     if (elso) {
       this._betolt();
       // Nyitott párbeszédablak alatt nincs újrarajzolás (eltüntetné az ablakot).
@@ -173,6 +193,13 @@ class HuRezsiPanel extends HTMLElement {
 
   connectedCallback() {
     for (const t of AKTIVITAS) window.addEventListener(t, this._jel, { capture: true, passive: true });
+    // Szélességváltáskor (pl. a tablet elforgatása) a nézet magától vált mobil és tablet között.
+    this._meretFigyelo ??= new ResizeObserver(() => {
+      if (!this._adat || this._nezetMod() === this._utolsoMod) return;
+      if (this._szerkesztesAlatt()) this._rajzolVar = true;  // nyitott ablak / szerkesztés alatt: bezáráskor
+      else this._rajzol();
+    });
+    this._meretFigyelo.observe(this);
     clearInterval(this._autoIdo);
     this._aktiv = Date.now();
     this._autoIdo = setInterval(() => this._autoBezaras(), 1000);
@@ -209,6 +236,7 @@ class HuRezsiPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._meretFigyelo?.disconnect();
     clearInterval(this._autoIdo);
     clearTimeout(this._emailFigyIdo);
     this._emailFigyIdo = null;
@@ -277,9 +305,10 @@ class HuRezsiPanel extends HTMLElement {
       </div>
       <div class="tartalom">
         ${this._hiba ? `<div class="hiba">Nem sikerült betölteni: ${esc(this._hiba)}</div>` : ""}
+        ${this._sav ? `<div class="banner korrsav" role="status"><div>${this._sav.html}</div><button type="button" class="ikongomb" data-savzar title="Bezárás" aria-label="Bezárás"><ha-icon icon="mdi:close"></ha-icon></button></div>` : ""}
         ${!a ? `<div class="toltes">Betöltés…</div>` : a.haztartasok.length === 0 ? `<div class="ures">Nincs beállított Rezsikövető-háztartás.</div>` : ""}
         ${a && a.haztartasok.length > 1 ? this._fulek(a.haztartasok) : ""}
-        ${a ? a.haztartasok.filter((h) => h === this._aktivHaztartas(a.haztartasok)).map((h) => this._haztartas(h)).join("") : ""}
+        ${a ? a.haztartasok.filter((h) => h === this._aktivHaztartas(a.haztartasok)).map((h) => ((this._utolsoMod = this._nezetMod()) === "regi" ? this._haztartas(h) : this._haztartasTablet(h))).join("") : ""}
         <div class="labjegyzet">Tájékoztató jellegű számítás, a hivatalos számlát nem helyettesíti.</div>
       </div>
       ${this._dialogus()}
@@ -447,6 +476,7 @@ class HuRezsiPanel extends HTMLElement {
     this._javitasKezelo();
     this._mentesKezelo();
     this._emailKezelo();
+    this._tabletKezelo();
     requestAnimationFrame(() => this._hosszuMagyarazat());
   }
 
@@ -576,7 +606,9 @@ class HuRezsiPanel extends HTMLElement {
         });
       }
       if (f.ismeretlen_fajlok?.length)
-        lista.push({ sid: f.sid, szint: "info", szoveg: `${f.nev}: ${f.ismeretlen_fajlok.length} fájlt nem ismertem fel a számlamappában (${f.ismeretlen_fajlok.slice(0, 3).join(", ")}${f.ismeretlen_fajlok.length > 3 ? ", …" : ""}) – rögzítsd az Új számla gombbal, vagy küldj mintát.` });
+        lista.push({ sid: f.sid, szint: "info", szoveg: `${f.nev}: ${f.ismeretlen_fajlok.length} fájlt nem ismertem fel a számlamappában (${f.ismeretlen_fajlok.slice(0, 3).join(", ")}${f.ismeretlen_fajlok.length > 3 ? ", …" : ""}) – rögzítsd az Új számla gombbal${this._aiLehet() ? ", olvastasd ki AI-val" : ""}, vagy küldj mintát.`,
+          html: this._aiLehet() ? `<div class="ellgombok">${f.ismeretlen_fajlok.filter((n) => /\.pdf$/i.test(n)).slice(0, 5).map((n) =>
+            `<button type="button" class="linkgomb" data-aifajl="${esc(`${f.sid}|${n}`)}" title="A számla szövegét (a személyes adatok kitakarásával) a választott AI kiolvassa; rögzíteni te hagyod jóvá">Kiolvasás AI-val: ${esc(n)} ›</button>`).join("")}</div>` : "" });
     }
     return lista;
   }
@@ -584,6 +616,12 @@ class HuRezsiPanel extends HTMLElement {
   _haztartas(h) {
     if (!h.fiokok.length && !(h.szigetek || []).length)
       return `<section class="osszesito"><div class="hnev">${esc(h.nev)}</div><div class="megj">Ennek a háztartásnak még nincs fiókja. Beállítások → Eszközök és szolgáltatások → Rezsikövető → ${esc(h.nev)} → Fiók hozzáadása.</div></section>`;
+    return `${this._osszesito(h)}
+      <div class="racs">${h.fiokok.map((f) => this._fiok(f)).join("")}${(h.szigetek || []).map((x) => this._sziget(x)).join("")}</div>`;
+  }
+
+  // Az otthon összesítője (nagy számok, e-mail, folyószámla, esedékes számlák, függő számlák, teendők).
+  _osszesito(h) {
     const figy = this._figyelmeztetesek(h);
     return `
       <section class="osszesito">
@@ -598,15 +636,265 @@ class HuRezsiPanel extends HTMLElement {
           <div><div class="cimke">Havi átlag ${info("Az átalány napra leosztott része, illetve a több hónapra számlázott díjak (víz) havi része. A hónapnál rövidebb vagy hosszabb időszak (pl. az éves leolvasás után a diktálásig) díja egy átlagos hónapra arányosítva. A fix díjas szemétszállítás csak az esedékesség hónapjában szerepel, a teljes számlaösszeggel.")}</div><div class="nagy masodlagos">${ft(h.osszesen.varhato)}</div></div>
         </div>
         ${h.hianyzo_szenzorok ? `<div class="banner szenzorhiany">${h.hianyzo_szenzorok} használt szenzor nem található ebben a rendszerben (pl. visszaállítás után) – ezek a fiókok nem kapnak mérést. ${this._hass?.user?.is_admin ? `<button type="button" class="linkgomb" data-szenzorok="${h.entry_id}">Szenzorok hozzárendelése ›</button>` : ""}</div>` : ""}
-        ${this._emailBlokk(h)}
+        ${(() => {
+          // Mobilon az e-mailes blokk összecsukva (hibánál, futó keresésnél nyitva).
+          const pfk = h.email?.postafiokok || [];
+          if (this._nezetMod() !== "mobil" || !pfk.length) return this._emailBlokk(h);
+          const nyitva = pfk.some((x) => x.felderites_fut || x.hiba);
+          return `<details class="mobilemail"${nyitva ? " open" : ""}><summary><ha-icon icon="mdi:email-search-outline"></ha-icon> Számlák e-mailből <span class="kicsi">(${pfk.length} postafiók)</span></summary>${this._emailBlokk(h)}</details>`;
+        })()}
         ${this._folyoszamlaSor(h)}
         ${this._esedekesLista(h)}
         ${this._szigetOsszesito(h)}
         ${this._fuggoBlokk(h)}
         ${figy.length ? `<ul class="figylista">${figy.map((x) => `<li class="${x.szint}"${x.sid ? ` data-ugrik="${x.sid}" title="Ugrás a fiók kártyájára"` : ""}>${esc(x.szoveg)}${x.html || ""}</li>`).join("")}</ul>` : `<div class="rendben">Nincs teendő.</div>`}
         ${h.fiokok.some((f) => (f.ellenorzes || []).some((t) => t.rendezve)) ? `<button type="button" class="linkgomb kicsi" data-ellmind="1">${this._ellMind ? "Rendezett számlahibák elrejtése" : "Rendezett számlahibák mutatása"}</button>` : ""}
-      </section>
-      <div class="racs">${h.fiokok.map((f) => this._fiok(f)).join("")}${(h.szigetek || []).map((x) => this._sziget(x)).join("")}</div>`;
+      </section>`;
+  }
+
+  // ---- Tablet/notebook nézet (2.3.0b3) ----
+  // A megjelenítés: „tablet” (széles, hasábos lapok, táblázatok), „mobil” (keskeny lapok, kártyák) vagy „regi”
+  // (minden egymás alatt). Automatikusan: 900 px felett tablet, alatta mobil.
+  _nezetMod() {
+    if (["tablet", "mobil", "regi"].includes(this._nezetBeall)) return this._nezetBeall;
+    return (this.clientWidth || window.innerWidth) >= 900 ? "tablet" : "mobil";
+  }
+
+  _tablet() { return this._nezetMod() !== "regi"; }  // lapozós (tablet vagy mobil) nézet
+
+  _mentLap() {
+    try {
+      localStorage.setItem("hu_rezsi_lap", JSON.stringify(this._lap));
+      localStorage.setItem("hu_rezsi_tablet_mod", this._tabletMod);
+      localStorage.setItem("hu_rezsi_nezet", this._nezetBeall);
+    } catch (e) { /* tárolás nélkül is működik */ }
+  }
+
+  _lapok(h) {
+    if (this._tabletMod === "tema")
+      return [["attekintes", "mdi:view-dashboard-outline", "Áttekintés"], ["szamlak", "mdi:file-document-outline", "Számlák"],
+        ["fogyasztas", "mdi:chart-bar", "Fogyasztás"], ["egyenleg", "mdi:scale-balance", "Egyenleg"], ["merok", "mdi:gauge", "Mérők"]]
+        .map(([id, ikon, nev]) => ({ id, ikon, nev }));
+    const figy = new Set(this._figyelmeztetesek(h).filter((x) => x.szint !== "info").map((x) => x.sid));
+    return [{ id: "attekintes", ikon: "mdi:view-dashboard-outline", nev: "Áttekintés", al: ft(h.osszesen.esedekes) },
+      ...h.fiokok.map((f) => ({ id: f.sid, ikon: IKON[f.kozmu] || "mdi:cash", nev: f.nev, figy: figy.has(f.sid),
+        al: f.fejlec?.kovetkezo ? ft(f.fejlec.kovetkezo.dij) : f.esedekes?.kovetkezo_osszeg != null ? ft(f.esedekes.kovetkezo_osszeg) : "" }))];
+  }
+
+  _aktivLap(h) {
+    const lapok = this._lapok(h), id = this._lap[`${h.entry_id}|${this._tabletMod}`];
+    return lapok.find((l) => l.id === id) || lapok[0];
+  }
+
+  _lapValt(entryId, id, mod = null) {
+    if (mod) this._tabletMod = mod;
+    if (id) this._lap[`${entryId}|${this._tabletMod}`] = id;
+    this._menuSid = null;
+    this._mentLap();
+    this._rajzol();
+    this.shadowRoot.querySelector(".lapful.aktiv")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  _lapLeptet(h, irany) {
+    const lapok = this._lapok(h), i = lapok.findIndex((l) => l.id === this._aktivLap(h).id);
+    this._lapValt(h.entry_id, lapok[(i + irany + lapok.length) % lapok.length].id);
+  }
+
+  _haztartasTablet(h) {
+    if (!h.fiokok.length && !(h.szigetek || []).length) return this._haztartas(h);
+    const lapok = this._lapok(h), aktivId = this._aktivLap(h).id, aktiv = lapok.find((l) => l.id === aktivId), fiokMod = this._tabletMod === "fiok";
+    const mobil = this._nezetMod() === "mobil";
+    const ful = (l) => `<button type="button" role="tab" class="lapful${l === aktiv ? " aktiv" : ""}" data-lap="${esc(l.id)}" data-entry="${esc(h.entry_id)}"
+        aria-selected="${l === aktiv}" tabindex="${l === aktiv ? 0 : -1}" title="${esc(l.nev)}"><ha-icon icon="${l.ikon}"></ha-icon>
+        <span class="lapnev">${esc(l.nev)}${l.figy ? '<span class="fulpont" title="Van teendő"></span>' : ""}</span>${l.al ? `<span class="lapal">${esc(l.al)}</span>` : ""}</button>`;
+    const valto = `<div class="nezetvalto" role="group" aria-label="Nézet">
+        <button type="button" class="${fiokMod ? "aktiv" : ""}" data-tabletmod="fiok" data-entry="${esc(h.entry_id)}" aria-pressed="${fiokMod}" title="Fiókonként: egy fiók egy lapon"><ha-icon icon="mdi:view-carousel-outline"></ha-icon><span class="nvszoveg">Fiókok</span></button>
+        <button type="button" class="${fiokMod ? "" : "aktiv"}" data-tabletmod="tema" data-entry="${esc(h.entry_id)}" aria-pressed="${!fiokMod}" title="Témánként: minden fiók egy táblázatban"><ha-icon icon="mdi:table-large"></ha-icon><span class="nvszoveg">Témák</span></button></div>`;
+    let lap;
+    if (aktiv.id === "attekintes") lap = this._attekintes(h);
+    else if (fiokMod) {
+      const f = h.fiokok.find((x) => x.sid === aktiv.id);
+      lap = mobil ? this._fiok(f) : `<div class="egylap">${this._fiok(f)}</div>`;
+    } else lap = this._temaLap(h, aktiv.id);
+    const i = lapok.indexOf(aktiv);
+    const lapozo = lapok.length > 1 ? `<div class="lapozo">
+        <button type="button" class="ikongomb" data-lapnyil="-1" data-entry="${esc(h.entry_id)}" title="Előző (←)" aria-label="Előző lap"><ha-icon icon="mdi:chevron-left"></ha-icon></button>
+        ${lapok.map((l, j) => `<button type="button" class="lappotty${j === i ? " aktiv" : ""}" data-lap="${esc(l.id)}" data-entry="${esc(h.entry_id)}" aria-label="${esc(l.nev)}" title="${esc(l.nev)}"></button>`).join("")}
+        <button type="button" class="ikongomb" data-lapnyil="1" data-entry="${esc(h.entry_id)}" title="Következő (→)" aria-label="Következő lap"><ha-icon icon="mdi:chevron-right"></ha-icon></button></div>` : "";
+    return `<div class="lapos${mobil ? " keskeny" : ""}"><div class="tabletsav"><nav class="lapfulek" role="tablist" aria-label="${fiokMod ? "Fiókok" : "Témák"}">${lapok.map(ful).join("")}</nav>${valto}</div>
+      <div class="lapter" data-lapter="${esc(h.entry_id)}">${lap}</div>${lapozo}</div>`;
+  }
+
+  // Áttekintés: az összesítő és fiókonként egy csempe (koppintásra a fiók lapja).
+  _attekintes(h) {
+    const figy = new Set(this._figyelmeztetesek(h).filter((x) => x.szint !== "info").map((x) => x.sid));
+    const csempe = (f) => {
+      const k = f.fejlec?.kovetkezo, e = f.fejlec?.egyenleg, ev = f.egyenleg;
+      const kov = k ? `${ft(k.dij)}${k.kesik ? ' <span class="figyszoveg">késik</span>' : ""}` : f.esedekes?.kovetkezo_osszeg != null ? ft(f.esedekes.kovetkezo_osszeg) : "–";
+      const mikor = k?.kelte ? `${nap(k.kelte)} körül` : f.esedekes?.kovetkezo_datum ? `${nap(f.esedekes.kovetkezo_datum)} körül` : "";
+      return `<button type="button" class="csempe${figy.has(f.sid) ? " figy" : ""}" data-lapra="${esc(f.sid)}" data-entry="${esc(h.entry_id)}" title="${esc(f.nev)} – a fiók lapja">
+        <div class="csfej"><ha-icon icon="${IKON[f.kozmu] || "mdi:cash"}"></ha-icon><b>${esc(f.nev)}</b>${figy.has(f.sid) ? '<span class="fulpont"></span>' : ""}</div>
+        ${f.hiba ? `<div class="kicsi figyszoveg">${esc(f.hiba)}</div>` : `<div class="cscimke">Következő számla</div><div class="csertek">${kov}</div><div class="kicsi">${mikor}</div>
+        <div class="cssor">${ev ? `<span>éves ${elojelFt(ev.egyenleg)}</span>` : ""}${e ? `<span>folyószámla ${elojelFt(-e.osszeg)}</span>` : ""}</div>`}</button>`;
+    };
+    return `${this._osszesito(h)}
+      <div class="csempek">${h.fiokok.map(csempe).join("")}</div>
+      ${(h.szigetek || []).length ? `<div class="racs">${h.szigetek.map((x) => this._sziget(x)).join("")}</div>` : ""}`;
+  }
+
+  // Témák: minden fiók egy táblázatban (tablet), illetve fiókonként egy kis kártyán (mobil); egy sorra/kártyára
+  // koppintva a fiók lapja a Fiókok nézetben. Az adat egyszer épül fel (fej, sorok, összesen), a megjelenítés kétféle.
+  _temaLap(h, tema) {
+    const egys = (f) => (f.egyseg === "db" ? "" : f.egyseg);
+    const ikon = (f) => `<ha-icon icon="${IKON[f.kozmu] || "mdi:cash"}"></ha-icon>`;
+    const sor = (f, cellak) => ({ f, cellak });
+    const td = (x) => x;
+    const ossz = (arr) => { const v = arr.filter((x) => typeof x === "number"); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
+    const ures = (c) => c === "" || c === "–" || c == null;
+    const tabla = (fej, sorok, lab = null, megj = "") => {
+      const megjegyzes = megj ? `<div class="kicsi temamegj">${megj}</div>` : "";
+      const nyit = (f) => `data-lapra="${esc(f.sid)}" data-entry="${esc(h.entry_id)}" title="${esc(f.nev)} – megnyitás a Fiókok nézetben"`;
+      if (this._nezetMod() === "mobil")
+        return `<div class="temakartyak">${sorok.map(({ f, cellak }) => `<div class="temakartya" role="button" tabindex="0" ${nyit(f)}>
+            <div class="tkfej">${ikon(f)}<b>${esc(f.nev)}</b><ha-icon class="tknyil" icon="mdi:chevron-right"></ha-icon></div>
+            <div class="tkracs">${fej.map((n, i) => (ures(cellak[i]) ? "" : `<div class="tkc">${n || ""}</div><div class="tkv">${cellak[i]}</div>`)).join("")}</div></div>`).join("")}
+          ${lab ? `<div class="temakartya osszes"><div class="tkfej"><b>Összesen</b></div><div class="tkracs">${fej.map((n, i) => (ures(lab[i]) ? "" : `<div class="tkc">${n}</div><div class="tkv">${lab[i]}</div>`)).join("")}</div></div>` : ""}</div>${megjegyzes}`;
+      return `<div class="tablagorgeto"><table class="tematabla"><thead><tr><th>Fiók</th>${fej.map((x) => `<th>${x}</th>`).join("")}</tr></thead>
+        <tbody>${sorok.map(({ f, cellak }) => `<tr ${nyit(f)}><td class="tfiok">${ikon(f)}${esc(f.nev)}</td>${cellak.map((c) => `<td class="szam">${c}</td>`).join("")}</tr>`).join("")}</tbody>
+        ${lab ? `<tfoot><tr><td>Összesen</td>${lab.map((c) => `<td class="szam">${c ?? ""}</td>`).join("")}</tr></tfoot>` : ""}</table></div>${megjegyzes}`;
+    };
+    const fiokok = h.fiokok.filter((f) => !f.hiba || tema === "merok");
+    if (tema === "szamlak") {
+      const kov = (f) => f.fejlec?.kovetkezo?.dij ?? f.esedekes?.kovetkezo_osszeg ?? null;
+      const utolso = (f) => (f.szamlak || []).filter((x) => x.tipus !== "storno").sort((a, b) => (b.kelte || "").localeCompare(a.kelte || ""))[0];
+      const sorok = fiokok.map((f) => {
+        const k = f.fejlec?.kovetkezo, u = utolso(f), s = f.szamla_stat, e = f.fejlec?.egyenleg;
+        const mikor = k?.kelte ? nap(k.kelte) : f.esedekes?.kovetkezo_datum ? nap(f.esedekes.kovetkezo_datum) : "–";
+        return sor(f, [td(`${ft(kov(f))}${k?.kesik ? ' <span class="figyszoveg">késik</span>' : ""}`), td(`${mikor}${f.esedekes?.elmaradt ? ' <span class="figyszoveg">elmaradt</span>' : ""}`),
+          td(ft(f.esedekes?.e_havi_osszesen ?? null)), td(u ? `${ft(Number(u.osszeg))} <span class="kicsi">${nap(u.kelte)}</span>` : "–"),
+          td(s ? `${ft(s.eves_osszeg)} <span class="kicsi">(${s.eves_db} db)</span>` : "–"), td(e ? elojelFt(-e.osszeg) : "–")]);
+      });
+      const lab = [ft(ossz(fiokok.map(kov))), "", ft(ossz(fiokok.map((f) => f.esedekes?.e_havi_osszesen))), "", ft(ossz(fiokok.map((f) => f.szamla_stat?.eves_osszeg))),
+        elojelFt(ossz(fiokok.map((f) => (f.fejlec?.egyenleg ? -f.fejlec.egyenleg.osszeg : null))))];
+      return tabla(["Következő számla", "Várható kelte", "Ebben a hónapban", "Utolsó számla", "Utolsó 12 hónap", "Folyószámla"], sorok, lab,
+        "Folyószámla: plusz = túlfizetés (a következő számlákon beszámítják), mínusz = fizetendő.");
+    }
+    if (tema === "fogyasztas") {
+      const sorok = fiokok.map((f) => {
+        const fo = f.fejlec?.folyo, ar = fo?.napok ? Math.max(0, Math.min(100, (100 * fo.eltelt_nap) / fo.napok)) : null, kr = f.keret;
+        const kar = kr?.osszes ? Math.min(100, (100 * kr.felhasznalt) / kr.osszes) : null;
+        return sor(f, [td(fo ? `${fejNap(fo.tol)} – ${fejNap(fo.ig)}` : f.idoszak ? `${fejNap(f.idoszak.tol)} – ${fejNap(f.idoszak.ig)}` : "–"),
+          td(ar != null ? `<div class="minisav"><div style="width:${ar}%"></div></div><div class="kicsi">${fo.eltelt_nap}/${fo.napok} nap</div>` : "–"),
+          td(f.fix_dij ? "–" : szam(f.eddig?.mennyiseg, egys(f))), td(ft(f.eddig?.osszeg ?? null)),
+          td(f.fix_dij ? "–" : szam(f.varhato?.mennyiseg, egys(f))), td(ft(f.varhato?.osszeg ?? null)),
+          td(f.fix_dij || f.varhato?.napi_atlag == null ? "–" : szam(f.varhato.napi_atlag, egys(f))),
+          td(kar != null ? `<div class="minisav${kr.felhasznalt > kr.osszes ? " tullepve" : ""}"><div style="width:${kar}%"></div></div><div class="kicsi">${szam(Math.round(kr.felhasznalt))} / ${szam(kr.osszes, kr.egyseg)}</div>` : "–")]);
+      });
+      const lab = ["", "", "", ft(ossz(fiokok.map((f) => f.eddig?.osszeg))), "", ft(ossz(fiokok.map((f) => f.varhato?.osszeg))), "", ""];
+      return tabla(["Folyó időszak", "Eltelt", "Fogyasztás eddig", "Díj eddig", "Várható fogyasztás", "Várható díj", "Napi átlag", "Kedvezményes keret"], sorok, lab);
+    }
+    if (tema === "egyenleg") {
+      const hama = (f) => (f.elszamolas && (f.reszszamlas || f.megszunt) ? f.elszamolas.egyenleg : null);
+      const sorok = fiokok.map((f) => {
+        const ev = f.egyenleg, e = f.fejlec?.egyenleg;
+        return sor(f, [td(hama(f) != null ? elojelFt(hama(f)) : "–"), td(ev ? elojelFt(ev.egyenleg) : "–"), td(ev ? `${nap(ev.ev_tol)} – ${nap(ev.ev_ig)}` : "–"),
+          td(ev ? ft(ev.varhato_eves) : "–"), td(ev ? `${ft(ev.befizetve)}${ev.hatralevo_db ? ` <span class="kicsi">+ ${ev.hatralevo_db} részszámla</span>` : ""}` : "–"), td(e ? elojelFt(-e.osszeg) : "–")]);
+      });
+      const lab = [elojelFt(ossz(fiokok.map(hama))), elojelFt(ossz(fiokok.map((f) => f.egyenleg?.egyenleg))), "", ft(ossz(fiokok.map((f) => f.egyenleg?.varhato_eves))), "",
+        elojelFt(ossz(fiokok.map((f) => (f.fejlec?.egyenleg ? -f.fejlec.egyenleg.osszeg : null))))];
+      return tabla(["Ha ma lenne az elszámolás", "Éves egyenleg", "Elszámolási év", "Várható éves költség", "Befizetve", "Folyószámla"], sorok, lab,
+        "Plusz: visszatérítés / túlfizetés várható, mínusz: ráfizetés / fizetendő. A „Ha ma lenne az elszámolás” csak átalányos (részszámlás) fióknál.");
+    }
+    // Mérők – a saját szenzor szerinti mostani állás élőben: állás + szorzó × (a szenzor mostani értéke − alap).
+    const SZEREP = { vetelezes: "", h_teli: "1.81 téli", h_nyari: "1.82 nyári", zona_csucs: "csúcs", zona_volgy: "völgy", almero: "almérő", betaplalas: "betáplálás" };
+    const elo = (a) => {
+      const v = Number(this._hass?.states?.[a.entity_id]?.state);
+      return a.alap == null || isNaN(v) || v < a.alap ? a.allas : a.allas + a.szorzo * (v - a.alap);
+    };
+    const szenzorCella = (f) => (f.szenzor_allasok || []).length
+      ? f.szenzor_allasok.map((a) => `<div title="${esc(a.entity_id)}${a.becsult ? " – becsült (a szenzor most nem ad értéket)" : ""}">${SZEREP[a.szerep] ? `<span class="kicsi">${SZEREP[a.szerep]}</span> ` : ""}<span class="szelo" data-eid="${esc(a.entity_id)}" data-allas="${a.allas}" data-alap="${a.alap ?? ""}" data-szorzo="${a.szorzo}" data-egys="${esc(egys(f))}">${szam(Math.round(elo(a) * 10) / 10, egys(f))}</span>${a.becsult ? ' <span class="kicsi">becsült</span>' : ""}</div>`).join("")
+      : "";
+    // Korrekció: a szenzor és a mérőóra aránya csatornánként (a saját leolvasásokból; kevés adatnál az ok).
+    const korrekcio = (f) => f.kalibracio.map((k) => `${f.kalibracio.length > 1 && SZEREP[k.csatorna] ? `${SZEREP[k.csatorna]} ` : ""}${k.szorzo
+        ? `<b>×${SZAM3.format(k.szorzo)}</b> (${k.pontok} leolv., ${k.napok} nap)`
+        : `<span title="${esc(k.ok || "")}">nincs még (${k.pontok}/3 leolv., ${k.napok}/45 nap)</span>`}`).join("<br>");
+    const sorok = h.fiokok.map((f) => {
+      const u = f.utolso_allasok || {}, fo = u.vetelezes || Object.values(u)[0], mero = (f.leolvasasok || []).find((x) => x.mero)?.mero;
+      const kl = f.utem?.kovetkezo_leolvasas, kd = f.utem?.kovetkezo_diktalas;
+      const tart = (x) => (Array.isArray(x) ? `${fejNap(x[0])} – ${fejNap(x[1])}` : x ? fejNap(x) : "–");
+      const kov = [kl ? `<div class="tor"><span class="kicsi">leolvasás</span> ${tart(kl)}</div>` : "", kd ? `<div class="tor"><span class="kicsi">diktálás</span> ${tart(kd)}</div>` : ""].join("") || "–";
+      return sor(f, [td(f.fix_dij ? '<span class="kicsi">nincs mérő</span>' : fo ? `${szam(fo.allas, egys(f))} <span class="kicsi">${nap(fo.datum)}</span>${mero ? `<div class="kicsi">mérő: ${esc(mero)}</div>` : ""}` : "–"),
+        td(f.fix_dij ? "" : `${szenzorCella(f)}${(f.kalibracio || []).length ? `<div class="kicsi mmkorr">korrekció: ${korrekcio(f)}</div>` : ""}`),
+        td(kov),
+        td(!f.fix_dij && f.device_id && !f.megszunt ? `<button type="button" class="kisgomb" data-leolvas="${esc(f.sid)}" >Mérőállás</button>` : "")]);
+    });
+    return tabla(["Utolsó rögzített állás", "Saját szenzor szerint most", "Következő", ""], sorok, null,
+      "A saját szenzor szerinti állás a kalibrált becslés (a rögzített állás + a szenzor azóta mért fogyasztása) – élőben frissül. "
+      + "Ha eltér az órától: Mérőállás → „Csak korrekciós leolvasás” – igazítja a szenzor szerinti állást és a korrekciós szorzót, de nem diktálás és nem időszakhatár.");
+  }
+
+  // Korrekciós leolvasás után (2.3.0b6): a háttér újraszámol (a frissítéskérés késleltetett – H-tarifánál három
+  // rögzítés), addig töltünk újra, amíg a beírt állás meg nem jelenik (≤ ~15 s); visszajelzés: a szenzor szerinti
+  // becslés és az eltérés, a korrekciós szorzó előtte → utána.
+  async _korrekcioEredmeny(f, ertekek, datum) {
+    const elotte = Object.fromEntries((f.kalibracio || []).map((k) => [k.csatorna, k.szorzo]));
+    const becsles = Object.fromEntries((f.szenzor_allasok || []).map((a) => [a.szerep, a.allas]));
+    const keres = () => (this._adat?.haztartasok || []).flatMap((x) => x.fiokok).find((x) => x.sid === f.sid);
+    const megvan = (x) => ertekek.every(([c, e]) => x?.utolso_allasok?.[c]?.datum === datum && Math.abs(Number(x.utolso_allasok[c].allas) - e) < 0.001);
+    for (let i = 0; i < 6; i++) {
+      await new Promise((ok) => setTimeout(ok, i ? 2500 : 1500));
+      try { this._adat = await this._hass.callWS({ type: "hu_rezsi/adatok" }); } catch (e) { /* a következő körben újra */ }
+      if (megvan(keres())) break;
+    }
+    const uj = keres() || f, egys = uj.egyseg === "db" ? "" : uj.egyseg, sorok = [];
+    for (const [csat, beirt] of ertekek) {
+      const nev = { h_teli: "1.81: ", h_nyari: "1.82: " }[csat] || "";
+      if (becsles[csat] != null) {
+        const e = beirt - becsles[csat];
+        sorok.push(`${nev}a szenzor szerint ${szam(Math.round(becsles[csat] * 10) / 10, egys)} volt – eltérés ${e >= 0 ? "+" : "−"}${szam(Math.round(Math.abs(e) * 10) / 10, egys)}`);
+      }
+      const k = (uj.kalibracio || []).find((x) => x.csatorna === csat);
+      if (k) sorok.push(`${nev}korrekciós szorzó: ${elotte[csat] ? `×${SZAM3.format(elotte[csat])}` : "nem volt"} → ${k.szorzo ? `<b>×${SZAM3.format(k.szorzo)}</b>` : `még nincs (${k.pontok}/3 leolvasás, ${k.napok}/45 nap)`}`);
+    }
+    return `<span class="ok">✓ Korrekciós leolvasás rögzítve:</span> ${ertekek.map(([c, e]) => `${{ h_teli: "1.81 ", h_nyari: "1.82 " }[c] || ""}${szam(e, egys)}`).join(" · ")}${sorok.length ? "<br>" + sorok.join("<br>") : ""}`;
+  }
+
+  _tabletKezelo() {
+    this._egyszer("tablet", () => {
+      const r = this.shadowRoot;
+      const haz = (id) => (this._adat?.haztartasok || []).find((x) => x.entry_id === id);
+      r.addEventListener("click", (ev) => {
+        if (ev.target.closest?.("[data-savzar]")) { this._sav = null; this._rajzol(); return; }
+        const t = ev.target.closest?.("[data-lap],[data-lapra],[data-tabletmod],[data-lapnyil]");
+        if (!t || ev.target.closest("[data-leolvas]")) return;
+        if (t.dataset.tabletmod) this._lapValt(t.dataset.entry, null, t.dataset.tabletmod);
+        else if (t.dataset.lapra) this._lapValt(t.dataset.entry, t.dataset.lapra, "fiok");
+        else if (t.dataset.lapnyil) { const h = haz(t.dataset.entry); if (h) this._lapLeptet(h, Number(t.dataset.lapnyil)); }
+        else this._lapValt(t.dataset.entry, t.dataset.lap);
+      });
+      r.addEventListener("keydown", (ev) => {
+        const tk = ev.target.closest?.(".temakartya[data-lapra]");
+        if (tk && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); this._lapValt(tk.dataset.entry, tk.dataset.lapra, "fiok"); return; }
+        if (!["ArrowLeft", "ArrowRight"].includes(ev.key) || !ev.target.closest?.(".lapfulek")) return;
+        const h = haz(ev.target.dataset.entry);
+        if (!h) return;
+        ev.preventDefault();
+        this._lapLeptet(h, ev.key === "ArrowRight" ? 1 : -1);
+        r.querySelector(".lapful.aktiv")?.focus();
+      });
+      // Lapozás húzással (a vízszintesen görgethető táblázatokon és az űrlapmezőkön nem).
+      let kezd = null;
+      r.addEventListener("touchstart", (ev) => {
+        const ter = ev.target.closest?.(".lapter");
+        kezd = ter && !ev.target.closest(".tablagorgeto, input, select, textarea, dialog") ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, id: ter.dataset.lapter } : null;
+      }, { passive: true });
+      r.addEventListener("touchend", (ev) => {
+        if (!kezd) return;
+        const dx = ev.changedTouches[0].clientX - kezd.x, dy = ev.changedTouches[0].clientY - kezd.y, h = haz(kezd.id);
+        kezd = null;
+        if (h && Math.abs(dx) > 70 && Math.abs(dy) < 50) this._lapLeptet(h, dx < 0 ? 1 : -1);
+      }, { passive: true });
+    });
   }
 
   // Az otthon összesítőjében: a szigetüzemi rendszerek folyó havi kWh-ja és önellátottsága – Ft nélkül, a rezsiösszegbe nem számít.
@@ -797,7 +1085,7 @@ class HuRezsiPanel extends HTMLElement {
     return fiokok.map((f) => {
       const e = f.fuggo_elonezet;
       const szamlak = (e?.szamlak || f.fuggo).map((x) => `<div class="fuggoszamla">
-        <b>${esc(x.sorszam)}</b> · ${TIP[x.tipus] || esc(x.tipus || "")} · kelte ${nap(x.kelte)}${x.idoszak ? ` · ${nap(x.idoszak[0])} – ${nap(x.idoszak[1])}` : ""} · fizetendő <b>${x.osszeg != null ? ft(Number(x.osszeg)) : "–"}</b>
+        <b>${esc(x.sorszam)}</b> · ${TIP[x.tipus] || esc(x.tipus || "")} · kelte ${nap(x.kelte)}${x.idoszak ? ` · ${nap(x.idoszak[0])} – ${nap(x.idoszak[1])}` : ""} · fizetendő <b>${x.osszeg != null ? ft(Number(x.osszeg)) : "–"}</b>${x.ai ? ` · <span class="cimkeszalag" title="${esc(`AI-val kiolvasva (${x.fajl}), az adatait te ellenőrizted${x.ai_megerositve ? " – ellentmondással, megerősítve" : ""}`)}">AI-val kiolvasva</span>` : String(x.forras || "").startsWith("sablon:") ? ` · <span class="cimkeszalag" title="${esc(`A korábban jóváhagyott számlából készült saját beolvasóval (${String(x.forras).slice(7)}) – AI nélkül`)}">saját beolvasóval</span>` : ""}
         ${x.szamla_ft != null && x.szamolt_ft != null ? `<div class="kicsi">A számla díja ${ft(x.szamla_ft)} · a saját mérésünk szerint ${ft(x.szamolt_ft)}${x.szamla_mennyiseg != null && x.szamolt_mennyiseg != null ? ` · ${szam(x.szamla_mennyiseg)} / ${szam(x.szamolt_mennyiseg)} ${esc(f.egyseg || "")}` : ""}${x.mert === false ? " (az időszak egyik végén nincs valódi mérőállás – a saját érték részben becsült)" : ""}</div>` : ""}
         ${(x.figyelmeztetes || []).map((m) => `<div class="kicsi figyszoveg">Figyelem: ${esc(m)}</div>`).join("")}</div>`).join("");
       const SOR = [["eddig", "Eddig (folyó időszak)"], ["varhato", "Várható (folyó időszak)"], ["kovetkezo", "Következő számla"],
@@ -1388,12 +1676,21 @@ class HuRezsiPanel extends HTMLElement {
     return hs.find((h) => h.fiokok.some((f) => f.sid === sid))?.entry_id || "";
   }
 
+  // A shadow-gyökér szintű (delegált) figyelők egyszer kötődnek be – a kezelők minden rajzoláskor lefutnak, és a
+  // gyökér a rajzolások között megmarad (korábban halmozódtak: egy kattintás többször futott le).
+  _egyszer(kulcs, fn) {
+    this._kotott ??= new Set();
+    if (this._kotott.has(kulcs)) return;
+    this._kotott.add(kulcs);
+    fn();
+  }
+
   _tetelKezelo() {
     const d = this.shadowRoot.getElementById("teteldlg");
     this.shadowRoot.getElementById("tetelbezar").addEventListener("click", () => d.close());
     d.addEventListener("click", (ev) => ev.target === d && d.close());
     // Delegált: a kártyák és a kimutatás „Tételesen” gombjai (újrarajzolás után is).
-    this.shadowRoot.addEventListener("click", (ev) => {
+    this._egyszer("deleg0", () => this.shadowRoot.addEventListener("click", (ev) => {
       const b = ev.target.closest?.("[data-tetel]");
       if (b) this._tetelNyit(b.dataset.entry, b.dataset.tetel, b.dataset.tol, b.dataset.ig);
       // Számla-ellenőrzés: reklamáció-tervezet, rendezve / újranyitás, rendezettek mutatása.
@@ -1407,6 +1704,13 @@ class HuRezsiPanel extends HTMLElement {
           .then(() => this._betolt?.()).catch((err) => { e.disabled = false; alert(err.message || err); });
       }
       if (ev.target.closest?.("[data-ellmind]")) { this._ellMind = !this._ellMind; this._rajzol(); }
+      // AI-számlabeolvasó (2.3.0b1): a fel nem ismert fájl kiolvasása, jóváhagyással.
+      const ai = ev.target.closest?.("[data-aifajl]");
+      if (ai) {
+        const i = ai.dataset.aifajl.indexOf("|");
+        this._aiNyit(ai.dataset.aifajl.slice(0, i), ai.dataset.aifajl.slice(i + 1));
+        return;
+      }
       // Díjeltérés (fix díjas fiók): a számla összege az új havidíj, vagy egyszeri eltérés.
       const de = ev.target.closest?.("[data-dijelt]");
       if (de) {
@@ -1418,6 +1722,10 @@ class HuRezsiPanel extends HTMLElement {
       }
       // Teendőre kattintva (nem a gombjaira): ugrás a fiók kártyájára, egy pillanatra kiemelve.
       const li = ev.target.closest?.("li[data-ugrik]");
+      if (li && !ev.target.closest("button, a") && this._tablet()) {
+        this._lapValt(this._entryId(li.dataset.ugrik), li.dataset.ugrik, "fiok");
+        return;
+      }
       if (li && !ev.target.closest("button, a")) {
         const k = this.shadowRoot.querySelector(`.kartya[data-kartya="${li.dataset.ugrik}"]`);
         if (k) {
@@ -1425,7 +1733,7 @@ class HuRezsiPanel extends HTMLElement {
           k.classList.remove("kiemelt"); void k.offsetWidth; k.classList.add("kiemelt");
         }
       }
-    });
+    }));
     const ed = this.shadowRoot.getElementById("evesdlg");
     this.shadowRoot.getElementById("evesbezar").addEventListener("click", () => ed.close());
     ed.addEventListener("click", (ev) => ev.target === ed && ed.close());
@@ -1434,7 +1742,7 @@ class HuRezsiPanel extends HTMLElement {
     this.shadowRoot.getElementById("evesev").addEventListener("change", (ev) => {
       if (this._eves) this._evesNyit(this._eves.entryId, this._eves.sid, ev.target.value);
     });
-    this.shadowRoot.addEventListener("change", (ev) => {
+    this._egyszer("deleg1", () => this.shadowRoot.addEventListener("change", (ev) => {
       const t = ev.target;
       if (t.dataset?.hatarido) {
         // Kézi számla fizetési határideje (üresre törölve: nincs határidő).
@@ -1454,13 +1762,13 @@ class HuRezsiPanel extends HTMLElement {
       this._helyiFizetes(sid, sorszam, { fizetve, datum: fizetve ? datum : null, forras: "kezi", lejart: false });
       this._hass.callWS({ type: "hu_rezsi/fizetes", entry_id: this._entryId(sid), sid, sorszam, fizetve, ...(fizetve ? { datum } : {}) })
         .then(() => this._kesoBetolt()).catch((err) => { alert(err.message || err); this._betolt(); });
-    });
-    this.shadowRoot.addEventListener("click", (ev) => {
+    }));
+    this._egyszer("deleg2", () => this.shadowRoot.addEventListener("click", (ev) => {
       const sz = ev.target.closest?.("[data-szigetido]");
       if (sz) { const [sid, k] = sz.dataset.szigetido.split("|"); this._szigetIdo = { ...(this._szigetIdo || {}), [sid]: k }; this._rajzol(); return; }
       const b = ev.target.closest?.("[data-eves]");
       if (b) this._evesNyit(b.dataset.entry, b.dataset.eves);
-    });
+    }));
     const rd = this.shadowRoot.getElementById("reklamdlg");
     this.shadowRoot.getElementById("reklambezar").addEventListener("click", () => rd.close());
     this.shadowRoot.getElementById("reklamnyomtat").addEventListener("click", () => this._reklamNyomtat());
@@ -2979,6 +3287,146 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     };
   }
 
+  // ---- AI-számlabeolvasó (2.3.0b1) ----
+  _aiEntitasok() {
+    return Object.values(this._hass?.states || {}).filter((s) => s.entity_id.startsWith("ai_task.") && s.state !== "unavailable")
+      .map((s) => ({ id: s.entity_id, nev: s.attributes?.friendly_name || s.entity_id }));
+  }
+
+  _aiLehet() { return this._admin && this._aiEntitasok().length > 0; }
+
+  _aiBeleegyezesSzoveg() {
+    return "Ismeretlen számla kiolvasása AI-val\n\n"
+      + "• A számla szövegét elküldöm a választott AI-szolgáltatónak (az AI Task entitás integrációjának, pl. Google Gemini). Helyi AI (pl. Ollama) esetén a gépedet nem hagyja el.\n"
+      + "• Elküldés előtt igyekszem kitakarni a felismerhető személyes adatokat: a feliratos név- és címsorokat, a címeket, az ismert neveket és azonosítókat, a mérőszámot, az e-mailt, a telefont, a bankszámlát, az adóazonosítót. A kitakarás nem tökéletes – szokatlan elrendezésű számlán maradhat benne személyes adat. A szolgáltató neve és adószáma marad.\n"
+      + "• Az AI válaszát és a számla szövegét nem tárolom; csak az általad jóváhagyott adatok kerülnek be.\n"
+      + "• Egy kiolvasás néhány forintba kerülhet (fizetős AI-nál).\n\nEngedélyezed?";
+  }
+
+  _aiFiok(sid) {
+    for (const h of this._adat?.haztartasok || []) { const f = h.fiokok.find((x) => x.sid === sid); if (f) return f; }
+    return null;
+  }
+
+  async _aiNyit(sid, fajl) {
+    const r = this.shadowRoot, d = r.getElementById("aiablak"), torzs = r.getElementById("aitorzs"), gombok = r.getElementById("aigombok"), hiba = r.getElementById("aihiba");
+    const f = this._aiFiok(sid);
+    r.getElementById("aicim").textContent = `Számla kiolvasása AI-val – ${f?.nev || ""}`;
+    hiba.textContent = "";
+    if (!this._adat?.panel_beallitas?.ai_beolvasas) {
+      if (!window.confirm(this._aiBeleegyezesSzoveg())) return;
+      try {
+        const v = await this._hass.callWS({ type: "hu_rezsi/panel_beallitas", beallitas: { ai_beolvasas: true } });
+        if (this._adat) this._adat.panel_beallitas = v;
+      } catch (err) { alert(err.message || err); return; }
+    }
+    torzs.innerHTML = `<div class="aitolt"><ha-circular-progress indeterminate size="small"></ha-circular-progress> Kiolvasás folyamatban: <b>${esc(fajl)}</b> – ez 10–60 másodperc.</div>`;
+    gombok.innerHTML = `<button type="button" data-aimegse>Mégse</button>`;
+    gombok.querySelector("[data-aimegse]").onclick = () => { this._aiKeres = null; d.close(); };
+    if (!d.open) d.showModal();
+    const keresJel = (this._aiKeres = Symbol(fajl));  // egy elkésett válasz ne kerüljön egy másik fájl ablakába
+    let e;
+    try { e = await this._hass.callWS({ type: "hu_rezsi/ai_kiolvasas", entry_id: this._entryId(sid), sid, fajl }); }
+    catch (err) { if (this._aiKeres === keresJel) { torzs.innerHTML = ""; hiba.textContent = err.message || String(err); } return; }
+    if (!d.open || this._aiKeres !== keresJel) return;
+    this._aiEredmeny = { sid, fajl, ...e };
+    this._aiRajzol();
+  }
+
+  _aiRajzol() {
+    const r = this.shadowRoot, torzs = r.getElementById("aitorzs"), gombok = r.getElementById("aigombok"), hiba = r.getElementById("aihiba");
+    const e = this._aiEredmeny, a = e.adat, jel = e.jelolesek || {};
+    const JEL = { ok: ["✓", "rendben"], figy: ["!", "ellenőrizd"], ellentmondas: ["✗", "ellentmondás"] };
+    const jelzo = (k) => { const j = jel[k]; return j ? `<span class="aijel aijel-${j.jel}" title="${esc(JEL[j.jel][1] + (j.uzenet ? ": " + j.uzenet : ""))}">${JEL[j.jel][0]}</span>` : `<span class="aijel"></span>`; };
+    const uzen = (k) => { const j = jel[k]; return j && j.jel !== "ok" && j.uzenet ? `<div class="aiuzenet aijel-${j.jel}">${esc(j.uzenet)}</div>` : ""; };
+    const mezo = (k, nev, tipus = "text", ertek = a[k]) => `<label class="aimezo">${jelzo(k)}<span>${nev}</span>
+      ${tipus === "tipus" ? `<select data-mezo="${k}">${[["resz", "részszámla"], ["elszamolo", "elszámoló"], ["egyeb", "egyéb"], ["storno", "sztornó"]].map(([v, n]) => `<option value="${v}" ${v === ertek ? "selected" : ""}>${n}</option>`).join("")}</select>`
+        : `<input data-mezo="${k}" type="${tipus}" ${tipus === "number" ? 'step="any" inputmode="decimal"' : ""} value="${esc(ertek ?? "")}">`}</label>${uzen(k)}`;
+    const tabla = (lista, oszlopok) => (a[lista] || []).length ? `<div class="tablagorgeto"><table class="aitabla"><thead><tr>${oszlopok.map((o) => `<th>${o[1]}</th>`).join("")}</tr></thead><tbody>${a[lista].map((s, i) =>
+      `<tr>${oszlopok.map(([k, , t]) => { const kk = `${lista}.${i}.${k}`; return `<td>${jelzo(kk)}${t === "mod"
+        ? `<select data-mezo="${kk}">${[["leolvasott", "leolvasott"], ["diktalt", "diktált"], ["becsult", "becsült"]].map(([v, n]) => `<option value="${v}" ${v === s[k] ? "selected" : ""}>${n}</option>`).join("")}</select>`
+        : `<input data-mezo="${kk}" type="${t || "text"}" ${t === "number" ? 'step="any"' : ""} value="${esc(s[k] ?? "")}">`}${uzen(kk)}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div>` : `<div class="kicsi">nincs</div>`;
+    const o = jel._osszes || {};
+    const kt = Object.entries(e.kitakarva || {}).map(([k, n]) => `${n} ${k}`).join(", ");
+    torzs.innerHTML = `<div class="aiosszeg kicsi">${o.ellentmondas ? `<span class="aijel aijel-ellentmondas">✗</span> ${o.ellentmondas} ellentmondás – javítsd, vagy erősítsd meg. ` : ""}${o.figy ? `<span class="aijel aijel-figy">!</span> ${o.figy} figyelmeztetés. ` : ""}${!o.ellentmondas && !o.figy ? `<span class="aijel aijel-ok">✓</span> Minden ellenőrzött érték szerepel a számlán. ` : ""}
+        Kiolvasta: ${esc(e.entitas)}${kt ? ` · elküldés előtt kitakarva: ${esc(kt)}` : ""}.</div>
+      <div class="aiketoszlop"><div class="aiadatok">
+        ${mezo("szolgaltato_nev", "Szolgáltató")}${mezo("sorszam", "Sorszám")}${mezo("tipus", "Típus", "tipus")}
+        ${mezo("kelte", "Kelte", "date")}${mezo("fizetesi_hatarido", "Fizetési határidő", "date")}
+        ${mezo("idoszak_tol", "Időszak kezdete", "date")}${mezo("idoszak_ig", "Időszak vége", "date")}
+        ${mezo("fizetendo", "Fizetendő (Ft)", "number")}${mezo("szamlaertek", "Számlaérték (Ft)", "number")}
+        <h4>Mérőállások</h4>${tabla("merok", [["gyari_szam", "Mérő"], ["tol_datum", "Induló nap", "date"], ["tol_allas", "Induló", "number"], ["ig_datum", "Záró nap", "date"], ["ig_allas", "Záró", "number"], ["mod", "Mód", "mod"]])}
+        <h4>Elszámolt mennyiség</h4>${tabla("mennyisegek", [["megnevezes", "Megnevezés"], ["mennyiseg", "Mennyiség", "number"], ["egyseg", "Egység"]])}
+        <h4>Tételek</h4>${tabla("tetelek", [["megnevezes", "Megnevezés"], ["mennyiseg", "Menny.", "number"], ["egyseg", "Egys."], ["egysegar", "Egységár", "number"], ["brutto", "Bruttó", "number"]])}
+      </div><pre class="aiszoveg" tabindex="0">${this._aiKiemel(e.szoveg || "", a)}</pre></div>
+      ${o.ellentmondas ? `<label class="jelolo aimeger"><input type="checkbox" id="aimeger"> Tudom, hogy ellentmondás van – mégis így veszem át</label>` : ""}
+      <div class="kicsi">Átvétel után a számla a jóváhagyásra várók közé kerül: ott látod, mi változna vele (fogyasztás, költség, egyenleg), és ott hagyod jóvá vagy veted el. A <b>beolvasó mentése</b> a jóváhagyott adatokból helyi beolvasót készít (személyes adat nélkül): a szolgáltató következő számláit már AI nélkül olvasom be – ellentmondásos számlából nem készül.</div>`;
+    torzs.querySelectorAll("[data-mezo]").forEach((el) => el.addEventListener("focus", () => {
+      const v = el.value; if (!v) return;
+      const m = [...torzs.querySelectorAll("pre.aiszoveg mark")].find((x) => x.dataset.k === el.dataset.mezo) || null;
+      torzs.querySelectorAll("pre.aiszoveg mark.aktiv").forEach((x) => x.classList.remove("aktiv"));
+      if (m) { m.classList.add("aktiv"); m.scrollIntoView({ block: "center", behavior: "smooth" }); }
+    }));
+    gombok.innerHTML = `<button type="button" data-aimegse>Mégse</button>
+      <button type="button" data-aiatvesz="0" title="A számla a jóváhagyásra várók közé kerül; beolvasó nem készül">Csak átvétel</button>
+      <button type="button" class="fo" data-aiatvesz="1" title="Átvétel, és a jóváhagyott adatokból helyi beolvasó (sablon) a szolgáltató következő számláihoz – AI nélkül, ingyen">Átvétel és beolvasó mentése</button>`;
+    gombok.querySelector("[data-aimegse]").onclick = () => r.getElementById("aiablak").close();
+    gombok.querySelectorAll("[data-aiatvesz]").forEach((g) => g.onclick = async (ev) => {
+      const gomb = ev.currentTarget, sablon = gomb.dataset.aiatvesz === "1";
+      hiba.textContent = "";
+      const megerosit = !!torzs.querySelector("#aimeger")?.checked;
+      gomb.disabled = true;  // a szerver újraellenőriz (a javított mezőkkel); ellentmondásnál csak megerősítéssel veszi át
+      try {
+        const v = await this._hass.callWS({ type: "hu_rezsi/ai_atvetel", entry_id: this._entryId(e.sid), sid: e.sid, fajl: e.fajl, adat: this._aiGyujt(), megerosit, sablon });
+        if (!v.ok) { this._aiEredmeny = { ...e, adat: this._aiGyujt(), jelolesek: v.jelolesek }; this._aiRajzol(); r.getElementById("aihiba").textContent = "Ellentmondás van – javítsd a jelölt mezőket, vagy pipáld be a megerősítést."; return; }
+        r.getElementById("aiablak").close();
+        if (v.sablon) alert(v.sablon.uzenet);
+        this._betolt?.();
+      } catch (err) { hiba.textContent = err.message || String(err); gomb.disabled = false; }
+    });
+  }
+
+  _aiGyujt() {
+    const torzs = this.shadowRoot.getElementById("aitorzs"), a = structuredClone(this._aiEredmeny.adat);
+    torzs.querySelectorAll("[data-mezo]").forEach((el) => {
+      const ut = el.dataset.mezo.split("."), v = el.type === "number" ? (el.value === "" ? null : Number(el.value)) : (el.value || null);
+      if (ut.length === 1) a[ut[0]] = v; else a[ut[0]][Number(ut[1])][ut[2]] = v;
+    });
+    return a;
+  }
+
+  // A számla szövegében kiemeli a kiolvasott értékeket (szám: tagolva/tagolás nélkül, dátum: pontokkal/kötőjellel).
+  _aiKiemel(szoveg, a) {
+    const tuk = [];
+    const szamForma = (n) => {
+      if (n === null || n === undefined || n === "") return [];
+      const x = Number(n), egesz = Math.trunc(Math.abs(x)).toString(), tort = String(Math.abs(x)).split(".")[1];
+      const tag = (s, sep) => s.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+      return [...new Set([" ", " ", ".", ""].map((sep) => (x < 0 ? "-" : "") + tag(egesz, sep) + (tort ? "," + tort : ""))
+        .concat(tort ? [(x < 0 ? "-" : "") + egesz + "." + tort] : []))];
+    };
+    const datForma = (s) => s ? [s.replaceAll("-", "."), s, s.replaceAll("-", ". ") + "."] : [];
+    const add = (k, v, tip) => { for (const s of tip === "d" ? datForma(v) : tip === "n" ? szamForma(v) : (v ? [String(v)] : [])) if (s.replace(/\D/g, "").length >= 3 || (tip === "s" && s.length >= 4)) tuk.push([s, k]); };
+    add("sorszam", a.sorszam, "s"); add("szolgaltato_nev", a.szolgaltato_nev, "s");
+    for (const k of ["kelte", "fizetesi_hatarido", "idoszak_tol", "idoszak_ig"]) add(k, a[k], "d");
+    for (const k of ["fizetendo", "szamlaertek"]) add(k, a[k], "n");
+    (a.merok || []).forEach((m, i) => { add(`merok.${i}.gyari_szam`, m.gyari_szam, "s"); add(`merok.${i}.tol_datum`, m.tol_datum, "d"); add(`merok.${i}.ig_datum`, m.ig_datum, "d"); add(`merok.${i}.tol_allas`, m.tol_allas, "n"); add(`merok.${i}.ig_allas`, m.ig_allas, "n"); });
+    (a.tetelek || []).forEach((m, i) => add(`tetelek.${i}.brutto`, m.brutto, "n"));
+    (a.mennyisegek || []).forEach((m, i) => add(`mennyisegek.${i}.mennyiseg`, m.mennyiseg, "n"));
+    tuk.sort((x, y) => y[0].length - x[0].length);
+    if (!tuk.length) return esc(szoveg);
+    const minta = new RegExp(tuk.map(([s]) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+    let ki = "", poz = 0;
+    for (const m of szoveg.matchAll(minta)) {
+      const elotte = szoveg[m.index - 1], utana = szoveg[m.index + m[0].length];
+      if (/[\d,]/.test(elotte || "") || /\d/.test(utana || "")) continue;  // ne egy hosszabb szám belsejében
+      const k = tuk.find(([s]) => s === m[0])[1];
+      ki += esc(szoveg.slice(poz, m.index)) + `<mark data-k="${esc(k)}">${esc(m[0])}</mark>`;
+      poz = m.index + m[0].length;
+    }
+    return ki + esc(szoveg.slice(poz));
+  }
+
   _reszletek(f) {
     const tabla = (fej, sorok, osztaly = "") =>
       sorok.length
@@ -3002,9 +3450,9 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           x.csatorna === "almero" ? "almérő" : x.csatorna === "betaplalas" ? "betáplálás (2.8.0)"
             : `${esc(x.mero || "fő")}${{ h_teli: " · 1.81 téli", h_nyari: " · 1.82 nyári", zona_csucs: " · 1.8.1 csúcs", zona_volgy: " · 1.8.2 völgy" }[x.csatorna]
               || (f.dijszabas === "villany/h" || (f.regiszterek || []).length ? " · 1.8.0 összes" : "")}`,
-          esc(x.tipus === "kezdo" ? "kezdő óraállás" : x.tipus === "szamla_atalany" ? "számla alapján" : x.tipus === "szolgaltatoi" ? "szolgáltató" : x.megjegyzes?.startsWith("számla") ? "számla" : x.megjegyzes?.startsWith("v1") ? "v1" : "saját"),
+          esc(x.korrekcio ? "korrekció" : x.tipus === "kezdo" ? "kezdő óraállás" : x.tipus === "szamla_atalany" ? "számla alapján" : x.tipus === "szolgaltatoi" ? "szolgáltató" : x.megjegyzes?.startsWith("számla") ? "számla" : x.megjegyzes?.startsWith("v1") ? "v1" : "saját"),
         ]))}
-        <div class="kicsi">★ éves elszámoló leolvasás · „számla alapján”: az átalányszámla szerint feltételezett állás (előző állás + számlázott mennyiség), tájékoztató – a fogyasztást nem befolyásolja · a „kezdő óraállás” a fiókban megadott kezdőállás – az elszámolások origója (Beállítások → fiók módosítása)</div>`}
+        <div class="kicsi">★ éves elszámoló leolvasás · „korrekció”: korrekciós leolvasás – csak a saját szenzor szerinti állást és a korrekciós szorzót igazítja, nem időszakhatár · „számla alapján”: az átalányszámla szerint feltételezett állás (előző állás + számlázott mennyiség), tájékoztató – a fogyasztást nem befolyásolja · a „kezdő óraállás” a fiókban megadott kezdőállás – az elszámolások origója (Beállítások → fiók módosítása)</div>`}
         ${this._evesLehet(f) ? `<p><button type="button" class="linkgomb" data-eves="${f.sid}" data-entry="${this._entryId(f.sid)}">Éves elszámolási kimutatás ›</button></p>` : ""}
         ${f.dijszabas_info ? (() => {
           // Helytakarékos: a fejlécben a díjszabás neve, a részletek (érvényesség, ellenőrzés, forrás) az ⓘ buborékban;
@@ -3111,6 +3559,17 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           </div>
           <div class="kicsi">A csak megjelenítő ablakok (Részletek, Számlák kimutatása, Folyószámla, Éves összevetés, tételes bontás, D tarifa elemzés, Entitások) ennyi másodperc tétlenség után maguktól bezárulnak; mozdulat, görgetés vagy billentyű újraindítja. Az űrlapok (mérőállás, számla, mentés, beállítások) soha nem zárulnak be maguktól. Minden felhasználóra és minden otthonra érvényes (az indítókártya ablakára is).</div>
           <div id="autobezarasered" class="kicsi"></div>
+          <div class="mentessor">
+            <label>Megjelenítés ezen az eszközön<select id="nezetbeall"><option value="auto">automatikus (900 px felett tablet, alatta mobil)</option><option value="tablet">tablet / notebook (széles lapok, táblázatok)</option><option value="mobil">mobil (keskeny lapok, kártyák)</option><option value="regi">minden egymás alatt (a korábbi nézet)</option></select></label>
+          </div>
+          <div class="kicsi">Fiókonként lapozhatsz (Fiókok), vagy minden fiókot témánként láthatsz (Témák: tableten táblázatban, mobilon kártyákon) – a kettő között a fülsor jobb oldalán váltasz. Csak erre a böngészőre/eszközre vonatkozik.</div>
+          <div class="mentessor">
+            <label class="jelolo"><input type="checkbox" id="aibeolvasas"> Ismeretlen számla kiolvasása AI-val</label>
+            <label>AI Task entitás<select id="aientitas"></select></label>
+            <button type="button" id="aiment">Mentés</button>
+          </div>
+          <div class="kicsi">Ha egy számlát a Rezsikövető nem ismer fel, a választott AI kiolvassa belőle az adatokat; a rögzítést te hagyod jóvá. Elküldés előtt a felismerhető személyes adatokat (név, cím, azonosítók, mérőszám, e-mail, telefon, bankszámla) igyekszik kitakarni – a kitakarás nem tökéletes. Helyi AI (pl. Ollama) is választható. Alapból ki van kapcsolva.</div>
+          <div id="aiered" class="kicsi"></div>
         </details>
         <h4>Mentés most</h4>
         <div class="mentessor">
@@ -3270,11 +3729,13 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
             <label>1.82 – nyári (A1-ár)<input type="number" name="reg182" step="0.001" min="0" inputmode="decimal"></label>
             <div class="kicsi" id="hregmegj">Ahogy az MVM alkalmazásában: a két regiszter (1.81 téli, 1.82 nyári). Az összeset (1.8.0 = 1.81 + 1.82) a Rezsikövető számolja és tárolja.</div>
           </div>
-          <label class="pipa"><input type="checkbox" name="szolgaltatoi"> Szolgáltatói leolvasás (nem saját)</label>
+          <label class="pipa" id="korrsor"><input type="checkbox" name="korrekcio"> Csak korrekciós leolvasás – a saját szenzor szerinti állást és a korrekciós szorzót igazítja; nem diktálás, nem elszámoló és nem időszakhatár</label>
+          <label class="pipa" id="szolgsor"><input type="checkbox" name="szolgaltatoi"> Szolgáltatói leolvasás (nem saját)</label>
           <label class="pipa" id="evessor"><input type="checkbox" name="eves"> Éves (elszámoló) leolvasás – a szolgáltató leolvasója járt itt; innen indul az új elszámolási év és a kedvezményes keret</label>
           <label class="pipa" id="diktaltsor"><input type="checkbox" name="diktalt"> Diktáltam a szolgáltatónak (itt zárul az elszámolási időszak; átalánynál egyszer, csak a következő számlát írja felül)</label>
           </div>
           <div class="dhiba" id="dhiba"></div>
+          <div class="kicsi" id="dered"></div>
           <div class="gombok">
             <button value="megse" type="button" id="megse">Mégse</button>
             <button class="fo" type="submit" id="leolvmentes">Mentés</button>
@@ -3360,6 +3821,12 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           <div class="kicsi hiba" id="dijhiba"></div>
           <div class="gombok"><button type="button" id="dijmegse">Mégse</button><button type="submit" class="fo">Mentés</button></div>
         </form>
+      </dialog>
+      <dialog id="aiablak" class="aiablak">
+        <h3 id="aicim">Számla kiolvasása AI-val</h3>
+        <div id="aitorzs"></div>
+        <div class="kicsi hiba" id="aihiba"></div>
+        <div class="gombok" id="aigombok"></div>
       </dialog>
       <dialog id="beallit">
         <h3 id="beallitcim">Entitások</h3>
@@ -3571,11 +4038,27 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     for (const n of ["regi_zaro", "uj_gyari", "regi_181", "regi_182", "uj_181", "uj_182"]) form[n].value = "";
     form.uj_kezdo.value = "0";
     this.shadowRoot.getElementById("cserehreg").hidden = !h;
+    // Korrekciós leolvasás: csak saját szenzoros fióknál van értelme.
+    this.shadowRoot.getElementById("korrsor").style.display = (f.szenzor_allasok || []).length ? "" : "none";
+    form.korrekcio.checked = false;
+    this.shadowRoot.getElementById("dered").innerHTML = "";
+    this.shadowRoot.getElementById("megse").textContent = "Mégse";
+    this._korrValt();
     this._csereValt();
     this._utolsoJelzes();
     this.shadowRoot.getElementById("dhiba").textContent = "";
     this._mentesAllapot();
     d.showModal();
+  }
+
+  // Korrekciós leolvasásnál a többi jelölés (szolgáltatói, éves, diktáltam, mérőcsere) nem választható.
+  _korrValt() {
+    const r = this.shadowRoot, form = r.getElementById("leolvform"), k = form.korrekcio.checked;
+    for (const n of ["szolgaltatoi", "eves", "diktalt", "csere"]) {
+      if (k) form[n].checked = false;
+      form[n].disabled = k;
+    }
+    for (const id of ["szolgsor", "evessor", "diktaltsor", "cseresor"]) r.getElementById(id).classList.toggle("tiltva", k);
   }
 
   // A kiválasztott csatorna legutolsó állása a mező alatt (H-nál a regiszterekkel együtt).
@@ -3585,7 +4068,12 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     const c = h ? "vetelezes" : form.csatorna.value || "vetelezes";
     const sor = (x, nev) => (x ? `${nev}${SZAM.format(x.allas)} (${nap(x.datum)})` : "");
     const reszek = h ? [sor(ut.h_teli, "1.81: "), sor(ut.h_nyari, "1.82: ")].filter(Boolean) : [sor(ut[c], "")].filter(Boolean);
-    r.getElementById("utolsoallas").textContent = reszek.length ? `Legutóbb rögzítve: ${reszek.join(" · ")}` : "Ehhez a mérőhöz még nincs rögzített állás.";
+    // A saját szenzor szerinti mostani állás is (ehhez veti össze a korrekciós leolvasást).
+    const sz = Object.fromEntries((f?.szenzor_allasok || []).map((a) => [a.szerep, a.allas]));
+    const szs = h ? [["h_teli", "1.81: "], ["h_nyari", "1.82: "]].filter(([x]) => sz[x] != null).map(([x, n]) => `${n}${SZAM.format(Math.round(sz[x] * 10) / 10)}`)
+      : sz[c] != null ? [SZAM.format(Math.round(sz[c] * 10) / 10)] : [];
+    r.getElementById("utolsoallas").textContent = (reszek.length ? `Legutóbb rögzítve: ${reszek.join(" · ")}` : "Ehhez a mérőhöz még nincs rögzített állás.")
+      + (szs.length ? ` · saját szenzor szerint most: ${szs.join(" · ")}` : "");
   }
 
   // H-tarifa: a (rejtett) 1.8.0 mindig a két regiszter összege.
@@ -3834,7 +4322,9 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         } else if (e.felismert) {
           ki.textContent = `A számlát felismertem (${e.sorszam}), de nem ehhez a fiókhoz tartozik (más mérő). A fájl a mappában maradt.`;
         } else {
-          ki.textContent = `A fájl (${e.fajl}) a mappába került, de nem ismertem fel – add meg az adatait lent kézzel.`;
+          ki.innerHTML = `A fájl (${esc(e.fajl)}) a mappába került, de nem ismertem fel – add meg az adatait lent kézzel${this._aiLehet() && /\.pdf$/i.test(e.fajl || "")
+            ? `, vagy <button type="button" class="linkgomb" data-aifajl="${esc(`${f.sid}|${e.fajl}`)}">olvastasd ki AI-val ›</button>` : ""}.`;
+          ki.querySelector("[data-aifajl]")?.addEventListener("click", (ev) => { ev.stopPropagation(); d.close(); this._aiNyit(f.sid, e.fajl); });
         }
       } catch (err) {
         ki.textContent = `Hiba: ${err.message || err}`;
@@ -3882,6 +4372,21 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         el("autobezarasered").innerHTML = `<span class="ok">✓ Mentve:</span> ${v.auto_bezaras_mp ? `${v.auto_bezaras_mp} másodperc` : "soha nem zárul be magától"}.`;
       } catch (err) {
         el("autobezarasered").innerHTML = `<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`;
+      }
+      gomb.disabled = false;
+    });
+    el("aiment").addEventListener("click", async () => {
+      const gomb = el("aiment");
+      gomb.disabled = true;
+      try {
+        const be = el("aibeolvasas").checked;
+        if (be && !this._adat?.panel_beallitas?.ai_beolvasas && !window.confirm(this._aiBeleegyezesSzoveg())) { el("aibeolvasas").checked = false; gomb.disabled = false; return; }
+        const v = await this._hass.callWS({ type: "hu_rezsi/panel_beallitas", beallitas: { ai_beolvasas: be, ai_entitas: el("aientitas").value || null } });
+        if (this._adat) this._adat.panel_beallitas = v;
+        el("aiered").innerHTML = `<span class="ok">✓ Mentve:</span> ${v.ai_beolvasas ? "bekapcsolva" : "kikapcsolva"}.`;
+        this._rajzol?.();
+      } catch (err) {
+        el("aiered").innerHTML = `<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`;
       }
       gomb.disabled = false;
     });
@@ -4012,10 +4517,10 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         gomb.disabled = false;
       }
     });
-    this.shadowRoot.addEventListener("click", (ev) => {
+    this._egyszer("deleg3", () => this.shadowRoot.addEventListener("click", (ev) => {
       const t = ev.target.closest?.("[data-szenzorok]");
       if (t) this._szenzorNyit(t.dataset.szenzorok);
-    });
+    }));
   }
 
   async _mentesNyit() {
@@ -4025,6 +4530,15 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     r.getElementById("mentesered").innerHTML = "";
     r.getElementById("autobezaras").value = this._autoMp;
     r.getElementById("autobezarasered").innerHTML = "";
+    r.getElementById("nezetbeall").value = this._nezetBeall;
+    r.getElementById("nezetbeall").onchange = (ev) => { this._nezetBeall = ev.target.value; this._mentLap(); this._rajzol(); this._mentesNyit(); };
+    {
+      const pb = this._adat?.panel_beallitas || {};
+      r.getElementById("aibeolvasas").checked = !!pb.ai_beolvasas;
+      r.getElementById("aientitas").innerHTML = `<option value="">az első elérhető</option>${this._aiEntitasok().map((e) =>
+        `<option value="${esc(e.id)}" ${e.id === pb.ai_entitas ? "selected" : ""}>${esc(e.nev)}</option>`).join("")}`;
+      r.getElementById("aiered").innerHTML = "";
+    }
     if (!d.open) d.showModal();
     try {
       this._helyJeloltek = await this._hass.callWS({ type: "hu_rezsi/mentes_helyek" });
@@ -4129,6 +4643,7 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     const form = this.shadowRoot.getElementById("leolvform");
     this.shadowRoot.getElementById("megse").addEventListener("click", () => d.close());
     form.csere.addEventListener("change", () => { this._csereValt(); this._mentesAllapot(); });
+    form.korrekcio.addEventListener("change", () => { this._korrValt(); this._csereValt(); this._mentesAllapot(); });
     form.regi_zaro.addEventListener("input", () => this._mentesAllapot());
     form.eves.addEventListener("change", () => { if (form.eves.checked) form.szolgaltatoi.checked = true; this._mentesAllapot(); });
     for (const n of ["allas", "reg181", "reg182"]) form[n].addEventListener("input", () => {
@@ -4155,8 +4670,9 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         device_id: f.device_id,
         datum: form.datum.value,
         tipus: form.szolgaltatoi.checked || form.eves.checked ? "szolgaltatoi" : "kezi",
-        megjegyzes: "Rezsikövető panel",
+        megjegyzes: form.korrekcio.checked ? "korrekciós leolvasás (panel)" : "Rezsikövető panel",
         ...(form.eves.checked ? { elszamolasi: true } : {}),
+        ...(form.korrekcio.checked ? { korrekcio: true } : {}),
       };
       const dikt = ["diktalas", "atalany"].includes(f.elszamolas_mod) && form.diktalt.checked ? { diktalt: true } : {};
       try {
@@ -4196,6 +4712,17 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           });
         }
         d.close();
+        if (form.korrekcio.checked) {
+          // A visszajelzés a panel tetején (a háttér újraszámolása után): eltérés a szenzorhoz, szorzó előtte → utána.
+          const ertekek = f.dijszabas === "villany/h" ? [["h_teli", Number(form.reg181.value)], ["h_nyari", Number(form.reg182.value)]]
+            : [[form.csatorna.value || "vetelezes", Number(form.allas.value)]];
+          this._sav = { html: `${esc(f.nev)}: korrekciós leolvasás rögzítve – a korrekciót számolom…` };
+          if (!this._szerkesztesAlatt()) this._rajzol();
+          const html = await this._korrekcioEredmeny(f, ertekek, form.datum.value);
+          this._sav = { html: `<b>${esc(f.nev)}</b> – ${html}` };
+          if (this._szerkesztesAlatt()) this._rajzolVar = true; else this._rajzol();
+          return;
+        }
         setTimeout(() => this._betolt(), 1500);
       } catch (e) {
         this.shadowRoot.getElementById("dhiba").textContent = e.message || String(e);
@@ -4349,6 +4876,115 @@ const STILUS = `
   button.veszely.tele { background: var(--error-color, #db4437); color: #fff; border-color: var(--error-color, #db4437); }
   ul.torleslista { margin: 0 0 10px; padding-left: 18px; font-size: 14px; max-height: 40vh; overflow: auto; }
   h4 .dijnev { font-weight: 400; margin-left: 4px; }
+  .tabletsav { display: flex; align-items: flex-end; gap: 12px; border-bottom: 1px solid var(--divider-color); margin: 8px 0 14px; }
+  .lapfulek { display: flex; gap: 2px; overflow-x: auto; flex: 1; scrollbar-width: thin; }
+  .lapful { border: none; background: none; padding: 8px 12px 6px; border-bottom: 3px solid transparent; cursor: pointer; color: var(--secondary-text-color);
+    display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 6px; align-items: center; white-space: nowrap; font: inherit; text-align: left; }
+  .lapful ha-icon { --mdc-icon-size: 20px; grid-row: 1 / span 2; }
+  .lapful .lapnev { font-size: 14px; font-weight: 500; color: var(--primary-text-color); }
+  .lapful .lapal { font-size: 12px; }
+  .lapful.aktiv { border-bottom-color: var(--primary-color); }
+  .lapful.aktiv ha-icon, .lapful.aktiv .lapnev { color: var(--primary-color); }
+  .lapful:hover { background: var(--secondary-background-color); }
+  .nezetvalto { display: flex; flex: none; border: 1px solid var(--divider-color); border-radius: 8px; overflow: hidden; margin-bottom: 6px; }
+  .nezetvalto button { border: none; background: none; padding: 5px 10px; cursor: pointer; display: flex; gap: 4px; align-items: center; color: var(--secondary-text-color); font: inherit; font-size: 13px; }
+  .nezetvalto button ha-icon { --mdc-icon-size: 18px; }
+  .nezetvalto button.aktiv { background: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .egylap .kartya { display: block; column-count: 3; column-gap: 32px; column-rule: 1px solid var(--divider-color); padding: 20px 24px; }
+  .egylap .kartya > * { break-inside: avoid; margin-bottom: 14px; }
+  .csempe .plusz { color: var(--success-color, #43a047); }
+  .csempe .minusz { color: var(--error-color, #db4437); }
+  .egylap .kartya > .kfej, .egylap .kartya > .fejlec, .egylap .kartya > .gombok, .egylap .kartya > .reszletek, .egylap .kartya > .hiba { column-span: all; }
+  .egylap .kartya > .gombok { justify-content: flex-end; margin-top: 12px; }
+  @media (max-width: 1150px) { .egylap .kartya { column-count: 2; } }
+  .lapozo { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 12px 0 4px; }
+  .lappotty { width: 10px; height: 10px; padding: 0; border-radius: 50%; border: none; background: var(--divider-color); cursor: pointer; }
+  .lappotty.aktiv { background: var(--primary-color); width: 22px; border-radius: 5px; }
+  .csempek { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin: 14px 0; }
+  .csempe { text-align: left; border: 1px solid var(--divider-color); border-radius: var(--ha-card-border-radius, 12px); background: var(--card-background-color);
+    padding: 12px 14px; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .csempe:hover { border-color: var(--primary-color); }
+  .csempe.figy { border-left: 4px solid var(--warning-color, #ff9800); }
+  .csfej { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .csfej ha-icon { --mdc-icon-size: 20px; color: var(--primary-color); }
+  .cscimke { font-size: 12px; color: var(--secondary-text-color); }
+  .csertek { font-size: 20px; font-weight: 500; }
+  .cssor { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
+  .tematabla { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; background: var(--card-background-color);
+    border: 1px solid var(--divider-color); border-radius: var(--ha-card-border-radius, 12px); overflow: hidden; }
+  .tematabla th { text-align: right; font-weight: 500; font-size: 12px; color: var(--secondary-text-color); padding: 10px; border-bottom: 1px solid var(--divider-color); }
+  .tematabla th:first-child { text-align: left; }
+  .tematabla td { padding: 9px 10px; border-bottom: 1px solid var(--divider-color); vertical-align: middle; }
+  .tematabla td.szam { text-align: right; white-space: nowrap; }
+  .tematabla td.tfiok { white-space: nowrap; font-weight: 500; }
+  .tematabla td.tfiok ha-icon { --mdc-icon-size: 18px; color: var(--primary-color); margin-right: 8px; vertical-align: -3px; }
+  .tematabla tbody tr { cursor: pointer; }
+  .tematabla tbody tr:hover { background: var(--secondary-background-color); }
+  .tematabla tfoot td { font-weight: 600; border-bottom: none; }
+  .tematabla .plusz { color: var(--success-color, #43a047); }
+  .tematabla .minusz { color: var(--error-color, #db4437); }
+  .temamegj { margin-top: 6px; }
+  .minisav { height: 6px; width: 72px; background: var(--divider-color); border-radius: 3px; display: inline-block; vertical-align: middle; }
+  .minisav > div { height: 100%; background: var(--primary-color); border-radius: 3px; }
+  .minisav.tullepve > div { background: var(--error-color, #db4437); }
+  .kisgomb { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 14px; border: 1px solid var(--primary-color); background: none; color: var(--primary-color); cursor: pointer; }
+  .keskeny .nagyszamok { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; }
+  .keskeny .nagyszamok .nagy { font-size: 26px; }
+  .mobilemail { margin: 8px 0; border: 1px solid var(--divider-color); border-radius: 8px; padding: 6px 10px; }
+  .mobilemail > summary { cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--secondary-text-color); }
+  .mobilemail > summary ha-icon { --mdc-icon-size: 18px; }
+  .mobilemail[open] > summary { margin-bottom: 6px; }
+  .keskeny .tabletsav { position: sticky; top: 56px; z-index: 1; background: var(--primary-background-color); margin: 0 -8px 10px; padding: 2px 8px 0; gap: 6px; }
+  .keskeny .lapful { padding: 6px 8px 4px; grid-template-rows: auto; }
+  .keskeny .lapful ha-icon { grid-row: auto; --mdc-icon-size: 18px; }
+  .keskeny .lapful .lapal { display: none; }
+  .keskeny .lapful .lapnev { font-size: 13px; }
+  .keskeny .nezetvalto button { padding: 5px 7px; }
+  .keskeny .nvszoveg { display: none; }
+  .keskeny .csempek { grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+  .keskeny .csempe { padding: 10px; }
+  .keskeny .csertek { font-size: 17px; }
+  .keskeny .cssor { flex-direction: column; gap: 0; }
+  .keskeny .lapozo { margin-top: 10px; }
+  .temakartyak { display: flex; flex-direction: column; gap: 10px; }
+  .temakartya { border: 1px solid var(--divider-color); border-radius: var(--ha-card-border-radius, 12px); background: var(--card-background-color); padding: 10px 12px; cursor: pointer; }
+  .temakartya.osszes { cursor: default; background: var(--secondary-background-color); }
+  .tkfej { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .tkfej ha-icon { --mdc-icon-size: 20px; color: var(--primary-color); }
+  .tkfej .tknyil { margin-left: auto; color: var(--secondary-text-color); }
+  .tkracs { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; font-variant-numeric: tabular-nums; align-items: baseline; }
+  .tkc { color: var(--secondary-text-color); font-size: 13px; }
+  .tkv { text-align: right; }
+  .temakartya .plusz { color: var(--success-color, #43a047); }
+  .temakartya .minusz { color: var(--error-color, #db4437); }
+  .mmkorr { margin-top: 2px; }
+  .tematabla td .tor { white-space: normal; }
+  .korrsav { display: flex; align-items: flex-start; gap: 8px; justify-content: space-between; margin-bottom: 12px; font-size: 14px; line-height: 1.5; }
+  .pipa.tiltva { opacity: .45; }
+  label.jelolo { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+  label.jelolo input[type="checkbox"] { width: auto; margin: 0; }
+  .aiablak { width: min(1200px, 96vw); max-width: 96vw; }
+  .aiketoszlop { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(280px, 1fr); gap: 12px; margin: 8px 0; }
+  @media (max-width: 760px) { .aiketoszlop { grid-template-columns: 1fr; } }
+  .aiadatok { max-height: 62vh; overflow: auto; padding-right: 4px; }
+  .aiadatok h4 { margin: 10px 0 4px; }
+  .aimezo { display: grid; grid-template-columns: 18px 150px 1fr; align-items: center; gap: 6px; margin: 3px 0; font-size: 13px; }
+  .aimezo input, .aimezo select, .aitabla input, .aitabla select { font: inherit; padding: 3px 5px; min-width: 0; width: 100%; box-sizing: border-box; }
+  .aitabla { border-collapse: collapse; font-size: 12px; }
+  .aitabla td { padding: 2px 3px; vertical-align: top; white-space: nowrap; }
+  .aitabla td input { width: 96px; }
+  .aitabla td .aijel { margin-right: 2px; }
+  .aijel { display: inline-block; width: 16px; text-align: center; font-weight: 700; }
+  .aijel-ok { color: var(--success-color, #43a047); }
+  .aijel-figy { color: var(--warning-color, #ff9800); }
+  .aijel-ellentmondas { color: var(--error-color, #db4437); }
+  .aiuzenet { font-size: 12px; margin: 0 0 4px 24px; white-space: normal; }
+  .aiszoveg { max-height: 62vh; overflow: auto; margin: 0; padding: 8px; font-size: 11px; line-height: 1.35; white-space: pre; background: var(--secondary-background-color, #f5f5f5); border-radius: 6px; }
+  .aiszoveg mark { background: rgba(255, 213, 79, .55); color: inherit; border-radius: 2px; }
+  .aiszoveg mark.aktiv { background: rgba(255, 152, 0, .9); outline: 2px solid var(--warning-color, #ff9800); }
+  .aitolt { display: flex; align-items: center; gap: 10px; padding: 16px 0; }
+  .aimeger { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-weight: 500; }
+  .aimeger input { width: auto; margin: 0; }
   .fuggo { margin-top: 12px; padding: 10px 14px; border-left: 4px solid var(--warning-color, #ff9800); border-radius: 6px;
            background: color-mix(in srgb, var(--warning-color, #ff9800) 10%, transparent); display: grid; gap: 8px; }
   .fuggocim { display: flex; align-items: center; gap: 8px; font-size: 15px; }

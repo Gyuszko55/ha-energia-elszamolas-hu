@@ -15,8 +15,12 @@ KULCS = f"{DOMAIN}_panel"
 MAX_MP = 600
 
 
+AI_BEOLVASAS = "ai_beolvasas"  # ismeretlen számla kiolvasása AI-val (2.3.0b1) – alapból ki, beleegyezéssel
+AI_ENTITAS = "ai_entitas"  # a használt AI Task entitás (üres: az első elérhető)
+
+
 def alap() -> dict[str, Any]:
-    return {PANEL_AUTO_BEZARAS: PANEL_AUTO_BEZARAS_ALAP}
+    return {PANEL_AUTO_BEZARAS: PANEL_AUTO_BEZARAS_ALAP, AI_BEOLVASAS: False, AI_ENTITAS: None}
 
 
 def ervenyes(uj: dict[str, Any]) -> dict[str, Any]:
@@ -30,6 +34,15 @@ def ervenyes(uj: dict[str, Any]) -> dict[str, Any]:
         if not 0 <= mp <= MAX_MP:
             raise ValueError(f"Az automatikus bezárás 0 és {MAX_MP} másodperc között lehet (0: soha).")
         ki[PANEL_AUTO_BEZARAS] = mp
+    if AI_BEOLVASAS in uj:
+        if not isinstance(uj[AI_BEOLVASAS], bool):
+            raise ValueError("Az AI-beolvasás kapcsolója igen/nem érték.")
+        ki[AI_BEOLVASAS] = uj[AI_BEOLVASAS]
+    if AI_ENTITAS in uj:
+        e = uj[AI_ENTITAS] or None
+        if e is not None and (not isinstance(e, str) or not e.startswith("ai_task.")):
+            raise ValueError("Csak AI Task entitás (ai_task.…) választható.")
+        ki[AI_ENTITAS] = e
     return ki
 
 

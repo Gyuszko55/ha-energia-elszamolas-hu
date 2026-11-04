@@ -1,12 +1,14 @@
 # Rezsikövető – telepítési és kezelési kézikönyv
 
-**Változat:** 2.2.0 · kiadva 2026. november 4.
+**Változat:** 2.3.0b8 – béta · 2026. november 4.
 **Készítők:** Gyuszko55, Krissz55555
 
 > [!IMPORTANT]
 > A Rezsikövető **tájékoztató jellegű** számítás. Nem helyettesíti a szolgáltató számláját; a valódi összeg mindig a számlán szerepel.
 
 > [!NOTE]
+> **Újdonságok a 2.3.0 bétában:** lapozós tablet- és mobilnézet – Fiókok és Témák ([7.0](#70-lapozós-nézet-fiókok-és-témák-230-béta)), ismeretlen számla kiolvasása AI-val és saját beolvasó ([9.9](#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-béta-kísérleti)), korrekciós leolvasás és a saját szenzor szerinti állás a Mérőknél ([8.](#8-mérőállás-rögzítése-mérőcsere)).
+>
 > **Újdonságok a 2.2.0-ban:** számlák e-mailből ([9.8](#98-számlák-e-mailből--lépésről-lépésre)), **Saját díjak** a kártyán ([13.1](#131-saját-díjak-a-panelről)), a fix díj a számlákból ([13.2](#132-a-fix-díj-a-számlákból)), a díjeltérés gombjai a kártyán ([13.3](#133-ha-a-számla-eltér-a-havidíjtól)), MVM-számla 15 jegyű mérőszámmal ([15.](#15-gyakori-kérdések-és-hibaelhárítás)).
 
 ---
@@ -487,6 +489,34 @@ A bal oldali menüben: **Rezsikövető**. (Mobilon a bal felső ☰ gombbal nyí
 
 **Több otthon:** ha több háztartást is felvettél (pl. a saját otthonod és egy szülőé), a fejléc alatt **fülsor** jelenik meg, mint a böngészőben: minden otthonnak egy fül, rajta a neve és az e havi esedékes összeg; narancs pötty jelzi, ha ott teendő van. Mindig csak a kiválasztott otthon kártyái látszanak; a panel böngészőnként megjegyzi az utoljára nyitott fület. (Billentyűzettel: ← →.)
 
+### 7.0 Lapozós nézet: Fiókok és Témák (2.3.0 béta)
+
+Szélesebb kijelzőn (900 px felett: tablet fekvő helyzetben, notebook, asztali gép) a panel nem egymás alá rakja a kártyákat, hanem **lapokra** bontja az otthont. Az otthonok fülei alatt egy második fülsor van, jobbra a nézetváltó: **Fiókok** · **Témák**.
+
+**Fiókok nézet**
+
+- **Áttekintés:** az otthon összesítője (7.1) és fiókonként egy **csempe** – következő számla és várható kelte, éves egyenleg, folyószámla; narancs csík: teendő van. A csempére koppintva a fiók lapja nyílik.
+- **Fiókonként egy lap:** a fiók kártyája (7.2) a teljes szélességben, három (keskenyebb kijelzőn két) hasábban – fent a következő számla, a folyószámla és a folyó időszak, alatta az ütem, a keret, a számlák, jobbra lent a gombok. Egy fiók egy képernyőn, görgetés nélkül.
+- **Lapozás:** a fülekre koppintva, a lap alatti **‹ ›** nyilakkal vagy pöttyökkel, ujjal **vízszintesen húzva**, billentyűzeten a fülsoron **← →**.
+
+**Témák nézet** – minden fiók egy táblázatban, egymás mellett összevethetően, alul összesítő sorral:
+
+| Lap | Oszlopok |
+|---|---|
+| Áttekintés | mint a Fiókok nézetben |
+| Számlák | következő számla és várható kelte (késik / elmaradt jelzéssel), ebben a hónapban, utolsó számla, utolsó 12 hónap, folyószámla |
+| Fogyasztás | folyó időszak és eltelt rész, fogyasztás és díj eddig, várható fogyasztás és díj, napi átlag, kedvezményes keret |
+| Egyenleg | „ha ma lenne az elszámolás”, éves egyenleg, elszámolási év, várható éves költség, befizetve, folyószámla |
+| Mérők | utolsó rögzített állás és napja (alatta a mérő), **saját szenzor szerint most** (a szenzoros csatornák kalibrált mostani állása – H-tarifánál téli/nyári, A2-nél csúcs/völgy, almérő; élőben frissül; alatta a **korrekció**: szorzó, hány leolvasásból, hány napból), következő leolvasás és diktálás, **Mérőállás** gomb |
+
+Ha a saját szenzor szerinti állás eltér az órától, a **Mérőállás** ablakban rögzíts **korrekciós leolvasást** (8.).
+
+Egy sorra koppintva a fiók lapja nyílik a Fiókok nézetben. Előjel: **plusz** = visszatérítés / túlfizetés, **mínusz** = ráfizetés / fizetendő.
+
+**Mobilon (900 px alatt)** ugyanez, keskenyre szabva: a fülsor tömör (ikon + név), görgetéskor a fejléc alatt marad; egy fiók egy lapon (a megszokott kártya), ujjal lapozható; az Áttekintésen a két nagy szám egymás mellett, az e-mailes blokk összecsukva, a csempék két oszlopban; a **Témák** lapjai táblázat helyett **fiókonként egy kis kártyán** (címke – érték), alul összesítő kártyával.
+
+**Melyik nézet?** Alapból automatikus: 900 px felett tablet, alatta mobil – elforgatáskor magától vált. Eszközönként rögzíthető: ⚙ → **Panel beállításai** → „Megjelenítés ezen az eszközön”: automatikus / tablet / mobil / **minden egymás alatt** (a korábbi nézet: összesítő és alatta az összes kártya). A választott nézetet (Fiókok/Témák) és lapot a böngésző megjegyzi.
+
 ### 7.1 A háztartás összesítője
 
 ![Összesítő – Újbudai bérlakás](kepek/02_osszesito.png)
@@ -703,6 +733,7 @@ A panelt egy kártyáról is el lehet indítani. A kártya egy vonalas ház (egy
 3. **Mérő:** víznél *Főmérő* vagy *Locsolási almérő*; napelemnél *Betáplálás (2.8.0)*.
 4. **Szolgáltatói leolvasás (nem saját):** pipáld be, ha a szolgáltató leolvasásáról van szó.
    **Éves (elszámoló) leolvasás:** pipáld be, ha a szolgáltató leolvasója az éves leolvasásra járt itt (a „Szolgáltatói” is bejelölődik). Innen indul az új elszámolási év és a kedvezményes keret, ehhez igazodik a következő éves leolvasás; az előtte lévő fogyasztást a szolgáltató ezzel az állással számolja el. Egy már rögzített állás utólag is megjelölhető: ugyanarra a napra ugyanazzal az állással, a jelölővel mentve (a Mentés ilyenkor változatlan állással is aktív). A Részletek mérőállás-listájában ★ jelzi.
+   **Csak korrekciós leolvasás** (csak saját szenzoros fióknál): ha a saját szenzor szerinti állás (a mező alatt: „saját szenzor szerint most: …”) eltér az órától, írd be az órán látható állást, és pipáld be. Igazítja a szenzor szerinti állást, és a **korrekciós szorzót** (a szenzor és a mérőóra aránya) a Rezsikövető újraszámolja, ha már van hozzá elég adat (legalább 3 saját leolvasás, 45 nap alatt). **Nem** diktálás, **nem** elszámoló leolvasás, és **nem** határa az elszámolási időszaknak – a többi jelölés ilyenkor nem választható. Mentés után a panel tetején egy sáv mutatja: mennyit mért a szenzor, mennyi az eltérés, és hogyan változott a szorzó. Az aznapi rendes saját leolvasást (pl. a diktálást) nem írja felül; ha viszont aznapra **ugyanezt az állást** már saját leolvasásként rögzítetted (és nem diktálás), azt utólag megjelöli korrekciósnak – az eredeti időpont marad.
    **Diktáltam a szolgáltatónak** (csak diktálásos villanyfióknál): pipáld be, ha ezt az állást be is diktáltad – itt zárul az elszámolási időszak, másnap indul a következő.
 5. **Mentés.** A gomb csak akkor aktív, ha valamelyik állás eltér az előtöltöttől (vagy bejelölted az éves leolvasást) (mérőcserénél: ha megadtad a régi mérő záró állását) – változatlan állást nem ment.
 
@@ -799,7 +830,8 @@ Ha egy számlához XML és PDF is van, az XML-t olvassa (pontosabb). Becsült á
 
 Más szolgáltató, szkennelt (képként mentett) PDF vagy nem számla: **értesítés** jön a fájl nevével, és a panel tetején is megjelenik. Teendő:
 
-- rögzítsd a számlát kézzel (9.4), és/vagy
+- rögzítsd a számlát kézzel (9.4), vagy
+- olvastasd ki **AI-val** (9.9) – szöveges PDF-nél, ha van AI Task entitásod, és/vagy
 - kérj beolvasót: GitHub → **Issues → New issue → „Új szolgáltató / számlaformátum”**, egy **kitakart** mintaszámlával. Kitakarandó: név, cím, ügyfél- és szerződésszám, mérési pont azonosító, bankszámla. Az összegek, dátumok, mérőállások és a szerkezet maradjon.
 
 A fel nem ismert fájlt a mappából törölve a jelzés is eltűnik.
@@ -914,6 +946,37 @@ A fiók beállításainál (Újrakonfigurálás → **E-mailes számlák** lép�
 Ha a fióknak még nincs **számlamappája**, a Rezsikövető létrehoz egyet (`Szamlak/<a fiók neve>`), és onnan olvassa be a számlákat. A **Visszatekintés** (az e-mail fiók Haladó részében, alapból 45 nap) az óránkénti átnézésre vonatkozik; a keresés („Keresés újra”, új e-mail fiók) mindig az utolsó 180 napot nézi.
 
 ---
+
+### 9.9 Ismeretlen számla kiolvasása AI-val, saját beolvasó (2.3.0 béta, kísérleti)
+
+Ha a Rezsikövető egy PDF-számlát nem ismer fel (más szolgáltató, pl. egy helyi vízmű), a választott **AI** kiolvassa belőle az adatokat, te ellenőrzöd és jóváhagyod – és a számla ugyanúgy bekerül, mint egy felismert.
+
+**Kell hozzá:** egy **AI Task** entitás a Home Assistantban (Beállítások → Eszközök és szolgáltatások → pl. *Google Generative AI*, *OpenAI* vagy helyi *Ollama*). Ugyanaz lehet, amit az AI-tájékoztató használ.
+
+**Bekapcsolás:** alapból **ki van kapcsolva**. A fejléc ⚙ (Beállítások, mentés és visszaállítás) → **Panel beállításai** → „Ismeretlen számla kiolvasása AI-val” + AI Task entitás → **Mentés**. Az első bekapcsoláskor (vagy az első kiolvasáskor) egy tájékoztató kérdezi meg, engedélyezed-e.
+
+**Mi kerül el az AI-hoz:** a számla szövege, de elküldés előtt a Rezsikövető **igyekszik kitakarni** a személyes adatokat: a feliratos név- és címsorokat (akkor is, ha az érték a következő sorban áll), a felirat nélküli címeket (irányítószám + település + közterület), az összes otthon számláiról ismert neveket, címeket, azonosítókat és mérési pontokat, a HA személyeinek nevét, a fiók mérőszámait (MERO_1 helyőrzővel – a válaszban visszakerülnek), az e-mailt, a telefont, a bankszámlát, az adóazonosítót. A szolgáltató neve és adószáma marad. **A kitakarás nem tökéletes:** szokatlan elrendezésű számlán maradhat benne személyes adat – ha ez nem elfogadható, válassz helyi AI-t (Ollama). Helyi AI-nál (Ollama) a gépedet sem hagyja el. Az AI válaszát és a számla szövegét a Rezsikövető nem tárolja; csak a jóváhagyott adatok kerülnek be. Fizetős AI-nál egy kiolvasás néhány forint.
+
+**Lépések:**
+
+1. A panel tetején a figyelmeztetés („… fájlt nem ismertem fel …”) alatt: **Kiolvasás AI-val: <fájl> ›** – vagy feltöltésnél (**Új számla → fájl**), ha nem ismerte fel: „olvastasd ki AI-val ›”.
+2. 10–60 másodperc múlva megnyílik a **jóváhagyó ablak**: balra a kiolvasott adatok (szolgáltató, sorszám, típus, kelte, határidő, időszak, fizetendő, mérőállások, elszámolt mennyiség, tételek) – mind javítható –, jobbra a számla szövege, a megtalált értékek kiemelve (egy mezőre kattintva a szövegben is kiemelődik).
+3. Minden mező mellett jelölés:
+   - **✓** – az érték szó szerint szerepel a számlán, és megfelel a szabályoknak;
+   - **!** – ellenőrizd (pl. a tételek összege nem adja ki a számla értékét, szokatlanul nagy fogyasztás, nem a fiók ismert mérője);
+   - **✗** – ellentmondás: az érték nincs a számla szövegében (az AI „kitalálta”), a záró állás kisebb az indulónál, a mérőállás ellentmond a fiók meglévő leolvasásainak, vagy a számla már szerepel.
+4. **Átvétel jóváhagyásra:** a Rezsikövető újraellenőriz. Ellentmondásnál csak akkor veszi át, ha kijavítod, vagy bepipálod: „Tudom, hogy ellentmondás van – mégis így veszem át”.
+4. Két gomb: **Csak átvétel**, vagy **Átvétel és beolvasó mentése** (ajánlott, lásd lent).
+5. A számla a **jóváhagyásra várók** közé kerül („AI-val kiolvasva” címkével): ott látod, mi változna vele (fogyasztás, költség, egyenleg, átvett mérőállások), és ott **Jóváhagyás** vagy **Elvetés**.
+
+**Saját beolvasó (2.3.0 béta):** az „Átvétel és beolvasó mentése” a jóváhagyott adatokból helyi beolvasót (sablont) készít ehhez a szolgáltatóhoz. A **következő számláit már AI nélkül**, helyben, ingyen olvassa be – ugyanúgy jóváhagyásra várnak, mint bármely mappába érkezett számla („saját beolvasóval” címkével). A mappában már ott lévő, korábban fel nem ismert számlái is magától előkerülnek.
+
+- A beolvasó csak akkor mentődik, ha a számlán **pontosan azt** olvassa ki, amit jóváhagytál, és nincs benne személyes adat (csak a szolgáltató neve, adószáma, a mezők feliratai és általános minták). Ellentmondásos számlából nem készül.
+- Helye: `config/hu_rezsi_sablonok/<szolgáltató>.yaml` – olvasható, a HA-mentésbe bekerül, és **megosztható** (pl. GitHub-hibajegyben, hogy beépített beolvasó legyen belőle).
+- Ha a szolgáltató más formájú számlát küld (pl. elszámoló a részszámla után, vagy átalakította a számláját), és a beolvasó egy kötelező adatot (sorszám, kelte, fizetendő) nem talál, a fájl fel nem ismert marad – olvastasd ki AI-val, és mentsd a beolvasót: az új forma külön beolvasót kap (`<szolgáltató>_2.yaml`), a régi is megmarad.
+- A számla típusát (rész / elszámoló / sztornó) a beolvasó minden számlánál a szövegből határozza meg; a sorminták az első kiolvasott értéktől az utolsóig tartanak (a sor elején, végén álló név, cím nem kerül bele).
+
+**Korlátok:** csak szöveges PDF (a szkennelt, képes számla egy későbbi változatban jön); a regiszterenkénti (pl. H-tarifás 1.8.1/1.8.2) sorokat még nem veszi át. Az AI-beolvasáshoz friss Home Assistant (AI Task, 2025.8+; a listás adatszerkezethez újabb) kell.
 
 ## 10. Hogyan számol?
 

@@ -1,5 +1,43 @@
 # Változások
 
+## Rezsikövető 2.3.0b8 – béta, 2026-11-04
+
+> Béta: a HACS-ban a béta változatok megjelenítésével telepíthető. Az új funkciók (AI-beolvasó, saját beolvasó)
+> kísérletiek; hibát a GitHub Issues-ban jelezz.
+
+### Új
+- **Ismeretlen számla kiolvasása AI-val (kísérleti):** a fel nem ismert szöveges PDF-számlát a választott AI Task
+  entitás (pl. Gemini, OpenAI, helyi Ollama) kiolvassa; elküldés előtt a személyes adatok kitakarása (feliratos név-
+  és címsorok – a következő sorban álló érték is –, felirat nélküli címek, az összes otthon ismert adatai, a HA
+  személyeinek neve, a fiók mérőszámai helyőrzővel, e-mail, telefon, bankszámla, adóazonosító). Jóváhagyó ablak:
+  javítható mezők, mezőnkénti ellenőrzés (szó szerint szerepel-e a számlán, tételek összege, egységár × mennyiség,
+  mérőállások a fiók leolvasásaihoz, dátumok, nagyságrend), a számla szövege a megtalált értékekkel kiemelve;
+  ellentmondásnál csak javítás vagy megerősítés után vehető át. Az átvett számla a jóváhagyásra várók közé kerül
+  („AI-val kiolvasva”), a megszokott előnézettel. Panel beállításai: kapcsoló (alapból ki) és az AI Task entitás.
+- **Saját számlabeolvasó (sablon):** az „Átvétel és beolvasó mentése” a jóváhagyott számlából helyi beolvasót készít
+  (`config/hu_rezsi_sablonok/`): a szolgáltató következő számláit AI nélkül olvassa, jóváhagyásra várnak („saját
+  beolvasóval”). Mentés csak önpróba után (a forrásszámlán pontosan a jóváhagyott értékeket adja) és ha a
+  személyesadat-szűrőn átmegy; a sorminták az első és az utolsó kiolvasott érték között (név, cím nem kerül bele);
+  a típus (rész / elszámoló / sztornó) számlánként; más számlaforma külön beolvasót kap. Új beolvasó után a fel nem
+  ismert fájlokat minden otthonban újraolvassa.
+- **Tablet/notebook nézet:** 900 px felett lapok görgetés helyett – **Fiókok** (Áttekintés csempékkel, fiókonként egy
+  lap három hasábban; lapozás fülekkel, nyilakkal, pöttyökkel, húzással) és **Témák** (Számlák, Fogyasztás, Egyenleg,
+  Mérők – minden fiók egy táblázatban, összesítő sorral).
+- **Mobilnézet lapokkal:** ugyanez keskenyre szabva (tömör, tapadó fülsor; a Témák kártyákon; összecsukott e-mailes
+  blokk). A korábbi „minden egymás alatt” nézet a Panel beállításaiban választható (eszközönként).
+- **Mérők:** a saját szenzor szerinti mostani állás (H-tarifánál téli/nyári, A2-nél csúcs/völgy, almérő), élőben, alatta
+  a korrekciós szorzó (hány leolvasásból, hány napból).
+- **Korrekciós leolvasás:** a Mérőállás ablakban „Csak korrekciós leolvasás” – igazítja a saját szenzor szerinti
+  állást és a korrekciós szorzót, de nem diktálás, nem elszámoló leolvasás és nem időszakhatár; az aznapi rendes
+  (saját vagy szolgáltatói) leolvasást nem írja felül, az azonos értékű saját leolvasást utólag megjelöli.
+  Visszajelzés a panel tetején: eltérés a szenzorhoz, szorzó előtte → utána. Szolgáltatás: `hu_rezsi.leolvasas_rogzites`
+  új `korrekcio` mezője.
+
+### Javítások
+- A panel delegált kattintás-figyelői minden újrarajzoláskor újra bekötődtek – egy kattintás többször is lefuthatott.
+- Az AI-val kiolvasott számla a számlamappa újraolvasásakor is megmarad (és a fájlja nem lesz újra „ismeretlen”).
+- Méretváltáskor (pl. elforgatás) és a korrekció visszajelzésekor egy nyitott ablak nem tűnik el.
+
 ## Rezsikövető 2.2.1 – 2026-11-04
 
 - **Javítás – mérő nélküli gáz (gázátalány):** a 2.2.0 „fix díj a számlákból” funkciója tévesen erre a fióktípusra is

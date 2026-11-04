@@ -104,6 +104,27 @@ async def leolvasas_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
                 f"Az állás nem illeszkedik a {lo['datum']}-i {lo['allas']} leolvasáshoz (a mérő nem mehet visszafelé)."
             )
     tipus = call.data.get("tipus", "kezi")
+    # Korrekciós leolvasás (2.3.0b6): saját leolvasás csak a szenzor szerinti állás és a korrekciós szorzó igazítására –
+    # nem elszámolási, nem diktálás, nem időszakhatár (diktalasi_hatarok kihagyja).
+    korrekcio = bool(call.data.get("korrekcio"))
+    if korrekcio and tipus != "kezi":
+        raise ServiceValidationError("Korrekciós leolvasás csak saját leolvasás lehet.")
+    aznapi = [lo for lo in mero["leolvasasok"] if lo["datum"] == nap.isoformat() and lo.get("csatorna", "vetelezes") == csatorna
+              and lo.get("tipus") == "kezi" and not lo.get("korrekcio")]
+    if korrekcio and aznapi and all(Decimal(str(lo["allas"])) == allas and not lo.get("diktalt") and not lo.get("elszamolasi")
+                                    and not lo.get("evkezdet") for lo in aznapi):
+        # Ugyanez az állás már saját leolvasásként rögzítve (pl. a korrekció jelölése előtt): csak megjelöljük – az eredeti
+        # időpont marad, a fogyasztás nem tolódik el.
+        for lo in aznapi:
+            lo["korrekcio"] = True
+            lo["megjegyzes"] = f"korrekciós leolvasás ({lo['megjegyzes']})" if lo.get("megjegyzes") else "korrekciós leolvasás"
+        await _ment(koord)
+        return
+    if korrekcio and (aznapi or any(lo["datum"] == nap.isoformat() and lo.get("csatorna", "vetelezes") == csatorna
+                                    and not lo.get("korrekcio") for lo in mero["leolvasasok"])):
+        raise ServiceValidationError(
+            f"Erre a napra ({nap.isoformat()}) már van saját leolvasás – a korrekciós nem írja felül (pl. egy diktálást); "
+            "ha javítani szeretnéd, rögzítsd újra korrekció nélkül.")
     # Időpont: a megadott, különben mai saját leolvasásnál a rögzítés pillanata – így az este leolvasott állás nem a nap
     # elejére kerül (a számláló a nap eleje óta mért fogyasztást különben még hozzáadná). Régebbi napra: a nap eleje.
     ido = call.data.get("ido")
@@ -131,12 +152,13 @@ async def leolvasas_rogzites(hass: HomeAssistant, call: ServiceCall) -> None:
             "datum": nap.isoformat(),
             "allas": str(allas),
             "tipus": tipus,
-            "elszamolasi": call.data.get("elszamolasi", False),
-            "megjegyzes": call.data.get("megjegyzes", ""),
+            "elszamolasi": False if korrekcio else call.data.get("elszamolasi", False),
+            "megjegyzes": call.data.get("megjegyzes", "") or ("korrekciós leolvasás" if korrekcio else ""),
             "csatorna": csatorna,
             **({"ido": ido.strftime("%H:%M")} if ido else {}),
-            **({"diktalt": True} if call.data.get("diktalt") else {}),
-            **({"evkezdet": True, "elszamolasi": True} if call.data.get("evkezdet") else {}),
+            **({"korrekcio": True} if korrekcio else {}),
+            **({"diktalt": True} if call.data.get("diktalt") and not korrekcio else {}),
+            **({"evkezdet": True, "elszamolasi": True} if call.data.get("evkezdet") and not korrekcio else {}),
         }
     ]
     mero["leolvasasok"].sort(key=lambda x: x["datum"])
@@ -595,6 +617,7 @@ def regisztral(hass: HomeAssistant) -> None:
                 vol.Optional("elszamolasi", default=False): cv.boolean,
                 vol.Optional("diktalt", default=False): cv.boolean,
                 vol.Optional("evkezdet", default=False): cv.boolean,
+                vol.Optional("korrekcio", default=False): cv.boolean,
                 vol.Optional("megjegyzes", default=""): cv.string,
                 vol.Optional("csatorna", default="vetelezes"): vol.In(["vetelezes", "betaplalas", "almero", "h_teli", "h_nyari", "zona_csucs", "zona_volgy"]),
             }

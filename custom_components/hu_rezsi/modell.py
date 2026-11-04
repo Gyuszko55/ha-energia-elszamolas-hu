@@ -339,7 +339,9 @@ def diktalasi_hatarok(tarolt: dict[str, Any], minden_leolvasas: bool = False) ->
     if minden_leolvasas:
         for m in tarolt.get("merok") or []:
             hatarok.add(d(m["beepitve"]))
-            hatarok |= {d(lo["datum"]) for lo in m.get("leolvasasok", []) if (lo.get("csatorna") or "vetelezes") == "vetelezes"}
+            # A korrekciós leolvasás (csak a szenzor igazítása) nem időszakhatár.
+            hatarok |= {d(lo["datum"]) for lo in m.get("leolvasasok", [])
+                        if (lo.get("csatorna") or "vetelezes") == "vetelezes" and not lo.get("korrekcio")}
         if origo := tarolt.get("kezdo_origo"):
             hatarok.add(d(origo["datum"]))
         return sorted(hatarok)

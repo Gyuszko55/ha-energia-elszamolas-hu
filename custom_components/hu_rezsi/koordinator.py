@@ -7,6 +7,7 @@ import copy
 import json
 import dataclasses
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -73,6 +74,7 @@ from homeassistant.components import persistent_notification
 from . import beallitas, dijnet, szamlak
 from .beallitas import atalany_mennyiseg
 from . import ellenorzes
+from . import ai_beolvaso, sablon, szamla_ellenorzo
 from . import folyoszamla as folyoszamla_
 from .szamla_import import (
     szamla_allasok,
@@ -129,9 +131,11 @@ def helyi_most() -> datetime:
 
 
 def _ismert_masolat(nev: str, tarolt: dict[str, Any]) -> bool:
-    """A fájlnévben egy már rögzített számla sorszáma áll (ugyanannak a számlának egy másolata)."""
-    tores = {k for k in (tarolt.get("szamlak") or {}) if len(k) >= 6}
-    return any(k in nev for k in tores)
+    """A fájlnévben egy már rögzített számla sorszáma áll (ugyanannak a számlának egy másolata), vagy egy rögzített
+    számla ebből a fájlból jött (pl. AI-val kiolvasva – a beépített olvasó nem ismeri fel)."""
+    szamlak = tarolt.get("szamlak") or {}
+    tores = {k for k in szamlak if len(k) >= 6}
+    return any(k in nev for k in tores) or any(x.get("fajl") == nev for x in szamlak.values())
 
 
 def _iso_d(x: Any) -> str | None:
@@ -2106,9 +2110,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         if self._elonezet_kulcs.get(sid) == kulcs:
             return
         mappa = Path(self.hass.config.config_dir) / sub.data[CONF_SZAMLA_MAPPA]
-        uj = await self.hass.async_add_executor_job(
-            lambda: [sz for x in fuggo if (mappa / x["fajl"]).exists() and (sz := self._beolvas(mappa / x["fajl"]))]
-        )
+        uj = await self.hass.async_add_executor_job(lambda: self._fuggo_szamlak(mappa, fuggo, tarolt))
         masolat = copy.deepcopy(tarolt)
         masolat["fuggo"] = []
         szamlak.meresi_pontok_kapcsolasa(uj, masolat.setdefault("meresi_pontok", {}))
@@ -2182,9 +2184,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             eredmeny: dict[str, Any] = {"szamlak": [x["sorszam"] for x in valasztott], "dontes": dontes}
             if dontes == "jovahagy":
                 mappa = Path(self.hass.config.config_dir) / sub.data[CONF_SZAMLA_MAPPA]
-                uj = await self.hass.async_add_executor_job(
-                    lambda: [sz for x in valasztott if (mappa / x["fajl"]).exists() and (sz := self._beolvas(mappa / x["fajl"]))]
-                )
+                uj = await self.hass.async_add_executor_job(lambda: self._fuggo_szamlak(mappa, valasztott, tarolt))
                 szamlak.meresi_pontok_kapcsolasa(uj, tarolt.setdefault("meresi_pontok", {}))
                 szuro = {x.strip() for x in str(sub.data.get(CONF_SZAMLA_MEROK) or "").split(",") if x.strip()}
                 j = rogzit(tarolt, uj, szuro, ARSZABAS.get(sub.data.get(CONF_DIJSZABAS)))
@@ -2195,12 +2195,191 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             nevek = {x["fajl"] for x in valasztott}
             tarolt["feldolgozott_fajlok"] = sorted(set(tarolt.get("feldolgozott_fajlok", [])) | nevek)
             tarolt["fuggo"] = [x for x in fuggo if x["fajl"] not in nevek]
+            # Az AI-val kiolvasott (eddig fel nem ismert) fájl a döntés után már nem „ismeretlen”.
+            ai_nevek = {x["fajl"] for x in valasztott if x.get("ai")}
+            if ai_nevek:
+                tarolt["ismeretlen_fajlok"] = [n for n in tarolt.get("ismeretlen_fajlok", []) if n not in ai_nevek]
+                if isinstance(tarolt.get("nem_olvasott_fajlok"), dict):
+                    for n in ai_nevek:
+                        tarolt["nem_olvasott_fajlok"].pop(n, None)
             if not tarolt["fuggo"]:
                 persistent_notification.async_dismiss(self.hass, f"{DOMAIN}_fuggo_{sid}")
             self._elonezet_kulcs.pop(sid, None)
             await self.tarolo.ment()
         await self.async_refresh()
         return eredmeny
+
+    def _fuggo_szamlak(self, mappa: Path, lista: list[dict[str, Any]], tarolt: dict[str, Any]) -> list[Any]:
+        """A függő számlák Számlaként (végrehajtó szálon): a mappából beolvasva, az AI-val kiolvasottak a jóváhagyott
+        adatukból."""
+        ki = []
+        for x in lista:
+            if not (mappa / x["fajl"]).exists():
+                continue
+            if x.get("ai"):
+                try:
+                    ki.append(ai_beolvaso.szamlava(x["ai"], x["fajl"], tarolt))
+                except (ValueError, ArithmeticError) as err:
+                    _LOGGER.warning("AI-val kiolvasott számla nem alakítható (%s): %s", x["fajl"], err)
+            elif sz := self._beolvas(mappa / x["fajl"]):
+                ki.append(sz)
+        return ki
+
+    # --- AI-számlabeolvasó (2.3.0b1) ---------------------------------------------------------------------------
+
+    def _ai_fiok(self, sid: str) -> ConfigSubentry:
+        sub = self.fiokok().get(sid)
+        if sub is None:
+            raise ValueError("Nincs ilyen fiók ebben az otthonban.")
+        return sub
+
+    def _ai_fajl(self, sub: ConfigSubentry, fajl: str) -> Path:
+        if not sub.data.get(CONF_SZAMLA_MAPPA):
+            raise ValueError("Ennek a fióknak nincs számlamappája – a számlát az Új számla gombbal töltsd fel vagy rögzítsd.")
+        mappa = Path(self.hass.config.config_dir) / sub.data[CONF_SZAMLA_MAPPA]
+        if not fajl or "/" in fajl or "\\" in fajl or fajl.startswith("."):
+            raise ValueError("Érvénytelen fájlnév.")
+        p = mappa / fajl
+        if not p.is_file():
+            raise ValueError(f"A fájl ({fajl}) nincs a fiók számlamappájában.")
+        if p.suffix.lower() != ".pdf":
+            raise ValueError("AI-val egyelőre csak PDF-számla olvasható ki.")
+        return p
+
+    def _ai_szovegek(self, p: Path) -> tuple[str, str]:
+        sima, tabla = szamlak.pdf_szoveg(p, "plain"), szamlak.pdf_szoveg(p)
+        if len(re.sub(r"\s+", "", sima + tabla)) < ai_beolvaso.MIN_SZOVEG:
+            raise ValueError("A PDF-ben nincs kinyerhető szöveg (szkennelt, képes számla) – ezt egy későbbi változat "
+                             "tudja majd kiolvasni. Addig rögzítsd az Új számla gombbal.")
+        return sima, tabla
+
+    def _ai_segito(self, sub: ConfigSubentry, tarolt: dict[str, Any]) -> tuple[dict[str, Any], list[str], list[str]]:
+        """A fiók segítő adatai az AI-nak, és a kitakarandók: ismert személyes adatok, a fiók mérőszámai."""
+        kozmu = sub.data.get(CONF_KOZMU)
+        merok = [m.get("gyari_szam") for m in (tarolt.get("merok") or []) + (tarolt.get("almero_merok") or []) if m.get("gyari_szam")]
+        merok += [x.strip() for x in str(sub.data.get(CONF_SZAMLA_MEROK) or "").split(",") if x.strip()]
+        merok = list(dict.fromkeys(merok))
+        leol = sorted(((lo["datum"], lo["allas"]) for m in tarolt.get("merok") or [] for lo in m.get("leolvasasok", [])
+                       if lo.get("csatorna", "vetelezes") == "vetelezes"), key=lambda x: x[0])
+        # Ismert személyes adatok: minden otthon minden fiókjának számláiról (név, cím, azonosító, mérési pont) – egy
+        # új fióknál / új szolgáltatónál is –, és a HA személyeinek (person) neve.
+        ismert: list[str] = []
+        tarolok = [k.tarolo for e in self.hass.config_entries.async_entries(DOMAIN)
+                   if isinstance(k := getattr(e, "runtime_data", None), RezsiKoordinator)] or [self.tarolo]
+        for tar in tarolok:
+            for t2 in list((tar.adat.get("fiokok") or {}).values()):
+                for x in (t2.get("szamlak") or {}).values():
+                    ismert += [v for k, v in (x.get("ugyfel") or {}).items() if k != "mero" and isinstance(v, str)]
+                    if x.get("meresi_pont"):
+                        ismert.append(str(x["meresi_pont"]))
+                ismert += [str(v) for v in (t2.get("meresi_pontok") or {})]
+        ismert += [s.attributes.get("friendly_name") or "" for s in self.hass.states.async_all("person")]
+        segito = {"kozmu": kozmu, "egyseg": EGYSEG.get(kozmu, ""), "merok": [f"MERO_{i}" for i in range(1, len(merok) + 1)],
+                  **({"utolso_allas": {"datum": leol[-1][0], "allas": str(leol[-1][1])}} if leol else {})}
+        return segito, ismert, merok
+
+    async def ai_kiolvasas(self, sid: str, fajl: str, entitas: str, context: Any = None) -> dict[str, Any]:
+        """Egy fel nem ismert PDF-számla kiolvasása AI-val (kitakarva): a kiolvasott adat, a mezőnkénti ellenőrzés
+        és a számla szövege (a panel jóváhagyó ablakához). Semmit nem rögzít, semmit nem tárol."""
+        sub = self._ai_fiok(sid)
+        tarolt = self.tarolo.fiok(sid)
+        p = self._ai_fajl(sub, fajl)
+        sima, tabla = await self.hass.async_add_executor_job(self._ai_szovegek, p)
+        segito, ismert, merok = self._ai_segito(sub, tarolt)
+        kt = ai_beolvaso.Kitakaro(ismert, merok)
+        k_sima = kt.kitakar(sima)
+        elso, kt.kategoriak = kt.kategoriak, {}
+        k_tabla = kt.kitakar(tabla)
+        kt.kategoriak = {k: max(elso.get(k, 0), kt.kategoriak.get(k, 0)) for k in elso.keys() | kt.kategoriak.keys()}
+        try:
+            valasz = await asyncio.wait_for(self.hass.services.async_call(
+                "ai_task", "generate_data",
+                {"task_name": "rezsi_szamla_kivonat", "entity_id": entitas, "structure": ai_beolvaso.STRUKTURA,
+                 "instructions": ai_beolvaso.utasitas(segito, k_sima, k_tabla)},
+                blocking=True, return_response=True, context=context,
+            ), timeout=90)
+        except TimeoutError as err:
+            raise ValueError("Az AI 90 másodpercen belül nem válaszolt – próbáld újra később.") from err
+        d = (valasz or {}).get("data")
+        if not isinstance(d, dict):
+            raise ValueError("Az AI nem adott értékelhető választ.")
+        adat = ai_beolvaso.normalizal(kt.visszair(d))
+        szuro = {x.strip() for x in str(sub.data.get(CONF_SZAMLA_MEROK) or "").split(",") if x.strip()}
+        return {
+            "fajl": fajl, "adat": adat, "entitas": entitas, "szoveg": tabla,
+            "jelolesek": szamla_ellenorzo.ellenoriz(adat, sima + "\n" + tabla, tarolt, sub.data.get(CONF_KOZMU), szuro),
+            "kitakarva": kt.kategoriak,
+        }
+
+    async def ai_atvetel(self, sid: str, fajl: str, adat: dict[str, Any], megerosit: bool = False,
+                         sablon_mentes: bool = False) -> dict[str, Any]:
+        """A jóváhagyott (esetleg javított) adat a függő számlák közé: a panel előnézete mutatja a hatását, és ott
+        hagyható jóvá vagy vethető el (mint a mappába érkezett számla)."""
+        async with self._zar:
+            sub = self._ai_fiok(sid)
+            tarolt = self.tarolo.fiok(sid)
+            p = self._ai_fajl(sub, fajl)
+            sima, tabla = await self.hass.async_add_executor_job(self._ai_szovegek, p)
+            adat = ai_beolvaso.normalizal(adat)
+            szuro = {x.strip() for x in str(sub.data.get(CONF_SZAMLA_MEROK) or "").split(",") if x.strip()}
+            jel = szamla_ellenorzo.ellenoriz(adat, sima + "\n" + tabla, tarolt, sub.data.get(CONF_KOZMU), szuro)
+            if jel["_osszes"]["ellentmondas"] and not megerosit:
+                return {"ok": False, "jelolesek": jel}
+            sz = ai_beolvaso.szamlava(adat, fajl, tarolt)  # ValueError: hiányzó kelte/sorszám
+            fuggo = tarolt.setdefault("fuggo", [])
+            if sz.sorszam in (tarolt.get("szamlak") or {}) or any(x["sorszam"] == sz.sorszam for x in fuggo if x["fajl"] != fajl):
+                raise ValueError(f"A(z) {sz.sorszam} számla már szerepel.")
+            meta = szamla_meta(sz)
+            tarolt["fuggo"] = [x for x in fuggo if x["fajl"] != fajl] + [{
+                "fajl": fajl, "sorszam": sz.sorszam, "erkezett": helyi_most().isoformat(), "ai": adat,
+                **({"ai_megerositve": True} if jel["_osszes"]["ellentmondas"] else {}),
+                **{k: meta.get(k) for k in ("kelte", "tipus", "idoszak", "osszeg", "szamlaertek", "elszamolt_kwh")}}]
+            self._elonezet_kulcs.pop(sid, None)
+            await self.tarolo.ment()
+            sab = None
+            if sablon_mentes:
+                if jel["_osszes"]["ellentmondas"]:
+                    sab = {"mentve": False, "uzenet": "Ellentmondásos számlából nem készül beolvasó."}
+                else:
+                    _seg, ismert, merok = self._ai_segito(sub, tarolt)
+                    sab = await self.hass.async_add_executor_job(self._sablon_keszit, adat, sima, tabla, ismert + merok)
+        if sab and sab.get("mentve"):
+            await self._sablon_utan(sab)
+        else:
+            await self.async_refresh()
+        return {"ok": True, "sorszam": sz.sorszam, **({"sablon": sab} if sab else {})}
+
+    def _sablon_keszit(self, adat: dict[str, Any], sima: str, tabla: str, tiltott: list[str]) -> dict[str, Any]:
+        """Sablon a jóváhagyott adatból (végrehajtó szálon): önpróba és személyesadat-szűrő után mentve."""
+        s = sablon.keszit(adat, sima, tabla)
+        if elteres := sablon.onproba(s, adat, sima, tabla):
+            return {"mentve": False, "uzenet": "A beolvasó nem készült el: a számlán nem ugyanazt olvasná ki ("
+                    + ", ".join(elteres) + "). A következő számlát újra AI-val olvashatod ki."}
+        if szem := sablon.szemelyes(s, tiltott):
+            _LOGGER.warning("Számlasablon (%s): személyes adat maradt benne, nem mentve (%s db)", s["azonosito"], len(szem))
+            return {"mentve": False, "uzenet": "A beolvasó nem készült el: személyes adat maradt volna benne."}
+        cel = sablon.ment(Path(self.hass.config.config_dir) / sablon.MAPPA_NEV, s)
+        return {"mentve": True, "azonosito": s["azonosito"], "nev": s["nev"], "verzio": s["verzio"], "fajl": f"{sablon.MAPPA_NEV}/{cel.name}",
+                "uzenet": f"Beolvasó mentve ({s['nev']}): a szolgáltató következő számláit AI nélkül olvasom be."}
+
+    async def _sablon_utan(self, sab: dict[str, Any]) -> None:
+        """Új sablon: betöltés, és minden otthon fel nem ismert fájljainak újraolvasása (ugyanattól a szolgáltatótól
+        a már a mappában lévő számlák is jóváhagyásra várók lesznek)."""
+        szamlak.SABLONOK[:] = await self.hass.async_add_executor_job(sablon.betolt, Path(self.hass.config.config_dir) / sablon.MAPPA_NEV)
+        for e in self.hass.config_entries.async_entries(DOMAIN):
+            k = getattr(e, "runtime_data", None)
+            if not isinstance(k, RezsiKoordinator):
+                continue
+            k._fajl_cache.clear()
+            for s_id in k.fiokok():
+                t = k.tarolo.fiok(s_id)
+                if t.get("nem_olvasott_fajlok"):
+                    t["nem_olvasott_fajlok"] = {}
+            await k.tarolo.ment()
+            await k.async_refresh()
+        persistent_notification.async_create(
+            self.hass, f"{sab['uzenet']} Fájl: {sab['fajl']} (megosztható – személyes adatot nem tartalmaz).",
+            title="Rezsikövető – új számlabeolvasó", notification_id=f"{DOMAIN}_sablon_{sab['azonosito']}")
 
     async def eves_kimutatas(self, sid: str, ev_tol: date | None = None) -> dict[str, Any]:
         """Éves elszámolási kimutatás (MVM villany, A1 és H): a két éves leolvasás közötti év a mérőállások és a díjszabás
@@ -3014,7 +3193,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             varo.append(f.name)
             fuggo_sorsz.add(x.sorszam)
             fuggo.append({"fajl": f.name, "sorszam": x.sorszam, "erkezett": helyi_most().isoformat(),
-                          **{k: meta.get(k) for k in ("kelte", "tipus", "idoszak", "osszeg", "szamlaertek", "elszamolt_kwh")}})
+                          **{k: meta.get(k) for k in ("kelte", "tipus", "idoszak", "osszeg", "szamlaertek", "elszamolt_kwh", "forras")}})
         self.azonnali_fajlok -= {f.name for f in fajlok}
         j = rogzit(tarolt, [x for f, x in zip(fajlok, beolvasott, strict=True) if x and f.name not in varo], szuro, arsz)
         self._fix_dij_tanul(sid, sub, tarolt)

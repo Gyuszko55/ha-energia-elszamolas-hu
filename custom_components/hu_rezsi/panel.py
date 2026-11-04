@@ -182,6 +182,8 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
         "elszamolas_mod": elszamolas_mod(sub.data),
         # Van-e saját mérő (szenzor) – a fejléc becslésének megbízhatóságához.
         "szenzor": any(sub.data.get(k) for k in (CONF_FORRAS, CONF_H_TELI, CONF_H_NYARI, CONF_A2_CSUCS, CONF_A2_VOLGY)),
+        # A szenzoros csatornák mostani, korrigált állása (mint az indítókártyán; a panel élőben lépteti).
+        "szenzor_allasok": getattr(koord, "mero_allasok", {}).get(sid, []),
         "szamlamappa": sub.data.get(CONF_SZAMLA_MAPPA),
         "hiba": a.hiba if a else "még nincs adat",
         "ismeretlen_fajlok": tarolt.get("ismeretlen_fajlok", []),
@@ -339,7 +341,7 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
                     # A regiszter is (H: h_teli / h_nyari, A2: zona_*), hogy a listában látsszon, melyiké az állás.
                     "csatorna": csat if csat == "almero" else ("fo" if (lo.get("csatorna") or "vetelezes") == "vetelezes" else lo["csatorna"]),
                     "mero": m.get("gyari_szam") or "", "elszamolasi": bool(lo.get("elszamolasi")),
-                    "megjegyzes": lo.get("megjegyzes", ""),
+                    "megjegyzes": lo.get("megjegyzes", ""), **({"korrekcio": True} if lo.get("korrekcio") else {}),
                 })
     if sub.data.get("dijszabas") == "villany/h":
         leolv = _h_idenyszuro(leolv)
@@ -725,6 +727,65 @@ async def ws_panel_beallitas(hass: HomeAssistant, connection: websocket_api.Acti
         connection.send_result(msg["id"], await panel_beallitas.ment(hass, msg["beallitas"]))
     except ValueError as err:
         connection.send_error(msg["id"], "hibas_ertek", str(err))
+
+
+def _ai_otthon(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> tuple[Any, str] | None:
+    """AI-beolvasás: betöltött otthon + a használható AI Task entitás (a beállítás engedélyezve); hiba: None."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
+        connection.send_error(msg["id"], "nincs_otthon", "Nincs ilyen otthon.")
+        return None
+    b = panel_beallitas.aktualis(hass)
+    if not b.get(panel_beallitas.AI_BEOLVASAS):
+        connection.send_error(msg["id"], "ki_van_kapcsolva", "Az AI-beolvasás nincs engedélyezve (Panel beállításai).")
+        return None
+    from .ai_tajekoztato import _ai_entitas  # noqa: PLC0415
+
+    entitas = _ai_entitas(hass, b.get(panel_beallitas.AI_ENTITAS))
+    if not entitas:
+        connection.send_error(msg["id"], "nincs_ai", "Nincs AI Task entitás (Beállítások → Eszközök és szolgáltatások: pl. Google Gemini, OpenAI, Ollama).")
+        return None
+    return entry, entitas
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hu_rezsi/ai_kiolvasas", vol.Required("entry_id"): str, vol.Required("sid"): str, vol.Required("fajl"): str,
+})
+@websocket_api.require_admin  # fizetős AI-hívás, a számla tartalmát küldi: csak rendszergazda
+@websocket_api.async_response
+async def ws_ai_kiolvasas(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Fel nem ismert PDF-számla kiolvasása AI-val (2.3.0b1): adat + mezőnkénti ellenőrzés + a számla szövege."""
+    if (r := _ai_otthon(hass, connection, msg)) is None:
+        return
+    entry, entitas = r
+    try:
+        eredmeny = await entry.runtime_data.ai_kiolvasas(msg["sid"], msg["fajl"], entitas, connection.context(msg))
+    except (ValueError, KeyError, ArithmeticError) as err:
+        connection.send_error(msg["id"], "hiba", str(err))
+        return
+    except Exception as err:  # noqa: BLE001 – az AI-szolgáltató hibája (kvóta, hálózat): a panelen jelenjen meg
+        _LOGGER.warning("AI-beolvasás (%s): %s", msg["fajl"], err)
+        connection.send_error(msg["id"], "ai_hiba", f"Az AI-hívás nem sikerült: {err}")
+        return
+    connection.send_result(msg["id"], eredmeny)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hu_rezsi/ai_atvetel", vol.Required("entry_id"): str, vol.Required("sid"): str, vol.Required("fajl"): str,
+    vol.Required("adat"): dict, vol.Optional("megerosit", default=False): bool, vol.Optional("sablon", default=False): bool,
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_ai_atvetel(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """A jóváhagyott AI-kivonat a függő számlák közé (ellentmondásnál csak megerősítéssel)."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
+        connection.send_error(msg["id"], "nincs_otthon", "Nincs ilyen otthon.")
+        return
+    try:
+        connection.send_result(msg["id"], await entry.runtime_data.ai_atvetel(msg["sid"], msg["fajl"], msg["adat"], msg["megerosit"], msg["sablon"]))
+    except (ValueError, KeyError, ArithmeticError) as err:
+        connection.send_error(msg["id"], "hiba", str(err))
 
 
 def _email_otthon(hass: HomeAssistant, entry_id: str) -> Any:
@@ -1130,6 +1191,8 @@ async def regisztral_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_fizetes)
     websocket_api.async_register_command(hass, ws_dij_elteres)
     websocket_api.async_register_command(hass, ws_sajat_dijak)
+    websocket_api.async_register_command(hass, ws_ai_kiolvasas)
+    websocket_api.async_register_command(hass, ws_ai_atvetel)
     websocket_api.async_register_command(hass, ws_szamla_javitas)
     websocket_api.async_register_command(hass, ws_hatarido)
     websocket_api.async_register_command(hass, ws_mentesek)

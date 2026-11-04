@@ -560,6 +560,10 @@
           "name": "MVM-év kezdete",
           "description": "Ettől a naptól új elszámolási év indul (pl. végszámla és új szerződés után), akkor is, ha 10 hónapnál közelebb van egy másik éves leolvasáshoz."
         },
+        "korrekcio": {
+          "name": "Csak korrekciós leolvasás",
+          "description": "Saját leolvasás csak a szenzor szerinti mérőállás és a korrekciós szorzó igazítására: nem diktálás, nem elszámoló leolvasás, és nem határa az elszámolási időszaknak."
+        },
         "ido": {
           "name": "Időpont",
           "description": "A leolvasás időpontja. Üresen mai saját leolvasásnál a rögzítés pillanata, régebbi napnál a nap eleje."

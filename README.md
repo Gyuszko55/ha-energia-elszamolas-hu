@@ -30,6 +30,14 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 | Tervek – adatmodell, díjszabás-formátum, elszámoló motor, ütemterv | fejlesztő | [`docs/terv/`](docs/terv/) |
 | Változások | mindenki | [CHANGELOG](CHANGELOG.md) |
 
+## Újdonságok a 2.3.0 bétában (2026. november 4.)
+
+> Béta – a HACS-ban a béta változatok megjelenítésével telepíthető.
+
+- **Tablet és mobil: lapozós nézet.** Fiókonként egy lap (Fiókok), vagy minden fiók témánként egy táblázatban / kártyán (Témák: Számlák, Fogyasztás, Egyenleg, Mérők) – görgetés helyett. Útmutató: [kézikönyv 7.0](docs/KEZIKONYV.md#70-lapozós-nézet-fiókok-és-témák-230-béta).
+- **Ismeretlen számla kiolvasása AI-val (kísérleti)** – a személyes adatok kitakarásával, jóváhagyással; az első számlából **saját beolvasó** készül, a szolgáltató következő számláit már AI nélkül olvassa. Útmutató: [kézikönyv 9.9](docs/KEZIKONYV.md#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-béta-kísérleti).
+- **Mérők:** a saját szenzor szerinti mostani állás és a korrekciós szorzó; **korrekciós leolvasás** a Mérőállás ablakban (nem diktálás, nem időszakhatár).
+
 ## Újdonságok a 2.2.0-ban (2026. november 4.)
 
 - **Számlák e-mailből:** a Rezsikövető maga kiolvassa a postafiókból a szolgáltatók e-mailes számláit (csak olvas, semmit nem töröl), és a számla tartalma – mérő gyári száma, mérési pont, szolgáltató – alapján a jó fiókba sorolja. Beállítás a panelen a **📧 Számlák e-mailből** gombbal, pár kattintással. Útmutató: [kézikönyv 9.8](docs/KEZIKONYV.md#98-számlák-e-mailből--lépésről-lépésre) és [Számlák e-mailből (PDF)](docs/Szamlak_emailbol.pdf).

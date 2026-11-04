@@ -50,7 +50,7 @@ MERO_NELKULI_FORRAS = {"hvsz", "mohu", "telekom", "one"}
 def hozzatartozik(szamla: Szamla, szuro: set[str], arszabas: str | None = None) -> bool:
     """A számla ehhez a fiókhoz tartozik-e: a számla-mérők szerint, ezek nélkül a számla árszabása (A1/H)
     és a fiók díjszabása szerint; ha egyik sem ad támpontot, igen."""
-    if szuro and not szamla.merok and szamla.forras in MERO_NELKULI_FORRAS:
+    if szuro and not szamla.merok and (szamla.forras in MERO_NELKULI_FORRAS or szamla.forras.startswith("sablon:")):
         return True  # pl. távhő (HVSZ): a számlán nincs mérőszám, a mappa maga választja ki a fiókot
     if szuro:
         return bool(szamla.merok & szuro)
@@ -765,7 +765,8 @@ def szamla_torles(tarolt: dict[str, Any], sorszam: str) -> bool:
 def mappas_adatok_torlese(tarolt: dict[str, Any], minden_meroallas: bool = False) -> None:
     """A számlamappából jött számlák, befizetések és mérőállások törlése (újraolvasás előtt). A kézzel rögzített
     számlák a befizetésükkel és a mérőállásukkal maradnak; minden_meroallas=True: a többi mérőállás is törlődik."""
-    kezi = {k: v for k, v in (tarolt.get("szamlak") or {}).items() if v.get("kezi")}
+    # A kézi és az AI-val kiolvasott (jóváhagyott) számlák maradnak – ez utóbbiak a fájlból nem olvashatók újra.
+    kezi = {k: v for k, v in (tarolt.get("szamlak") or {}).items() if v.get("kezi") or v.get("forras") == "ai"}
     tarolt["szamlak"] = kezi
     tarolt["feldolgozott_fajlok"] = []
     tarolt["ismeretlen_fajlok"] = []
