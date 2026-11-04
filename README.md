@@ -1,5 +1,4 @@
 <p align="center">
-
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo_sotet.png">
     <img src="docs/brand/logo.png" alt="Rezsikövető" width="420">
