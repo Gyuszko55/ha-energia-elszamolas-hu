@@ -74,3 +74,36 @@ def test_sajat_dijak_mentes_bruttobol_es_tiltott_mezo(monkeypatch):
         raise AssertionError("tiltott mező")
     except ValueError:
         pass
+
+
+def _gaz_atalany(monkeypatch, tanult=True):
+    k, sub, tarolt, ert = _koord(monkeypatch, {
+        "1": _sz("2026-04-08", "2026-01-01", "2026-03-31", 3475), "2": _sz("2026-07-08", "2026-04-01", "2026-06-30", 3475)})
+    sub.data = {K.CONF_KOZMU: "gaz", K.CONF_DIJSZABAS: "gaz/mero_nelkuli", K.CONF_SZAMLAZAS_HONAP: 3}
+    elrejt = []
+    monkeypatch.setattr(K.persistent_notification, "async_dismiss", lambda hass, nid: elrejt.append(nid))
+    if tanult:  # a 2.2.0 tévesen tanult havidíja (912 Ft/hó, amit a díjszabás Ft/MJ-ként szorzott a 370 MJ-lal)
+        tarolt["feluliras"] = [{"kulcs": "dijak.alapdij_ho", "ertek": "912.07", "ervenyes_tol": "2026-01-01"},
+                               {"kulcs": "dijak.alapdij_ho", "ertek": "3.5", "ervenyes_tol": "2027-01-01"}]
+        tarolt["fix_dij_tanulva"] = {"sorszam": "1", "havi": "912.07", "tol": "2026-01-01"}
+    return k, sub, tarolt, ert, elrejt
+
+
+def test_mero_nelkuli_gaz_nem_tanul_havidijat(monkeypatch):
+    """2.2.1: a mérő nélküli gáz díja egységár × havi MJ – a havidíj-tanulás milliós várható díjat adott."""
+    k, sub, tarolt, ert, _ = _gaz_atalany(monkeypatch, tanult=False)
+    assert k._fix_dij_tanul("S", sub, tarolt) is False
+    assert tarolt["feluliras"] == [] and not ert and "fix_dij_tanulva" not in tarolt
+
+
+def test_mero_nelkuli_gaz_teves_tanulas_visszavonva(monkeypatch):
+    k, sub, tarolt, _, elrejt = _gaz_atalany(monkeypatch)
+    assert k._fix_dij_tanul("S", sub, tarolt) is True
+    assert tarolt["feluliras"] == [{"kulcs": "dijak.alapdij_ho", "ertek": "3.5", "ervenyes_tol": "2027-01-01"}]  # a kézi marad
+    assert "fix_dij_tanulva" not in tarolt and elrejt
+    assert k._fix_dij_tanul("S", sub, tarolt) is False
+
+
+def test_mero_nelkuli_gaz_nincs_sajat_havidij(monkeypatch):
+    k, sub, tarolt, _, _ = _gaz_atalany(monkeypatch, tanult=False)
+    assert k._sajat_dij_mezok(sub) == []

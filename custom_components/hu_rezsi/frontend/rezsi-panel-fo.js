@@ -1195,7 +1195,7 @@ class HuRezsiPanel extends HTMLElement {
         <div class="gombok">
           <button data-reszlet="${f.sid}">${nyitva ? "Kevesebb" : "Részletek"}</button>
           ${f.device_id && this._admin ? `<button data-szamla="${f.sid}">${f.kozmu === "kozos" ? "Új előírás" : "Új számla"}</button>` : ""}
-          ${this._admin && !f.megszunt && (f.fix_dij || f.kozmu === "viz") ? `<button data-sajatdij="${f.sid}" title="A saját (település, edényméret szerinti) díjaid">Saját díjak</button>` : ""}
+          ${this._admin && !f.megszunt && ((f.fix_dij && !f.gaz_atalany) || f.kozmu === "viz") ? `<button data-sajatdij="${f.sid}" title="A saját (település, edényméret szerinti) díjaid">Saját díjak</button>` : ""}
           ${!f.fix_dij && f.device_id && !f.megszunt ? `<button class="fo" data-leolvas="${f.sid}">Mérőállás</button>` : ""}
         </div>
         ${nyitva ? this._reszletek(f) : ""}

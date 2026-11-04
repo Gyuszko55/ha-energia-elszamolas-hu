@@ -1727,6 +1727,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
     }
 
     def _sajat_dij_mezok(self, sub: ConfigSubentry) -> list[tuple[str, str, str]]:
+        if beallitas.fix_dijas(sub.data) and sub.data.get(CONF_KOZMU) not in FIX_DIJAS:
+            return []  # mérő nélküli gáz: országos egységár × átalány-MJ, nincs saját havidíj
         if beallitas.fix_dijas(sub.data):
             return self.SAJAT_DIJ_MEZOK["_fix"]
         return self.SAJAT_DIJ_MEZOK.get(sub.data.get(CONF_KOZMU), [])
@@ -1771,6 +1773,20 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         """Fix díjas fiók (MOHU, közös költség): a díj a helyi szolgáltatótól függ (edény, ürítés, település), a beépített
         díjszabás csak kiindulás. Ha a havidíjat kézzel nem adták meg, és a legutóbbi két teljes időszakos számla
         ugyanannyi, de eltér a díjszabás díjától, a számlák díja lesz a havidíj – egyszer, értesítéssel (2.2.0b6)."""
+        if beallitas.fix_dijas(sub.data) and sub.data.get(CONF_KOZMU) not in FIX_DIJAS:
+            # Mérő nélküli gáz: a díj egységár (Ft/MJ) × a havi átalány-MJ, nem havidíj – nem tanulunk. A 2.2.0 tévesen
+            # ide is tanult (a havidíjat Ft/MJ-ként szorozta a havi MJ-val: milliós várható díj); a saját tanult
+            # felülírását visszavonjuk (a kézzel megadottat nem).
+            t = tarolt.get("fix_dij_tanulva") or {}
+            if not t.get("havi"):
+                return False
+            tarolt["feluliras"] = [f for f in tarolt.get("feluliras") or []
+                                   if not (f.get("kulcs") == "dijak.alapdij_ho" and f.get("ervenyes_tol") == t.get("tol")
+                                           and str(f.get("ertek")) == str(t["havi"]))]
+            tarolt.pop("fix_dij_tanulva", None)
+            persistent_notification.async_dismiss(self.hass, f"{DOMAIN}_fixdij_{sid}")
+            _LOGGER.warning("%s: a tévesen a számlákból tanult havidíj (%s) visszavonva – mérő nélküli gáz", sub.title, t["havi"])
+            return True
         if not beallitas.fix_dijas(sub.data) or not sub.data.get(CONF_SZAMLAZAS_HONAP) or tarolt.get("fix_dij_tanulva"):
             return False
         if any(f.get("kulcs") == "dijak.alapdij_ho" for f in tarolt.get("feluliras") or []):

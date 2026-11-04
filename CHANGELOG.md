@@ -1,5 +1,13 @@
 # Változások
 
+## Rezsikövető 2.2.1 – 2026-11-04
+
+- **Javítás – mérő nélküli gáz (gázátalány):** a 2.2.0 „fix díj a számlákból” funkciója tévesen erre a fióktípusra is
+  lefutott: a negyedéves számlából számolt havidíjat egységárként (Ft/MJ) szorozta a havi átalány-MJ-val, ezért a
+  várható díj és a következő számla százezres–milliós összeg lett. A díjat itt az országos egységár × a havi
+  átalány-MJ adja, így a tanulás ennél a fióktípusnál nem fut; a tévesen tanult díjat a frissítés magától visszavonja
+  (a kézzel megadott díj marad). A „Saját díjak” gomb ennél a fióknál nem jelenik meg.
+
 ## Rezsikövető 2.2.0 – 2026-11-04
 
 - **Új: Saját díjak a fiókkártyán (2.2.0b6).** A víz- és a fix díjas fiókoknál (hulladék, közös költség, távközlés) a kártyán egy **Saját díjak** gomb: a településenként, edényméret vagy ürítési gyakoriság szerint eltérő díjak a saját számláról, bruttóban (víz: ivóvíz, csatorna Ft/m³, alapdíj Ft/hó; fix díjas: havidíj), „érvényes ettől” dátummal. A háttérben felülírásként kerülnek be – a Fejlesztői eszközök nem kellenek hozzá. Csak rendszergazdának.
