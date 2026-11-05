@@ -1,13 +1,13 @@
 # Rezsikövető – telepítési és kezelési kézikönyv
 
-**Változat:** 2.4.0b1 – béta · 2026. november 5.
+**Változat:** 2.4.0b2 – béta · 2026. november 5.
 **Készítők:** Gyuszko55, Krissz55555
 
 > [!IMPORTANT]
 > A Rezsikövető **tájékoztató jellegű** számítás. Nem helyettesíti a szolgáltató számláját; a valódi összeg mindig a számlán szerepel.
 
 > [!NOTE]
-> **Újdonságok a 2.4.0-ban (béta):** értesítés a mobilra a fizetési határidő előtt ([7.5.2](#752-értesítés-a-mobilra-a-fizetési-határidő-előtt-240)) és hangutasítás: „Van befizetendő számlám?” ([7.5.3](#753-hangutasítás-van-befizetendő-számlám-240)).
+> **Újdonságok a 2.4.0-ban (béta):** értesítés a mobilra a fizetési határidő előtt ([7.5.2](#752-értesítés-a-mobilra-a-fizetési-határidő-előtt-240)) és hangutasítások – „Van befizetendő számlám?”, következő számla, rezsi eddig, keret, utolsó számla ([7.5.3](#753-hangutasítások-van-befizetendő-számlám-és-társai-240)).
 >
 > **Újdonságok a 2.3.0-ban:** lapozós tablet- és mobilnézet – Fiókok, Témák és Mátrix ([7.0](#70-lapozós-nézet-fiókok-és-témák-230)), ismeretlen számla kiolvasása AI-val és saját beolvasó ([9.9](#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-kísérleti)), korrekciós leolvasás és a saját szenzor szerinti állás a Mérőknél ([8.](#8-mérőállás-rögzítése-mérőcsere)).
 >
@@ -728,7 +728,7 @@ A Rezsikövető a telefonodra szól, ha egy számlát hamarosan be kell fizetni.
 - **Hány nappal előtte:** 1–14 nap, alapból **3**.
 - **Időpont:** mikor nézze meg naponta, alapból **9:00**.
 - **Telefonok:** a Home Assistant mobilalkalmazásával bejelentkezett telefonok (`notify.mobile_app_…`), több is választható. Ha a lista üres, telepítsd a mobilalkalmazást, és jelentkezz be vele.
-- **Otthonok** (ha több van): mely otthonok számláiról szóljon – ez a hangutasításra (7.5.3) is vonatkozik. Ha mindegyik be van jelölve, a később felvett otthonok is beletartoznak. Ha csak egy otthon van kiválasztva, az üzenetben nem szerepel az otthon neve.
+- **Otthonok** (ha több van): mely otthonok számláiról szóljon – ez a hangutasításokra (7.5.3) is vonatkozik. Ha mindegyik be van jelölve, a később felvett otthonok is beletartoznak. Ha csak egy otthon van kiválasztva, az üzenetben nem szerepel az otthon neve.
 - **Mentés**, majd a **Próbaüzenet** gombbal kipróbálhatod: azt küldi el, ami ma kimenne.
 
 ![Panel beállításai: értesítés a fizetési határidő előtt](kepek/panel_beallitas_ertesites.png)
@@ -742,12 +742,25 @@ A Rezsikövető a telefonodra szól, ha egy számlát hamarosan be kell fizetni.
 
 Bekapcsolva a fejlécben egy **telefon ikon** (📱) jelzi; föléhúzva mutatja, hány nappal előtte, hány órakor és hány telefonra küld, rákattintva a beállításhoz visz.
 
-### 7.5.3 Hangutasítás: „Van befizetendő számlám?” (2.4.0)
+### 7.5.3 Hangutasítások: „Van befizetendő számlám?” és társai (2.4.0)
 
-Megkérdezheted a Home Assistant hangasszisztensét (Assist) is: *„Van befizetendő számlám?”*, *„Milyen számlát kell befizetnem?”*, *„Van lejárt számlám?”*. A válasz felsorolja a befizetendő számlákat összeggel, és hogy hány nap múlva esedékesek (a lejártaknál: hány napja járt le), pl. *„2 befizetendő számlád van, összesen 19 134 forint: A1 áram 12 345 forint, 3 nap múlva esedékes; Víz 6 789 forint, 10 nap múlva esedékes. Lejárt számla nincs.”* Ugyanazok a számlák számítanak, mint az értesítésnél (a beszedéses és állandó átutalásos kimarad), és csak a beállításban kiválasztott otthonokból (7.5.2, *Otthonok*) – akkor is, ha maga az értesítés ki van kapcsolva.
+A Home Assistant hangasszisztensétől (Assist) megkérdezheted a Rezsikövető legfontosabb számait. Minden kérdés
+mellé odamondhatod a közművet is (villany vagy áram, gáz, víz, távhő vagy fűtés, szemét, internet, közös költség) –
+ilyenkor csak arról felel; anélkül minden fiókról.
 
-- **LLM-es ügynökkel** (Google Gemini, OpenAI, Anthropic, Ollama…) nincs teendő: ha az ügynök beállításaiban az **Assist** be van kapcsolva, a Rezsikövető eszközként (*Befizetendő számlák*) adja, az ügynök magától használja.
-- **A beépített (helyi) Assisthoz** a magyar mondatokat kell bemásolni: a tároló `examples/custom_sentences/hu/hu_rezsi.yaml` fájlját a Home Assistant `config/custom_sentences/hu/` mappájába, utána a HA újraindítása (vagy Fejlesztői eszközök → YAML → *Beszélgetés* újratöltése).
+| Kérdés (példák) | Mit mond |
+|---|---|
+| *„Van befizetendő számlám?”*, *„Van befizetendő gázszámlám?”*, *„Milyen számlát kell befizetnem?”*, *„Mikor kell befizetni a villanyszámlát?”* | a még be nem fizetett számlák összeggel, és hogy hány nap múlva esedékesek (a lejártaknál: hány napja járt le); a végén, ha nincs lejárt |
+| *„Mikor jön a következő számla?”*, *„Mennyi lesz a következő vízszámla?”* | a várható következő számla összege és ideje (ha már meg kellett volna érkeznie: „… óta várható, még nem érkezett meg”) |
+| *„Mennyi a rezsi eddig?”*, *„Mennyi a villany eddig?”*, *„Mennyibe kerül a gáz ebben az időszakban?”* | a folyó elszámolási időszak költsége eddig és az időszak végére várhatóan (fiókonként és összesen) |
+| *„Hol tartok a keretben?”*, *„Hol tartok a gázkeretben?”*, *„Túllépem a keretet?”* | a kedvezményes (rezsicsökkentett) keretből hátralévő mennyiség, és ha várható, mikor lépi túl |
+| *„Mennyi volt az utolsó villanyszámla?”* | a legutóbbi számla összege és kelte |
+
+- **Melyik otthonról:** a beállításban kiválasztott otthonokról (7.5.2, *Otthonok*) – akkor is, ha maga az értesítés ki van kapcsolva. Több otthonnál a válasz az otthon nevét is mondja.
+- A befizetendő számlákba ugyanazok számítanak, mint az értesítésnél (a beszedéses és állandó átutalásos kimarad).
+- **Közvetlenül a Home Assistant indulása után** pár percig ezt mondja: *„A számlák adatai még töltődnek, próbáld újra pár perc múlva.”* – amíg az első számolás le nem fut (különben a Díjneten fizetett számlákat is befizetendőnek látná).
+- **LLM-es ügynökkel** (Google Gemini, OpenAI, Anthropic, Ollama…) nincs teendő: ha az ügynök beállításaiban az **Assist** be van kapcsolva, a Rezsikövető ezeket eszközként adja (*Befizetendő számlák, Következő számla, Rezsi eddig és várhatóan, Kedvezményes keret, Utolsó számla*), és szabadabban is kérdezhetsz.
+- **A beépített (helyi) Assisthoz** a magyar mondatokat kell bemásolni: a tároló `examples/custom_sentences/hu/hu_rezsi.yaml` fájlját a Home Assistant `config/custom_sentences/hu/` mappájába, utána a HA újraindítása (vagy Fejlesztői eszközök → YAML → *Beszélgetés* újratöltése). Frissítéskor ezt a fájlt is cseréld.
 - Automatizálásból is kérhető (pl. reggeli összefoglaló a telefonra) a `conversation.process` művelettel – példa a tároló `examples/README.md` fájljában.
 
 ### 7.6 Indítókártya az irányítópultra

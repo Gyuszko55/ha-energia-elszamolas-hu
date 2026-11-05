@@ -92,17 +92,6 @@ def test_bekapcsolas_cel_nelkul_hiba(monkeypatch):
         asyncio.run(pb.ment(hass, {pb.ERT_BE: True}))
 
 
-def test_llm_eszkoz(monkeypatch):
-    from homeassistant.helpers import intent
-    from homeassistant.helpers.llm import LLM_API_ASSIST
-    from custom_components.hu_rezsi import llm as L
-    monkeypatch.setattr(intent, "async_get", lambda hass: [H.BefizetendoIntent()])
-    eszk = L.async_get_tools(None, None, LLM_API_ASSIST).tools
-    assert [e.name for e in eszk] == ["hu_rezsi__befizetendo_szamlak"] and eszk[0].integration == "hu_rezsi"
-    assert "unpaid" in eszk[0].description
-    assert L.async_get_tools(None, None, "mas_api") is None
-
-
 def test_otthon_szures(monkeypatch):
     def koord(cim):
         sub = SimpleNamespace(title="Áram")

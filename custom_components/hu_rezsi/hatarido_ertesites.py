@@ -10,8 +10,8 @@ stornózott, és a 90 napnál régebbi határidejű (ezekről gyakran nincs fize
 
 Mely otthonokra: a beállításban választható (értesítés és hangutasítás együtt; üres: mindegyik, az újak is).
 
-Hangutasítás: a „HuRezsiBefizetendo” szándék (intent) ugyanezt a listát mondja el, hány nap múlva esedékes / hány
-napja lejárt. Az Assist-ügynök (pl. Gemini) eszközként kapja (llm.py), a helyi Assist a custom_sentences mondataival.
+Hangutasítás: a „HuRezsiBefizetendo” szándék (hang.py) ugyanezt a listát mondja el, hány nap múlva esedékes / hány
+napja lejárt. Amíg az első számolás nem futott le (a Díjnet-fizetések még nincsenek betöltve), nem küld és nem válaszol.
 """
 
 from __future__ import annotations
@@ -21,13 +21,12 @@ from datetime import date, datetime, timedelta
 from typing import Any, Iterable
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers import intent
 from homeassistant.helpers.event import async_call_later, async_track_time_change
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from . import panel_beallitas as pb
+from . import hang, panel_beallitas as pb
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,7 +37,8 @@ PANEL_UT = "/rezsi"
 REGI_NAP = 90  # ennél régebbi határidejű számlát nem jelez (mint a fizetési összesítő)
 LEJART_NAP = 7  # a lejárt számláról legfeljebb ennyi napig pótolja az egyszeri jelzést
 MEGORZES_NAP = 200  # a küldött-jelölések ennyi napig maradnak
-INDULAS_MP = 300  # pótlás: a HA indulása után ennyivel (addig a számolás lefut)
+INDULAS_MP = 300  # pótlás: a HA indulása után ennyivel
+UJRA_MP = 600  # ha az első számolás még nem futott le (a fizetési adatok hiányoznak): ennyi múlva újra
 BESZEDES = ("beszed", "csoportos", "kompenz")
 HONAP = ("jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec.")
 
@@ -213,6 +213,12 @@ class Ertesito:
         b = pb.aktualis(self.hass)
         if not b.get(pb.ERT_BE) or not b.get(pb.ERT_CELOK):
             return 0
+        if not hang.kesz(self.hass):
+            # Indulás után az első számolásig a Díjnet-fizetések nincsenek betöltve: minden számla befizetetlennek
+            # látszana (téves „lejárt” üzenet). Később újra.
+            _LOGGER.debug("Határidő-értesítés: az első számolás még nem futott le, %s mp múlva újra", UJRA_MP)
+            async_call_later(self.hass, UJRA_MP, self._kesleltetve)
+            return 0
         ma = dt_util.now().date()
         tet = _gyujt(self.hass, ma)
         kuldott: dict[str, str] = self.adat.setdefault("kuldott", {})
@@ -233,6 +239,8 @@ class Ertesito:
 
     async def proba(self, celok: list[str]) -> str:
         """Próbaüzenet a választott telefon(ok)ra: a mostani befizetendő számlák, a küldött-jelölések érintése nélkül."""
+        if not hang.kesz(self.hass):
+            raise ValueError(hang.BETOLT_SZOVEG)
         tet = _gyujt(self.hass, dt_util.now().date())
         napok = int(pb.aktualis(self.hass).get(pb.ERT_NAPOK, pb.ERT_NAPOK_ALAP))
         u = uzenet(*kuldendok(tet, napok, {}))  # amit ma küldene (a már küldöttekkel együtt)
@@ -262,22 +270,6 @@ class Ertesito:
         return ok
 
 
-class BefizetendoIntent(intent.IntentHandler):
-    """„Van befizetendő számlám?” – a nyitott számlák összeggel és határidővel."""
-
-    intent_type = INTENT
-    description = ("Lists the household's unpaid utility bills (Rezsikövető: electricity, gas, water, district heating, "
-                   "waste, internet…) with the amount and how many days until the payment deadline, or how many days "
-                   "overdue. Use it when the user asks (e.g. in Hungarian) whether there is a bill to pay: "
-                   "'van befizetendő számlám?', 'milyen számlát kell befizetni?', 'mikor esedékes a villanyszámla?'. "
-                   "The answer is in Hungarian.")
-
-    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
-        valasz = intent_obj.create_response()
-        valasz.async_set_speech(hang_valasz(befizetendok(intent_obj.hass)))
-        return valasz
-
-
 async def indit(hass: HomeAssistant) -> Ertesito:
     """Egyszer, az integráció betöltésekor: tároló, ütemezés, pótlás az indulás után, a hang-szándék."""
     e = Ertesito(hass)
@@ -290,7 +282,7 @@ async def indit(hass: HomeAssistant) -> Ertesito:
         e.potlas()
 
     async_at_started(hass, _indult)
-    intent.async_register(hass, BefizetendoIntent())
+    hang.regisztral(hass)  # a hangutasítások (köztük a „Van befizetendő számlám?”)
     return e
 
 

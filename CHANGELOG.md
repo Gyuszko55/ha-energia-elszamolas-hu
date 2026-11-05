@@ -1,5 +1,10 @@
 # Változások
 
+## Rezsikövető 2.4.0b2 – 2026-11-05
+
+- **Javítás: téves „lejárt számla” indulás után.** Közvetlenül a HA indulása után, amíg az első számolás nem futott le, a Díjneten fizetett számlák befizetetlennek látszottak: a hangutasítás lejártnak mondta őket, és az indulás utáni pótló értesítés is tévesen szólhatott. Most az értesítő ilyenkor nem küld (10 perc múlva újra próbálja), a hangutasítás pedig azt feleli: „A számlák adatai még töltődnek, próbáld újra pár perc múlva.” A próbaüzenet is megvárja.
+- **Új hangutasítások** (`hang.py`, mind elhagyható `kozmu` résszel – villany/áram, gáz, víz, távhő/fűtés, szemét, internet, közös költség): `HuRezsiKovetkezoSzamla` („Mennyi lesz a következő gázszámla?”), `HuRezsiKoltseg` („Mennyi a rezsi eddig?”), `HuRezsiKeret` („Hol tartok a keretben?”), `HuRezsiUtolsoSzamla` („Mennyi volt az utolsó villanyszámla?”); a `HuRezsiBefizetendo` is szűrhető közműre („Van befizetendő gázszámlám?”). Az LLM-es ügynök mind az ötöt eszközként kapja (`hu_rezsi__befizetendo_szamlak`, `__kovetkezo_szamla`, `__koltseg_eddig`, `__kedvezmenyes_keret`, `__utolso_szamla`). A helyi Assist mondatai bővültek: `examples/custom_sentences/hu/hu_rezsi.yaml` – frissítéskor ezt is cseréld.
+
 ## Rezsikövető 2.4.0b1 – 2026-11-05
 
 - **Értesítés a mobilra a fizetési határidő előtt** (panel → Beállítások → Panel beállításai, alapból ki): naponta a megadott időpontban (alap 9:00) a választott telefon(ok)ra (`notify.mobile_app_…`) szól a még be nem fizetett számlákról, amelyek határideje N napon belül van (alap 3, 1–14), egy üzenetben felsorolva; a lejárt, ki nem fizetett számláról a lejárat után egyszer. Minden számláról csak egyszer (a küldöttek a HA tárhelyén, `hu_rezsi_ertesites`); a csoportos beszedéses / kompenzációs és az állandó átutalásos, a 0 Ft-os és a stornózott számla kimarad. Ha a küldés időpontjában a HA nem futott, indulás után pótolja. *Próbaüzenet* gomb (websocket: `hu_rezsi/ertesites_proba`). Bekapcsolva a fejlécben telefon ikon jelzi.

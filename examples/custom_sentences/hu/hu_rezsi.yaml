@@ -1,18 +1,70 @@
-# Rezsikövető – magyar hangparancs a helyi Assisthoz („van befizetendő számlám?”)
+# Rezsikövető – magyar hangparancsok a helyi Assisthoz
 #
 # Másold a Home Assistant config mappájába: config/custom_sentences/hu/hu_rezsi.yaml
 # (a mappát hozd létre, ha nincs), utána: Fejlesztői eszközök → YAML → „Beszélgetés” újratöltése,
 # vagy indítsd újra a HA-t. LLM-es ügynöknél (pl. Gemini) nem kell: ott a Rezsikövető eszközként adja.
+#
+# A {kozmu} elhagyható: „Van befizetendő számlám?” – mind; „Van befizetendő gázszámlám?” – csak a gáz.
 language: hu
 intents:
   HuRezsiBefizetendo:
     data:
       - sentences:
-          - "van [még] (befizetendő|befizetni való|fizetendő|kifizetetlen|lejárt) számlám"
-          - "van [még] (befizetendő|befizetni való|fizetendő|kifizetetlen|lejárt) számla"
-          - "(milyen|mely|hány) számlá(t|kat|m) kell [még] [be]fizetnem"
+          - "van [még] (befizetendő|befizetni való|fizetendő|kifizetetlen|lejárt) [{kozmu}]számlám"
+          - "van [még] (befizetendő|befizetni való|fizetendő|kifizetetlen|lejárt) [{kozmu}]számla"
+          - "(milyen|mely|hány) [{kozmu}]számlá(t|kat|m) kell [még] [be]fizetnem"
           - "(milyen|mely|hány) számlám van"
-          - "kell [még] számlát [be]fizetnem"
+          - "kell [még] [{kozmu}]számlát [be]fizetnem"
           - "mi(t|lyen számlát) kell [be]fizetni"
-          - "mikor (esedékes|jár le) a [következő] számla"
+          - "(mikor|meddig) kell befizetni a [{kozmu}]számlát"
           - "befizetendő számlák"
+  HuRezsiKovetkezoSzamla:
+    data:
+      - sentences:
+          - "mikor (jön|érkezik|lesz) a következő [{kozmu}]számla"
+          - "mennyi lesz a következő [{kozmu}]számla"
+          - "mennyi lesz a [{kozmu}]számla"
+          - "mekkora lesz a [következő] [{kozmu}]számla"
+          - "várható [{kozmu}]számla"
+  HuRezsiKoltseg:
+    data:
+      - sentences:
+          - "mennyi a rezsi eddig"
+          - "mennyi a {kozmu}rezsi eddig"
+          - "mennyi a {kozmu} eddig"
+          - "mennyi(be kerül|t fizetek) [eddig] a {kozmu} [ebben az időszakban|most]"
+          - "mennyi (lesz|lett) a rezsi [ebben az időszakban|eddig]"
+          - "mennyi a rezsi [ebben az időszakban|most]"
+          - "hol tart a (fogyasztás|költség|rezsi)"
+          - "hol tart a ({kozmu}fogyasztás|{kozmu} fogyasztás|{kozmu}költség|{kozmu} költség)"
+  HuRezsiKeret:
+    data:
+      - sentences:
+          - "hol tartok a ([{kozmu}]keretben|{kozmu} keretben)"
+          - "mennyi van [még] [hátra] a ([{kozmu}]keretből|{kozmu} keretből)"
+          - "(túllépem|túllépjük) a ([{kozmu}]keretet|{kozmu} keretet)"
+          - "mennyi a hátralévő ([{kozmu}]keret|{kozmu} keret)"
+          - "meddig tart a kedvezményes ([{kozmu}]keret|{kozmu} keret)"
+  HuRezsiUtolsoSzamla:
+    data:
+      - sentences:
+          - "mennyi volt az utolsó [{kozmu}]számla"
+          - "mennyi volt a legutóbbi [{kozmu}]számla"
+          - "mekkora volt az utolsó [{kozmu}]számla"
+          - "utolsó [{kozmu}]számla"
+lists:
+  kozmu:
+    values:
+      - { in: "villany", out: "villany" }
+      - { in: "áram", out: "villany" }
+      - { in: "gáz", out: "gáz" }
+      - { in: "víz", out: "víz" }
+      - { in: "csatorna", out: "víz" }
+      - { in: "távhő", out: "távhő" }
+      - { in: "fűtés", out: "távhő" }
+      - { in: "szemét", out: "szemét" }
+      - { in: "szemétszállítás", out: "szemét" }
+      - { in: "internet", out: "internet" }
+      - { in: "telefon", out: "internet" }
+      - { in: "tévé", out: "internet" }
+      - { in: "közös költség", out: "közös költség" }
