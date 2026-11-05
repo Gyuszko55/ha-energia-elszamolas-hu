@@ -26,15 +26,16 @@ def test_panel_beallitas_olvasas_mindenkinek_iras_adminnak(monkeypatch):
 
     monkeypatch.setattr(panel_beallitas, "Store", Tar)
     hass = SimpleNamespace(data={})
+    ERT = {"hatarido_ertesites": False, "hatarido_napok": 3, "hatarido_celok": [], "hatarido_ido": "09:00", "hatarido_otthonok": []}
     k = _ws(panel.ws_panel_beallitas, hass, {"type": "hu_rezsi/panel_beallitas"}, admin=False)
-    assert k.eredmeny == {"auto_bezaras_mp": 10, "ai_beolvasas": False, "ai_entitas": None}
+    assert k.eredmeny == {"auto_bezaras_mp": 10, "ai_beolvasas": False, "ai_entitas": None} | ERT
     k = _ws(panel.ws_panel_beallitas, hass, {"beallitas": {"auto_bezaras_mp": 30}}, admin=False)
     assert k.hiba[0] == "unauthorized" and tarolt == {}
     k = _ws(panel.ws_panel_beallitas, hass, {"beallitas": {"auto_bezaras_mp": 30}})
-    assert k.eredmeny == {"auto_bezaras_mp": 30, "ai_beolvasas": False, "ai_entitas": None} and tarolt["x"] == {"auto_bezaras_mp": 30, "ai_beolvasas": False, "ai_entitas": None}
-    assert panel_beallitas.aktualis(hass) == {"auto_bezaras_mp": 30, "ai_beolvasas": False, "ai_entitas": None}
+    assert k.eredmeny == {"auto_bezaras_mp": 30, "ai_beolvasas": False, "ai_entitas": None} | ERT and tarolt["x"] == {"auto_bezaras_mp": 30, "ai_beolvasas": False, "ai_entitas": None} | ERT
+    assert panel_beallitas.aktualis(hass) == {"auto_bezaras_mp": 30, "ai_beolvasas": False, "ai_entitas": None} | ERT
     k = _ws(panel.ws_panel_beallitas, hass, {"beallitas": {"auto_bezaras_mp": 9999}})
     assert k.hiba[0] == "hibas_ertek"
-    assert _ws(panel.ws_panel_beallitas, hass, {"beallitas": {"auto_bezaras_mp": "0"}}).eredmeny == {"auto_bezaras_mp": 0, "ai_beolvasas": False, "ai_entitas": None}
+    assert _ws(panel.ws_panel_beallitas, hass, {"beallitas": {"auto_bezaras_mp": "0"}}).eredmeny == {"auto_bezaras_mp": 0, "ai_beolvasas": False, "ai_entitas": None} | ERT
     with pytest.raises(ValueError):
         panel_beallitas.ervenyes({"auto_bezaras_mp": "sok"})

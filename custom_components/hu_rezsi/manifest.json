@@ -4,6 +4,7 @@
   "after_dependencies": [
     "backup",
     "energy",
+    "llm",
     "lovelace",
     "recorder"
   ],
@@ -26,5 +27,5 @@
   "requirements": [
     "pypdf>=4.0"
   ],
-  "version": "2.3.1"
+  "version": "2.4.0b1"
 }

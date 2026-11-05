@@ -7,6 +7,9 @@
 
 # Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
 
+> [!WARNING]
+> **A main ágon most a 2.4.0 béta (2.4.0b1) van.** A stabil változat a **2.3.1** – ezt telepíti a Marketplace (HA 2026.11-től) és a HACS, amíg a béta változatokat be nem kapcsolod (Marketplace: a Rezsikövető oldalán a béta-/pre-release kapcsoló; HACS: Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta újdonsága az értesítés a fizetési határidő előtt és a „Van befizetendő számlám?” hangutasítás; hibát a GitHub Issues-ban jelezz.
+
 > [!IMPORTANT]
 > **Tájékoztató jellegű számítás, nem helyettesíti a szolgáltatói számlát.** A valódi összeg mindig a szolgáltató számláján szerepel.
 
@@ -38,6 +41,7 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 
 ## Újdonságok a 2.2.0-ban (2026. november 4.)
 
+- **Értesítés a határidő előtt, hangon is:** a telefonodra szól (Home Assistant mobilalkalmazás), ha egy számla határideje közeleg – alapból 3 nappal előtte, beállítható, ki-be kapcsolható –, és egyszer, ha lejárt és még nincs befizetve. Az Assisttól meg is kérdezheted: *„Van befizetendő számlám?”* – felsorolja, mennyit és hány nap múlva kell fizetni. Útmutató: [kézikönyv 7.5.2–7.5.3](docs/KEZIKONYV.md#752-értesítés-a-mobilra-a-fizetési-határidő-előtt-240).
 - **Számlák e-mailből:** a Rezsikövető maga kiolvassa a postafiókból a szolgáltatók e-mailes számláit (csak olvas, semmit nem töröl), és a számla tartalma – mérő gyári száma, mérési pont, szolgáltató – alapján a jó fiókba sorolja. Beállítás a panelen a **📧 Számlák e-mailből** gombbal, pár kattintással. Útmutató: [kézikönyv 9.8](docs/KEZIKONYV.md#98-számlák-e-mailből--lépésről-lépésre) és [Számlák e-mailből (PDF)](docs/Szamlak_emailbol.pdf).
 - **Saját díjak a fiókkártyán:** a víz- és a fix díjas fiókoknál (hulladék, közös költség, internet/TV/telefon) a településenként vagy edényméret szerint eltérő díjak a saját számláról, bruttóban, „érvényes ettől” dátummal – a Fejlesztői eszközök nélkül.
 - **A fix díj a számlákból:** ha a havidíjat kézzel nem adtad meg, és a legutóbbi két teljes időszakos számla ugyanannyi, de eltér a beépített díjtól (pl. MOHU), a Rezsikövető a számlák díját veszi át, értesítéssel.

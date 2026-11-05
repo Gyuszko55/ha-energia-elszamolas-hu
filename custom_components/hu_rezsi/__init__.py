@@ -15,7 +15,7 @@ from homeassistant.helpers.typing import ConfigType
 from .const import DOMAIN, PLATFORMS
 from .d_arak import DArak
 from .koordinator import RezsiKoordinator
-from . import mentes_ha, panel_beallitas
+from . import hatarido_ertesites, mentes_ha, panel_beallitas
 from .email_ha import EmailFigyelo, issue_id
 from .panel import regisztral_panel
 from .szolgaltatasok import regisztral
@@ -52,6 +52,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         hass.async_create_background_task(_d_frissit(), "hu_rezsi D-árlista")
 
     async_at_started(hass, _indulaskor)
+    await hatarido_ertesites.indit(hass)  # mobil-értesítés a fizetési határidő előtt + „van befizetendő számlám?”
     mentes_ha.utemezo_indit(hass)  # a Rezsikövető ütemezett mentése (beállítás: panel → Mentés és visszaállítás)
     async_track_time_interval(hass, _d_frissit, timedelta(hours=3))
     return True

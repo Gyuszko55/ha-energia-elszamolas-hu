@@ -1,5 +1,11 @@
 # Változások
 
+## Rezsikövető 2.4.0b1 – 2026-11-05
+
+- **Értesítés a mobilra a fizetési határidő előtt** (panel → Beállítások → Panel beállításai, alapból ki): naponta a megadott időpontban (alap 9:00) a választott telefon(ok)ra (`notify.mobile_app_…`) szól a még be nem fizetett számlákról, amelyek határideje N napon belül van (alap 3, 1–14), egy üzenetben felsorolva; a lejárt, ki nem fizetett számláról a lejárat után egyszer. Minden számláról csak egyszer (a küldöttek a HA tárhelyén, `hu_rezsi_ertesites`); a csoportos beszedéses / kompenzációs és az állandó átutalásos, a 0 Ft-os és a stornózott számla kimarad. Ha a küldés időpontjában a HA nem futott, indulás után pótolja. *Próbaüzenet* gomb (websocket: `hu_rezsi/ertesites_proba`). Bekapcsolva a fejlécben telefon ikon jelzi.
+- **Mely otthonokra:** az értesítés és a hangutasítás otthononként szűrhető (a beállításban jelölőkkel; mind bejelölve = minden otthon, az újak is – `hatarido_otthonok`, üres lista).
+- **Hangutasítás: „Van befizetendő számlám?”** – új `HuRezsiBefizetendo` szándék: felsorolja a befizetendő számlákat összeggel, hány nap múlva esedékes / hány napja lejárt. Az LLM-es Assist-ügynök (pl. Gemini) eszközként kapja (`hu_rezsi__befizetendo_szamlak`, HA 2026.x `llm` platform); a helyi Assisthoz magyar mondatok: `examples/custom_sentences/hu/hu_rezsi.yaml`.
+
 ## Rezsikövető 2.3.1 – 2026-11-05
 
 Karbantartás a Home Assistant Marketplace (HACS) katalógusához – a működés nem változik.

@@ -1,0 +1,18 @@
+# Rezsikövető – magyar hangparancs a helyi Assisthoz („van befizetendő számlám?”)
+#
+# Másold a Home Assistant config mappájába: config/custom_sentences/hu/hu_rezsi.yaml
+# (a mappát hozd létre, ha nincs), utána: Fejlesztői eszközök → YAML → „Beszélgetés” újratöltése,
+# vagy indítsd újra a HA-t. LLM-es ügynöknél (pl. Gemini) nem kell: ott a Rezsikövető eszközként adja.
+language: hu
+intents:
+  HuRezsiBefizetendo:
+    data:
+      - sentences:
+          - "van [még] (befizetendő|befizetni való|fizetendő|kifizetetlen|lejárt) számlám"
+          - "van [még] (befizetendő|befizetni való|fizetendő|kifizetetlen|lejárt) számla"
+          - "(milyen|mely|hány) számlá(t|kat|m) kell [még] [be]fizetnem"
+          - "(milyen|mely|hány) számlám van"
+          - "kell [még] számlát [be]fizetnem"
+          - "mi(t|lyen számlát) kell [be]fizetni"
+          - "mikor (esedékes|jár le) a [következő] számla"
+          - "befizetendő számlák"

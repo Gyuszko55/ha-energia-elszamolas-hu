@@ -23,7 +23,7 @@ from homeassistant.util import dt as dt_util
 from .gaz_atalany import havi_mj
 from .beallitas import elszamolas_mod, fix_dijas, idoszak_mod, reszszamlas
 from . import fizetes
-from . import panel_beallitas
+from . import hatarido_ertesites, panel_beallitas
 from . import szamlak as szamlak_mod
 from .motor.dijszabas import ELLENORZES_ALLAPOTOK, VALIDALAS_ELSZAMOLAS, VALIDALAS_HMKE, VALIDALAS_SZAMLA
 from .const import (
@@ -731,9 +731,29 @@ async def ws_panel_beallitas(hass: HomeAssistant, connection: websocket_api.Acti
         connection.send_error(msg["id"], websocket_api.ERR_UNAUTHORIZED, "Csak rendszergazda módosíthatja.")
         return
     try:
-        connection.send_result(msg["id"], await panel_beallitas.ment(hass, msg["beallitas"]))
+        b = await panel_beallitas.ment(hass, msg["beallitas"])
     except ValueError as err:
         connection.send_error(msg["id"], "hibas_ertek", str(err))
+        return
+    if e := hatarido_ertesites.ertesito(hass):
+        e.utemez()  # a határidő-értesítés időpontja / kapcsolója változhatott
+    connection.send_result(msg["id"], b)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/ertesites_proba", vol.Required("celok"): [str]})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_ertesites_proba(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Próbaüzenet a határidő-értesítés választott telefonjaira (a mostani befizetendő számlákkal)."""
+    e = hatarido_ertesites.ertesito(hass)
+    celok = [c for c in msg["celok"] if c.startswith("notify.")]
+    if e is None or not celok:
+        connection.send_error(msg["id"], "hibas_ertek", "Válassz legalább egy telefont.")
+        return
+    try:
+        connection.send_result(msg["id"], {"szoveg": await e.proba(celok)})
+    except ValueError as err:
+        connection.send_error(msg["id"], "kuldes_hiba", str(err))
 
 
 def _ai_otthon(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> tuple[Any, str] | None:
@@ -1226,7 +1246,7 @@ async def regisztral_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_hatarido)
     websocket_api.async_register_command(hass, ws_mentesek)
     websocket_api.async_register_command(hass, ws_email_atnezes)
-    for parancs in (ws_panel_beallitas, ws_postafiok_felismeres, ws_postafiok_hozzaad, ws_email_felderites, ws_email_valasz):
+    for parancs in (ws_panel_beallitas, ws_ertesites_proba, ws_postafiok_felismeres, ws_postafiok_hozzaad, ws_email_felderites, ws_email_valasz):
         websocket_api.async_register_command(hass, parancs)
     websocket_api.async_register_command(hass, ws_ai_tajekoztato)  # kísérleti
     for parancs in (ws_mentes_beallitas, ws_mentes_helyek, ws_ha_mentesek, ws_ha_mentesbol, ws_szenzor_lista, ws_szenzor_csere):

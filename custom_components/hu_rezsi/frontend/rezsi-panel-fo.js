@@ -312,6 +312,7 @@ class HuRezsiPanel extends HTMLElement {
       <div class="fej">
         <ha-menu-button></ha-menu-button>
         <div class="cim">Rezsikövető</div>
+        ${this._ertesitesIkon()}
         ${this._hass?.user?.is_admin ? `<button class="ikongomb" id="mentesgomb" title="Beállítások, mentés és visszaállítás"><ha-icon icon="mdi:backup-restore"></ha-icon></button>` : ""}
         <button class="ikongomb" id="frissit" title="Frissítés (új panelváltozatnál újratölt)${window.huRezsiPanel?.verzio ? ` · betöltött változat: ${new Date(window.huRezsiPanel.verzio).toLocaleString("hu-HU")}` : ""}"><ha-icon icon="mdi:refresh"></ha-icon></button>
       </div>
@@ -332,6 +333,7 @@ class HuRezsiPanel extends HTMLElement {
     }
     this.shadowRoot.getElementById("frissit").addEventListener("click", () => this._frissit());
     this.shadowRoot.getElementById("mentesgomb")?.addEventListener("click", () => this._mentesNyit());
+    this.shadowRoot.getElementById("ertesitesgomb")?.addEventListener("click", () => this._mentesNyit("ertesites"));
     this.shadowRoot.querySelectorAll("[data-otthon]").forEach((el) =>
       el.addEventListener("click", () => this._otthonValt(el.dataset.otthon)),
     );
@@ -3811,6 +3813,19 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           </div>
           <div class="kicsi">Ha egy számlát a Rezsikövető nem ismer fel, a választott AI kiolvassa belőle az adatokat; a rögzítést te hagyod jóvá. Elküldés előtt a felismerhető személyes adatokat (név, cím, azonosítók, mérőszám, e-mail, telefon, bankszámla) igyekszik kitakarni – a kitakarás nem tökéletes. Helyi AI (pl. Ollama) is választható. Alapból ki van kapcsolva.</div>
           <div id="aiered" class="kicsi"></div>
+          <div class="mentessor" id="ertblokk">
+            <label class="jelolo"><input type="checkbox" id="ertbe"> Értesítés a mobilra a fizetési határidő előtt</label>
+            <label>Hány nappal előtte<input type="number" id="ertnapok" min="1" max="14" step="1" inputmode="numeric"></label>
+            <label>Időpont<input type="time" id="ertido"></label>
+          </div>
+          <div class="mentessor ertcelok" id="ertcelok"></div>
+          <div class="mentessor ertcelok" id="ertotthonok"></div>
+          <div class="mentessor">
+            <button type="button" id="ertment">Mentés</button>
+            <button type="button" id="ertproba">Próbaüzenet</button>
+          </div>
+          <div class="kicsi">Naponta a megadott időpontban végignézi minden otthon számláit: ha egy még be nem fizetett számla határideje ennyi napon belül van, a kiválasztott telefon(ok)ra üzenetet küld (több számlát egy üzenetben). Ha a határidő elmúlt és nincs befizetve, a lejárat után egyszer még szól. Minden számláról csak egyszer; a csoportos beszedéses és az állandó átutalásos számlákról nem (ott nincs teendő). A telefonok a Home Assistant mobilalkalmazásából jönnek (<code>notify.mobile_app_…</code>). Bekapcsolva a fejlécben egy telefon ikon jelzi.</div>
+          <div id="ertered" class="kicsi"></div>
         </details>
         <h4>Mentés most</h4>
         <div class="mentessor">
@@ -4631,6 +4646,40 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
       }
       gomb.disabled = false;
     });
+    el("ertment").addEventListener("click", async () => {
+      const gomb = el("ertment");
+      gomb.disabled = true;
+      try {
+        const celok = [...r.querySelectorAll("#ertcelok input:checked")].map((x) => x.value);
+        const ob = [...r.querySelectorAll("#ertotthonok input")], oj = ob.filter((x) => x.checked).map((x) => x.value);
+        if (ob.length && !oj.length) throw new Error("Válassz legalább egy otthont.");
+        const v = await this._hass.callWS({ type: "hu_rezsi/panel_beallitas", beallitas: {
+          hatarido_otthonok: oj.length === ob.length ? [] : oj,
+          hatarido_ertesites: el("ertbe").checked, hatarido_napok: Number(el("ertnapok").value || 3),
+          hatarido_ido: el("ertido").value || "09:00", hatarido_celok: celok } });
+        if (this._adat) this._adat.panel_beallitas = v;
+        el("ertered").innerHTML = `<span class="ok">✓ Mentve:</span> ${v.hatarido_ertesites
+          ? `bekapcsolva – ${v.hatarido_napok} nappal a határidő előtt, ${esc(v.hatarido_ido)}-kor, ${v.hatarido_celok.length} telefonra` : "kikapcsolva"}; otthonok: ${(v.hatarido_otthonok || []).length ? (this._adat?.haztartasok || []).filter((h) => v.hatarido_otthonok.includes(h.entry_id)).map((h) => esc(h.nev)).join(", ") : "mindegyik"}.`;
+        this._fejlecFrissit();
+      } catch (err) {
+        el("ertered").innerHTML = `<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`;
+      }
+      gomb.disabled = false;
+    });
+    el("ertproba").addEventListener("click", async () => {
+      const gomb = el("ertproba");
+      const celok = [...r.querySelectorAll("#ertcelok input:checked")].map((x) => x.value);
+      if (!celok.length) { el("ertered").innerHTML = `<span class="figyszoveg">Válassz legalább egy telefont.</span>`; return; }
+      gomb.disabled = true;
+      el("ertered").textContent = "Küldés…";
+      try {
+        const v = await this._hass.callWS({ type: "hu_rezsi/ertesites_proba", celok });
+        el("ertered").innerHTML = `<span class="ok">✓ Elküldve:</span> ${esc(v.szoveg).replace(/\n/g, "<br>")}`;
+      } catch (err) {
+        el("ertered").innerHTML = `<span class="figyszoveg">Hiba: ${esc(err.message || err)}</span>`;
+      }
+      gomb.disabled = false;
+    });
     el("mentesmost").addEventListener("click", async (ev) => {
       const gomb = ev.currentTarget;  // az await után az ev már nem megbízható (a lista újrarajzolása közben)
       gomb.disabled = true;
@@ -4764,7 +4813,45 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     }));
   }
 
-  async _mentesNyit() {
+  // Értesítés a határidő előtt (2.4.0b1): a fejléc telefon ikonja, ha be van kapcsolva.
+  _ertesitesIkon() {
+    const pb = this._adat?.panel_beallitas;
+    if (!pb?.hatarido_ertesites) return "";
+    const n = (pb.hatarido_celok || []).length;
+    const cim = `Értesítés a mobilra: ${pb.hatarido_napok} nappal a fizetési határidő előtt, ${pb.hatarido_ido}-kor, ${n} telefonra`;
+    return this._hass?.user?.is_admin
+      ? `<button class="ikongomb" id="ertesitesgomb" title="${esc(cim)} – beállítás" aria-label="${esc(cim)}"><ha-icon icon="mdi:cellphone-message"></ha-icon></button>`
+      : `<span class="ikongomb fejjel" title="${esc(cim)}" aria-label="${esc(cim)}"><ha-icon icon="mdi:cellphone-message"></ha-icon></span>`;
+  }
+
+  _fejlecFrissit() {
+    // csak a fejléc ikonja változik: a nyitott ablakot nem rajzoljuk újra
+    const fej = this.shadowRoot.querySelector(".fej");
+    if (!fej) return;
+    fej.querySelector("#ertesitesgomb, .fejjel")?.remove();
+    const t = document.createElement("template");
+    t.innerHTML = this._ertesitesIkon().trim();
+    const uj = t.content.firstElementChild;
+    if (uj) {
+      fej.insertBefore(uj, fej.querySelector("#mentesgomb") || fej.querySelector("#frissit"));
+      uj.addEventListener?.("click", () => uj.id === "ertesitesgomb" && this._mentesNyit("ertesites"));
+    }
+  }
+
+  _ertesitoCelok(valasztott) {
+    const szolg = Object.keys(this._hass?.services?.notify || {});
+    const lista = [...new Set([...szolg.filter((k) => k.startsWith("mobile_app_")).map((k) => `notify.${k}`), ...valasztott])].sort();
+    const eszkozNev = (cel) => {
+      const slug = cel.replace(/^notify\.mobile_app_/, "");
+      const d = Object.values(this._hass?.devices || {}).find((x) => (x.name_by_user || x.name || "").toLowerCase().normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") === slug);
+      return d ? (d.name_by_user || d.name) : slug.replace(/_/g, " ");
+    };
+    if (!lista.length) return `<span class="kicsi">Nincs telefon: telepítsd a Home Assistant mobilalkalmazást, és jelentkezz be vele.</span>`;
+    return `<span class="kicsi">Telefonok:</span>` + lista.map((c) => `<label class="jelolo"><input type="checkbox" value="${esc(c)}" ${valasztott.includes(c) ? "checked" : ""}> ${esc(eszkozNev(c))}${szolg.includes(c.slice(7)) ? "" : " (nem elérhető)"}</label>`).join("");
+  }
+
+  async _mentesNyit(fokusz) {
     const r = this.shadowRoot, d = r.getElementById("mentesdlg");
     const hazak = this._adat?.haztartasok || [];
     r.getElementById("mentesotthon").innerHTML = `<option value="">Minden otthon</option>${hazak.map((h) => `<option value="${esc(h.entry_id)}">${esc(h.nev)}</option>`).join("")}`;
@@ -4779,8 +4866,23 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
       r.getElementById("aientitas").innerHTML = `<option value="">az első elérhető</option>${this._aiEntitasok().map((e) =>
         `<option value="${esc(e.id)}" ${e.id === pb.ai_entitas ? "selected" : ""}>${esc(e.nev)}</option>`).join("")}`;
       r.getElementById("aiered").innerHTML = "";
+      r.getElementById("ertbe").checked = !!pb.hatarido_ertesites;
+      r.getElementById("ertnapok").value = pb.hatarido_napok ?? 3;
+      r.getElementById("ertido").value = pb.hatarido_ido || "09:00";
+      r.getElementById("ertcelok").innerHTML = this._ertesitoCelok(pb.hatarido_celok || []);
+      {
+        const hz = this._adat?.haztartasok || [], val = pb.hatarido_otthonok || [];
+        r.getElementById("ertotthonok").innerHTML = hz.length > 1 ? `<span class="kicsi">Otthonok (értesítés és hangutasítás):</span>`
+          + hz.map((h) => `<label class="jelolo"><input type="checkbox" value="${esc(h.entry_id)}" ${!val.length || val.includes(h.entry_id) ? "checked" : ""}> ${esc(h.nev)}</label>`).join("") : "";
+      }
+      r.getElementById("ertered").innerHTML = "";
     }
     if (!d.open) d.showModal();
+    if (fokusz === "ertesites") {
+      r.getElementById("panelbeall").open = true;
+      r.getElementById("ertblokk")?.scrollIntoView({ block: "center" });
+      r.getElementById("ertbe")?.focus();
+    }
     try {
       this._helyJeloltek = await this._hass.callWS({ type: "hu_rezsi/mentes_helyek" });
       r.getElementById("helyjelolt").innerHTML = this._helyJeloltek.map((x) =>
@@ -5414,6 +5516,8 @@ const STILUS = `
   .szenzorgomb { position: absolute; top: 8px; right: 48px; color: var(--primary-color); }
   .szenzorhiany { background: color-mix(in srgb, var(--error-color, #db4437) 14%, transparent); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 14px; }
   .mentessor { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .mentessor.ertcelok { gap: 6px 16px; }
+  .fej .fejjel { display: inline-flex; align-items: center; justify-content: center; opacity: .8; }
   .mentessor label { margin-bottom: 0; }
   table.menteslista { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.menteslista th, table.menteslista td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--divider-color); vertical-align: top; }

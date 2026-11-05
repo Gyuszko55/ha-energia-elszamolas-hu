@@ -1,12 +1,14 @@
 # Rezsikövető – telepítési és kezelési kézikönyv
 
-**Változat:** 2.3.0b8 – béta · 2026. november 4.
+**Változat:** 2.4.0b1 – béta · 2026. november 5.
 **Készítők:** Gyuszko55, Krissz55555
 
 > [!IMPORTANT]
 > A Rezsikövető **tájékoztató jellegű** számítás. Nem helyettesíti a szolgáltató számláját; a valódi összeg mindig a számlán szerepel.
 
 > [!NOTE]
+> **Újdonságok a 2.4.0-ban (béta):** értesítés a mobilra a fizetési határidő előtt ([7.5.2](#752-értesítés-a-mobilra-a-fizetési-határidő-előtt-240)) és hangutasítás: „Van befizetendő számlám?” ([7.5.3](#753-hangutasítás-van-befizetendő-számlám-240)).
+>
 > **Újdonságok a 2.3.0-ban:** lapozós tablet- és mobilnézet – Fiókok, Témák és Mátrix ([7.0](#70-lapozós-nézet-fiókok-és-témák-230)), ismeretlen számla kiolvasása AI-val és saját beolvasó ([9.9](#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-kísérleti)), korrekciós leolvasás és a saját szenzor szerinti állás a Mérőknél ([8.](#8-mérőállás-rögzítése-mérőcsere)).
 >
 > **Újdonságok a 2.2.0-ban:** számlák e-mailből ([9.8](#98-számlák-e-mailből--lépésről-lépésre)), **Saját díjak** a kártyán ([13.1](#131-saját-díjak-a-panelről)), a fix díj a számlákból ([13.2](#132-a-fix-díj-a-számlákból)), a díjeltérés gombjai a kártyán ([13.3](#133-ha-a-számla-eltér-a-havidíjtól)), MVM-számla 15 jegyű mérőszámmal ([15.](#15-gyakori-kérdések-és-hibaelhárítás)).
@@ -716,6 +718,37 @@ Az **űrlapok soha nem zárulnak be maguktól**: mérőállás, számla rögzít
 Az idő a fejléc **Beállítások, mentés és visszaállítás** gombjával nyíló ablakban, a **Panel beállításai** részben állítható (csak rendszergazda; másodpercben, **0 = soha**). Minden felhasználóra és otthonra érvényes.
 
 ![Panel beállításai: a részletező ablakok automatikus bezárása](kepek/panel_beallitas_auto_bezaras.png)
+
+### 7.5.2 Értesítés a mobilra a fizetési határidő előtt (2.4.0)
+
+A Rezsikövető a telefonodra szól, ha egy számlát hamarosan be kell fizetni. Alapból ki van kapcsolva.
+
+**Bekapcsolás:** fejléc → **Beállítások, mentés és visszaállítás** → **Panel beállításai** → *Értesítés a mobilra a fizetési határidő előtt* (csak rendszergazda):
+
+- **Hány nappal előtte:** 1–14 nap, alapból **3**.
+- **Időpont:** mikor nézze meg naponta, alapból **9:00**.
+- **Telefonok:** a Home Assistant mobilalkalmazásával bejelentkezett telefonok (`notify.mobile_app_…`), több is választható. Ha a lista üres, telepítsd a mobilalkalmazást, és jelentkezz be vele.
+- **Otthonok** (ha több van): mely otthonok számláiról szóljon – ez a hangutasításra (7.5.3) is vonatkozik. Ha mindegyik be van jelölve, a később felvett otthonok is beletartoznak. Ha csak egy otthon van kiválasztva, az üzenetben nem szerepel az otthon neve.
+- **Mentés**, majd a **Próbaüzenet** gombbal kipróbálhatod: azt küldi el, ami ma kimenne.
+
+![Panel beállításai: értesítés a fizetési határidő előtt](kepek/panel_beallitas_ertesites.png)
+
+**Mit küld:** naponta a megadott időpontban végignézi minden otthon számláit. Ha egy még be nem fizetett számla határideje a megadott napon belül van, üzenetet küld; több számlát egy üzenetben sorol fel, pl. *„A1 áram: 12 345 Ft, határidő nov. 13. (3 nap múlva)”* (több otthonnál az otthon nevével). Ha a határidő elmúlt, és a számla még nincs befizetve, **a lejárat után egyszer** még szól (*„tegnap lejárt (nov. 9.), még nincs befizetve”*). Az üzenetre koppintva a Rezsikövető panel nyílik meg.
+
+- **Minden számláról egyszer** szól előtte, és egyszer, ha lejárt – újraindítás után sem ismétel. Ha a számla később érkezik (pl. 2 nappal a határidő előtt), akkor is szól.
+- **Nem szól** a csoportos beszedéses (és kompenzációs) és az állandó átutalásos számláról (ott nincs teendő), a 0 Ft-os és a stornózott számláról, és a 90 napnál régebbi határidejűről.
+- Ha a küldés időpontjában a Home Assistant nem futott, az indulás után pótolja.
+- Hogy mi számít befizetettnek, azt a folyószámla mutatja (7.5): Díjnet, kézzel jelölt fizetés, beszedés, állandó átutalás. Ha egy számlát máshol fizettél, jelöld befizetettnek (számla → *Javítás*), különben a lejárat után szól.
+
+Bekapcsolva a fejlécben egy **telefon ikon** (📱) jelzi; föléhúzva mutatja, hány nappal előtte, hány órakor és hány telefonra küld, rákattintva a beállításhoz visz.
+
+### 7.5.3 Hangutasítás: „Van befizetendő számlám?” (2.4.0)
+
+Megkérdezheted a Home Assistant hangasszisztensét (Assist) is: *„Van befizetendő számlám?”*, *„Milyen számlát kell befizetnem?”*, *„Van lejárt számlám?”*. A válasz felsorolja a befizetendő számlákat összeggel, és hogy hány nap múlva esedékesek (a lejártaknál: hány napja járt le), pl. *„2 befizetendő számlád van, összesen 19 134 forint: A1 áram 12 345 forint, 3 nap múlva esedékes; Víz 6 789 forint, 10 nap múlva esedékes. Lejárt számla nincs.”* Ugyanazok a számlák számítanak, mint az értesítésnél (a beszedéses és állandó átutalásos kimarad), és csak a beállításban kiválasztott otthonokból (7.5.2, *Otthonok*) – akkor is, ha maga az értesítés ki van kapcsolva.
+
+- **LLM-es ügynökkel** (Google Gemini, OpenAI, Anthropic, Ollama…) nincs teendő: ha az ügynök beállításaiban az **Assist** be van kapcsolva, a Rezsikövető eszközként (*Befizetendő számlák*) adja, az ügynök magától használja.
+- **A beépített (helyi) Assisthoz** a magyar mondatokat kell bemásolni: a tároló `examples/custom_sentences/hu/hu_rezsi.yaml` fájlját a Home Assistant `config/custom_sentences/hu/` mappájába, utána a HA újraindítása (vagy Fejlesztői eszközök → YAML → *Beszélgetés* újratöltése).
+- Automatizálásból is kérhető (pl. reggeli összefoglaló a telefonra) a `conversation.process` művelettel – példa a tároló `examples/README.md` fájljában.
 
 ### 7.6 Indítókártya az irányítópultra
 
