@@ -1,6 +1,6 @@
 # Rezsikövető – AI-os számlaolvasó
 
-**Változat:** 2.3.0 béta (2.3.0b8, kísérleti funkció) · 2026. november
+**Változat:** 2.3.0 (kísérleti funkció) · 2026. november
 **Kinek szól:** a Rezsikövető felhasználóinak, programozói tudás nélkül
 
 > [!NOTE]
@@ -317,6 +317,8 @@ Ha egy beolvasót törölni szeretnél, töröld a fájlját a `hu_rezsi_sablono
 
 A beolvasó fájlja **megosztható**. Ha elküldöd a fejlesztőnek egy hibajegyben (GitHub Issues: <https://github.com/Gyuszko55/ha-energia-elszamolas-hu/issues>), a szolgáltató **beépített beolvasót** kaphat, és akkor mindenki más is AI nélkül használhatja. Küldés előtt nézd át a fájlt, és ha mégis látnál benne bármi személyeset, azt töröld ki belőle.
 
+**Beépített beolvasók** (a Rezsikövetővel érkeznek, nem kell semmit bemásolni): **Mezőföldvíz** – víz, részszámla (2.3.0b10-től). Ha ugyanolyan azonosítójú saját beolvasód is van a `hu_rezsi_sablonok` mappában, az a saját az erősebb. A frissítés után a korábban fel nem ismert számlákat magától újraolvassa.
+
 ## 8. Hibaüzenetek és teendők
 
 | Üzenet | Mit jelent? | Mit tegyél? |
@@ -344,7 +346,7 @@ A beolvasó fájlja **megosztható**. Ha elküldöd a fejlesztőnek egy hibajegy
 - Ha **mented a beolvasót**, a szolgáltató következő számlái **ingyen**, AI nélkül jönnek.
 - **Helyi AI-nál** (Ollama) nincs díj, csak a géped dolgozik.
 
-### Korlátok (2.3.0 béta)
+### Korlátok (2.3.0)
 
 - Csak **szöveges PDF**. A szkennelt, képes számla egy későbbi változatban jön.
 - A **regiszterenkénti** mérőállás-sorokat (például H-tarifás 1.8.1 / 1.8.2) még nem veszi át, csak a fő mérőállást.

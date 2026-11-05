@@ -24,7 +24,7 @@ from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
 VALODI_LM = ("Dikt", "Leol")
-PDF_OLVASO_VERZIO = 5  # 2: MVM áram-PDF; 3: MVM végszámla; 4: Telekom PDF, üres oldal; 5: kelte nélküli, ISO-dátumos, MVM gáz-stornó (a fel nem ismert fájlokat újrapróbálja)
+PDF_OLVASO_VERZIO = 6  # 2: MVM áram-PDF; 3: MVM végszámla; 4: Telekom PDF, üres oldal; 5: kelte nélküli, ISO-dátumos, MVM gáz-stornó; 6: beépített beolvasók (Mezőföldvíz) (a fel nem ismert fájlokat újrapróbálja)
 
 
 @dataclass
@@ -246,6 +246,12 @@ def mvm_xml(adat: bytes, fajl: str = "") -> Szamla | None:
     return sz
 
 
+def storno_hivatkozas(szoveg: str) -> str:
+    """Stornó szövegéből a sztornózott számla sorszáma (MVM: „Stornózott számla száma: …”), vagy üres."""
+    m = re.search(r"S(?:z)?tornózott számla (?:sor)?száma:?\s*(\d+)", szoveg or "")
+    return m.group(1) if m else ""
+
+
 def _xml_sztornozott(gyoker: ET.Element) -> str:
     """MVM stornó XML: az érvénytelenített számla sorszáma, ha szerepel benne – egy „sztorn”/„storno”/„eredeti”/
     „hivatkoz”/„helyesb” nevű, számlaszámot tartalmazó mező, vagy a szövegben „Sztornózott számla sorszáma: …”.
@@ -255,7 +261,7 @@ def _xml_sztornozott(gyoker: ET.Element) -> str:
         if re.search(r"sztorn|storno|eredeti|hivatkoz|helyesb", tag) and re.search(r"sz(?:a|á)m|szla|sorsz", tag):
             if (v := (e.text or "").strip()) and re.fullmatch(r"[\w/-]+", v) and re.search(r"\d", v):
                 return v
-        if e.text and (m := re.search(r"Sztornózott számla sorszáma:?\s*(\d+)", e.text)):
+        if e.text and (m := re.search(r"S(?:z)?tornózott számla (?:sor)?száma:?\s*(\d+)", e.text)):
             return m.group(1)
     return ""
 
@@ -986,7 +992,7 @@ def mvm_aram_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
     if tipus != "storno":
         sz.tetelek = mvm_tetelek(t, sz.idoszak, sz.kelte)
     sz.hatarido = fizetesi_hatarido(t)
-    if tipus == "storno" and (m := re.search(r"Sztornózott számla sorszáma:\s*(\d+)", t)):
+    if tipus == "storno" and (m := re.search(r"S(?:z)?tornózott számla (?:sor)?száma:?\s*(\d+)", t)):
         sz.sztornozott = m.group(1)
     return sz
 
@@ -1127,6 +1133,9 @@ def _beolvas_fajl(fajl: Path) -> Szamla | None:
             sz = _xml_szamla(fajl)
             # Az MVM áram-XML-ben nincs benne az átalány mennyisége, a PDF-párban igen: friss számlánál onnan.
             pdf = fajl.with_suffix(".pdf")
+            if sz and sz.tipus == "storno" and not sz.sztornozott and sz.forras in ("mvm_aram", "mvm_gaz") and pdf.exists():
+                # Az MVM-stornó XML-jében nincs a sztornózott számla sorszáma, a PDF-párban igen („Stornózott számla száma”).
+                sz.sztornozott = storno_hivatkozas(pdf_szoveg(pdf, "plain"))
             if sz and sz.forras == "mvm_gaz" and pdf.exists() and sz.folyoszamla is None:
                 # A gáz-XML-ben nincs, a PDF-ben igen: „A nyilvántartás szerinti folyószámla-egyenlege a számla kibocsátásakor”.
                 sz.folyoszamla = mvm_folyoszamla(pdf_szoveg(pdf, "plain"))[0]

@@ -33,6 +33,7 @@ from .const import (
 )
 from .ai_tajekoztato import ws_ai_tajekoztato
 from .fejlec import fejlec
+from .szamla_import import lemondott_datumok
 from .modell import szelet_dict
 from .varhato_szamlak import varhato_szamlak
 from .sensor import idenyszakok
@@ -386,6 +387,12 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
         )}, "fizetes": fiz.get(k)} for k, v in (koord.javitott_szamlak(sid) if hasattr(koord, "javitott_szamlak") else tarolt.get("szamlak") or {}).items()),
         key=lambda x: x["kelte"], reverse=True,
     )[:24]
+    # A felhasználó jóváhagyásával lemondott várt számlák (a legutóbbi valódi számla utániak; ld. szamla_import).
+    lemondott = lemondott_datumok(tarolt)
+    adat["lemondott_szamlak"] = [x for x in tarolt.get("lemondott_szamlak") or [] if x.get("kovetkezo_datum") in lemondott]
+    # Automatikusan rendezett várt / úton lévő számlák (egy későbbi számla elszámolta) – a panel tájékoztatójához.
+    adat["auto_rendezett"] = [{**x, "fajta": f} for f, lst in (("lemondas", tarolt.get("lemondott_szamlak")), ("uton", tarolt.get("rendezett_uton")))
+                              for x in lst or [] if x.get("auto")] or None
     kihagy = szamlak_mod.ervenytelenek(tarolt.get("szamlak") or {})  # stornó + sztornózott
     adat["fizetes"] = fizetes.osszesito([x for k, x in fiz.items() if k not in kihagy], date.today())
     # A kártya fejléce: következő számla · folyó időszak · folyószámla-egyenleg (MVM-nél a közös folyószámláé).
@@ -951,6 +958,27 @@ async def ws_szamla_javitas(hass: HomeAssistant, connection: websocket_api.Activ
 
 
 @websocket_api.websocket_command({
+    vol.Required("type"): "hu_rezsi/szamla_lemondas", vol.Required("entry_id"): str, vol.Required("sid"): str,
+    vol.Required("kovetkezo_datum"): str, vol.Optional("tol"): vol.Any(str, None), vol.Optional("ig"): vol.Any(str, None),
+    vol.Optional("osszeg"): vol.Any(vol.Coerce(float), None),
+})
+@websocket_api.require_admin  # adatot ír: csak rendszergazda
+@websocket_api.async_response
+async def ws_szamla_lemondas(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Késő, soha meg nem érkező várt számla lemondása (csak becslés: számla, befizetés, egyenleg nem változik)."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
+        connection.send_error(msg["id"], "nincs_otthon", "Nincs ilyen otthon.")
+        return
+    try:
+        await entry.runtime_data.szamla_lemondas(msg["sid"], msg["kovetkezo_datum"], msg.get("tol"), msg.get("ig"), msg.get("osszeg"))
+    except ValueError as err:
+        connection.send_error(msg["id"], "hiba", str(err))
+        return
+    connection.send_result(msg["id"], {"ok": True})
+
+
+@websocket_api.websocket_command({
     vol.Required("type"): "hu_rezsi/dij_elteres", vol.Required("entry_id"): str, vol.Required("sid"): str,
     vol.Required("sorszam"): str, vol.Required("dontes"): vol.In(["uj_dij", "egyszeri"]),
 })
@@ -1190,6 +1218,7 @@ async def regisztral_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_eves_kimutatas)
     websocket_api.async_register_command(hass, ws_fizetes)
     websocket_api.async_register_command(hass, ws_dij_elteres)
+    websocket_api.async_register_command(hass, ws_szamla_lemondas)
     websocket_api.async_register_command(hass, ws_sajat_dijak)
     websocket_api.async_register_command(hass, ws_ai_kiolvasas)
     websocket_api.async_register_command(hass, ws_ai_atvetel)

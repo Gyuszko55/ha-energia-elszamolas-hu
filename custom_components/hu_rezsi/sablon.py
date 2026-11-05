@@ -167,6 +167,18 @@ def _koz(s: str) -> str:
         return r"[ \t]+" if s else r"[ \t]*"
     if all(len(x) <= 4 for x in s.split()):
         return r"[ \t]*" + _altalanosit(s.strip()) + r"[ \t]*"
+    if re.search(r"\d", s):
+        # Köztes számoszlopok (pl. „Ft/m3   1 194,30   27”): a helyük megmarad, különben a következő érték helyett egy
+        # köztes számot (nettó díj, ÁFA %) olvasna. A szavak helyett bármi szám nélkül – szöveg nem kerül a sablonba.
+        darabok: list[str] = []
+        for x in re.findall(r"\d{1,3}(?:[  .]\d{3})+(?:,\d+)?(?=\s|$)|\S+", s.strip()):
+            if re.fullmatch(SZAM, x):
+                darabok.append("{SZAM}")
+            elif re.search(r"\d", x):
+                darabok.append(r"\S*\d\S*")
+            elif not darabok or darabok[-1] != r"[^\d\s][^\d\n]*?":
+                darabok.append(r"[^\d\s][^\d\n]*?")
+        return (r"[ \t]+" if s[0].isspace() else "") + r"[ \t]+".join(darabok) + (r"[ \t]+" if s[-1].isspace() else "")
     return r"[ \t]+[^\n]*?[ \t]*"
 
 
@@ -464,6 +476,18 @@ def betolt(mappa: Path) -> list[dict[str, Any]]:
             s["_fajl"] = f.name
             ki.append(s)
     return ki
+
+
+BEEPITETT = Path(__file__).parent / "sablonok"
+
+
+def osszes_betolt(config_dir: Path | str) -> list[dict[str, Any]]:
+    """A felhasználó saját beolvasói (`config/hu_rezsi_sablonok/`), utánuk a Rezsikövetővel érkező beépítettek
+    (`sablonok/`). Azonos azonosítónál a saját az erősebb (pl. ha valaki a beépítettet már kézzel bemásolta)."""
+    sajat = betolt(Path(config_dir) / MAPPA_NEV)
+    van = {s["azonosito"] for s in sajat}
+    beep = [dict(s, _beepitett=True) for s in betolt(BEEPITETT) if s["azonosito"] not in van]
+    return sajat + beep
 
 
 def ment(mappa: Path, sab: dict[str, Any]) -> Path:

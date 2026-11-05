@@ -344,6 +344,10 @@ def kivonat(
                                             for s in kozos if s != sid for kk, x in haztartas[s][1].items()
                                             if (_dec(x.get("osszeg")) or Decimal(0)) < 0]
     sztornozott = sztornozottak(x for _, x, *_ in szamlak)
+    # A stornó kelte a sztornózott számlánként: a stornó ELŐTT kifizetett eredeti befizetése valódi pénz (a szolgáltató
+    # túlfizetésként viszi tovább, pl. az újra kiállított számlán „túlfizetés miatt levont”) – az számít.
+    storno_kelte = {str(x["sztornozott"]).lstrip("0"): x.get("kelte") or "" for _, x, *_ in szamlak
+                    if x.get("tipus") == "storno" and x.get("sztornozott")}
     fedezett: set[str] = set()  # a folyószámla jóváírásából rendezett számlák (nincs befizetés)
     for i, (k, x, fnev, egyseg) in enumerate(szamlak):
         kelte = x.get("kelte") or ""
@@ -395,8 +399,10 @@ def kivonat(
         fiz = _dec(x.get("osszeg"))
         if fiz is not None and fiz < 0:
             negativ.append(fiz)
-        if fiz is None or fiz <= 0 or tip == "storno" or k in sztornozott:
+        if fiz is None or fiz <= 0 or tip == "storno":
             continue
+        if k in sztornozott and not (f.get("fizetve") and f.get("datum") and f["datum"] < storno_kelte.get(str(k).lstrip("0"), "")):
+            continue  # a sztornózott, nem (vagy csak a stornó után, beszámítással) „fizetett” számla nem befizetés
         if f.get("nincs_fizetendo") and f.get("forras") != "kezi" and not f.get("fizetve"):
             fedezett.add(k)
             continue  # a számla fizetendője a közös folyószámla túlfizetéséből rendezett (pl. 991 Ft-os részszámla, −47 138 Ft fizetendő)

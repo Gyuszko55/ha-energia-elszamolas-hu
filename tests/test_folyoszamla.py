@@ -270,3 +270,17 @@ def test_szamla_javitas_hatarido_es_megjegyzes_a_kivonatban():
     k = kivonat("s", {"s": ("Telekom", szamlak)}, {}, None, date(2026, 10, 8))
     t = next(x for x in k["tetelek"] if x["fajta"] == "szamla")
     assert (t["hatarido"], t["megjegyzes"]) == ("2026-10-05", "kedvezmény miatt kevesebb")
+
+
+def test_sztornozott_szamla_elotte_befizetve_szamit():
+    """MVM: az eredeti számlát kifizették (02.14.), utána sztornózták és újra kiállították (a túlfizetésből levonva,
+    fizetendő 0): a befizetés számít – a záró egyenleg 0, nem a számla összege (kitalált adatok)."""
+    i = ["2026-01-13", "2026-02-02"]
+    sz = {"E": {"kelte": "2026-02-04", "tipus": "elszamolo", "forras": "mvm_aram", "osszeg": "25000", "szamlaertek": "25000", "idoszak": i},
+          "S": {"kelte": "2026-02-27", "tipus": "storno", "forras": "mvm_aram", "osszeg": "0", "szamlaertek": "-25000", "idoszak": i, "sztornozott": "E"},
+          "U": {"kelte": "2026-02-27", "tipus": "elszamolo", "forras": "mvm_aram", "osszeg": "0", "szamlaertek": "25000", "idoszak": i}}
+    k = kivonat("x", {"x": ("Villany", sz)}, {"E": {"fizetve": True, "datum": "2026-02-14", "forras": "kezi"}}, None, MA)
+    assert k["zaro"] == 0
+    # A stornó után (beszámítással) „fizetett” jelölés nem befizetés.
+    k = kivonat("x", {"x": ("Villany", sz)}, {"E": {"fizetve": True, "datum": "2026-02-28", "forras": "dijnet"}}, None, MA)
+    assert k["zaro"] == 25000

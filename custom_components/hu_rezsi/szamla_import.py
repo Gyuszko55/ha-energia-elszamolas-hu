@@ -15,9 +15,9 @@ from decimal import Decimal
 from typing import Any
 
 try:
-    from .szamlak import Meroallas, Szamla, ervenytelenek, mero_azonosito, sztornozott_kulcsok, sztornozottak
+    from .szamlak import Meroallas, Szamla, ervenytelenek, mero_azonosito, szamlazott_idoszak, sztornozott_kulcsok, sztornozottak
 except ImportError:  # tesztek: a csomag HA nélkül, közvetlenül
-    from szamlak import Meroallas, Szamla, ervenytelenek, mero_azonosito, sztornozott_kulcsok, sztornozottak
+    from szamlak import Meroallas, Szamla, ervenytelenek, mero_azonosito, szamlazott_idoszak, sztornozott_kulcsok, sztornozottak
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -388,7 +388,9 @@ def storno_parositas(szamlak: dict[str, dict[str, Any]]) -> None:
                   and list(x.get("idoszak") or []) == list(st["idoszak"]) and (x.get("kelte") or "") <= (st.get("kelte") or "")
                   and str(s).lstrip("0") not in foglalt and {-y for y in v} & _ertekek(x)]
         if jelolt:
-            st["sztornozott"] = max(jelolt)[1]
+            # A stornó a korábbi számlát érvényteleníti: a nála korábbi keltűek közül a legutóbbi; azonos napi csak akkor,
+            # ha nincs korábbi (az MVM az újra kiállítottat a stornóval egy napon adja ki – azt ne sztornózza).
+            st["sztornozott"] = max(jelolt, key=lambda j: (j[0] < (st.get("kelte") or ""), j[0]))[1]
             foglalt.add(str(st["sztornozott"]).lstrip("0"))
 
 
@@ -520,6 +522,11 @@ def szamla_statisztika(tarolt: dict[str, Any], ma: date, fix_dij: bool = False, 
     elif fix_dij and len(sz) >= 2 and sz[-1][1] != sz[-2][1] and not (
             napok(-1) is not None and napok(-2) is not None and abs(napok(-1) - napok(-2)) > 3):
         figy.append(f"díjváltozás: {sz[-2][1]} → {sz[-1][1]} Ft")
+    if kovetkezo and honap:
+        lemondott, n, alap = lemondott_datumok(tarolt), 1, kovetkezo
+        while kovetkezo.isoformat() in lemondott:
+            n += 1
+            kovetkezo = _honap_mulva(sz[-1][0], honap * n) if not idenyes else _honap_mulva(alap, honap * (n - 1))
     if kovetkezo and (ma - kovetkezo).days > 21:
         figy.append(f"elmaradt számla: {kovetkezo.isoformat()} körül kellett volna jönnie")
     return {
@@ -566,9 +573,12 @@ def atalany_szamitas(beallitott: Any, tarolt: dict[str, Any], tol: date, ig: dat
         return None
     honap_napjai = (ig - tol).days
     eltelt = min(max((most.date() - tol).days + 1, 0), honap_napjai)
+    # Több hónapos (pl. kéthavi számlázási) időszakban a havi egy átlagos hónap, az időszaké az idoszak_ft.
+    havi = napi * honap_napjai if honap_napjai <= 31 else napi * 365 / 12
     return {
         "napi": round(float(napi), 2),
-        "havi": int(round(napi * honap_napjai)),
+        "havi": int(round(havi)),
+        "idoszak_ft": int(round(napi * honap_napjai)),
         "eddig": int(round(napi * eltelt)),
         "napok": honap_napjai,
         "eltelt_nap": eltelt,
@@ -584,10 +594,21 @@ def _honap_mulva(d: date, honap: int) -> date:
     return d.replace(year=ev, month=ho, day=min(d.day, calendar.monthrange(ev, ho)[1]))
 
 
+def lemondott_datumok(tarolt: dict[str, Any]) -> set[str]:
+    """A lemondott várt számlák (várt kelte, ISO) – csak a legutóbbi valódi számla utániak számítanak: ha azóta jött
+    számla, a várt számla innen újraszámolódik, a régi lemondás hatástalan."""
+    utolso = max((str(x.get("kelte") or "")[:10] for x in (tarolt.get("szamlak") or {}).values()), default="")
+    return {x["kovetkezo_datum"] for x in tarolt.get("lemondott_szamlak") or [] if x.get("kovetkezo_datum", "") > utolso}
+
+
 def esedekes(
-    tarolt: dict[str, Any], ma: date, periodus_honap: int | None, varhato_osszeg: Decimal | None
+    tarolt: dict[str, Any], ma: date, periodus_honap: int | None, varhato_osszeg: Decimal | None,
+    kozos_utolso: date | None = None,
 ) -> dict[str, Any] | None:
     """Ebben a hónapban esedékes számlák: a már kiállítottak és a számlázási ütem szerint még várható.
+
+    kozos_utolso: közös számlázásnál (MVM: egy ügyfél áramfiókjai együtt) a társfiókok legutóbbi számlájának kelte –
+    ha későbbi a sajátnál, a következő számla ettől az ütem szerint (a számlák együtt jönnek).
 
     periodus_honap: számlázási ütem (1 havi, 2 kéthavi, 3 negyedéves); ha nincs megadva, a számlák
     szokásos időközéből. varhato_osszeg: a következő számla várható összege (átalány × időszak, fix díj);
@@ -607,7 +628,13 @@ def esedekes(
     ho_eleje = ma.replace(day=1)
     ho_vege = _honap_mulva(ho_eleje, 1)
     e_havi = [(d, x, k) for d, x, k in sz if ho_eleje <= d < ho_vege]
-    kovetkezo = _honap_mulva(sz[-1][0], periodus_honap)
+    alap = max(sz[-1][0], kozos_utolso) if kozos_utolso else sz[-1][0]
+    kovetkezo = _honap_mulva(alap, periodus_honap)
+    # A felhasználó jóváhagyásával lemondott (soha meg nem érkező) várt számla: a következő az utána jövő ütem.
+    lemondott, n = lemondott_datumok(tarolt), 1
+    while kovetkezo.isoformat() in lemondott:
+        n += 1
+        kovetkezo = _honap_mulva(alap, periodus_honap * n)  # a hónap vége ne csússzon (aug. 31. → okt. 31.)
     elmaradt = kovetkezo < ho_eleje
     osszeg = Decimal(varhato_osszeg) if varhato_osszeg is not None else sz[-1][1]
     e_havi_varhato = osszeg if (ho_eleje <= kovetkezo < ho_vege) else (osszeg if elmaradt else Decimal(0))
@@ -780,3 +807,50 @@ def mappas_adatok_torlese(tarolt: dict[str, Any], minden_meroallas: bool = False
                 if (kezi_megj and lo.get("megjegyzes", "").startswith(kezi_megj))
                 or (not minden_meroallas and not lo.get("megjegyzes", "").startswith("számla "))
             ]
+
+
+def automatikus_rendezes(fiokok: dict[str, tuple[dict[str, Any], dict[str, Any] | None, list[dict[str, Any]] | None]],
+                         csoport: dict[str, list[str]], most: str) -> list[tuple[str, str, dict[str, Any]]]:
+    """A ki nem számlázott (soha meg nem érkező) várt számlák automatikus rendezése, ha egy későbbi számla jött.
+
+    fiokok: {sid: (tarolt, esedekes, uton_szamlak)}; csoport: {sid: a közös folyószámla fiókjai (önmagát is)} –
+    MVM-nél a fizetendő a folyószámla szerint, az áramfiókok összevonva, így egy társfiók későbbi számlája is
+    elszámolhatja. Szabályok:
+    - úton lévő (lezárt, saját számítású) számla: ha azóta jött későbbi kelte számla a fióknak vagy egy társfióknak;
+    - késő várt számla (átalány, fix díj, diktálás): ha a várt kelte után egy társfiók számlája jött (a saját későbbi
+      számla úgyis újraindítja a várakozást).
+    Az eredményt a tárolt adatba írja (rendezett_uton / lemondott_szamlak, auto jelöléssel); visszaadja: (sid, fajta, bejegyzés)."""
+    def valodi(t: dict[str, Any]) -> list[tuple[str, str, str]]:
+        """(kelte, sorszám, az elszámolt időszak utolsó napja – vagy "" ha nincs a számlán)."""
+        kihagy = ervenytelenek(t.get("szamlak") or {})
+        def vege(x: dict[str, Any]) -> str:
+            i = szamlazott_idoszak(x)
+            return i[1].isoformat() if i else ""
+        return sorted((str(x.get("kelte"))[:10], k, vege(x)) for k, x in (t.get("szamlak") or {}).items()
+                      if x.get("kelte") and k not in kihagy and x.get("tipus") != "storno")
+    out: list[tuple[str, str, dict[str, Any]]] = []
+    for sid, (tarolt, es, uton) in fiokok.items():
+        tars = [s for s in csoport.get(sid) or [sid] if s != sid and s in fiokok]
+        tars_sz = sorted(x for s in tars for x in valodi(fiokok[s][0]))
+        sajat_sz = valodi(tarolt)
+        mar = {x.get("tol") for x in tarolt.get("rendezett_uton") or []}
+        for u in uton or []:
+            # Közös (MVM) folyószámlán bármely későbbi számla elszámolhatja (a befizetés mindent kiegyenlít); máshol a saját
+            # számla csak akkor, ha az időszaka eléri az úton lévőt (egy késve jött korábbi számla nem rendezi).
+            jelolt = sajat_sz + tars_sz if tars else [x for x in sajat_sz if x[2] and x[2] >= str(u.get("tol") or "")]
+            kesobbi = next((x for x in sorted(jelolt) if x[0] > str(u.get("ig") or "9999")), None)
+            if kesobbi and u.get("tol") and u["tol"] not in mar:
+                bej = {"tol": u["tol"], "ig": u.get("ig"), "osszeg": u.get("osszeg"), "auto": True, "sorszam": kesobbi[1],
+                       "rogzitve": most}
+                tarolt.setdefault("rendezett_uton", []).append(bej)
+                out.append((sid, "uton", bej))
+        if es and es.get("elmaradt") and es.get("kovetkezo_datum"):
+            varva = es["kovetkezo_datum"]
+            varva = varva.isoformat() if hasattr(varva, "isoformat") else str(varva)[:10]
+            kesobbi = next((x for x in tars_sz if x[0] > varva), None)
+            if kesobbi and varva not in lemondott_datumok(tarolt):
+                bej = {"kovetkezo_datum": varva, "tol": None, "ig": None, "osszeg": es.get("kovetkezo_osszeg"), "auto": True,
+                       "sorszam": kesobbi[1], "rogzitve": most}
+                tarolt.setdefault("lemondott_szamlak", []).append(bej)
+                out.append((sid, "lemondas", bej))
+    return out

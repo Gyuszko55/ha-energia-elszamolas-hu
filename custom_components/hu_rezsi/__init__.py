@@ -33,7 +33,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     from . import sablon, szamlak  # noqa: PLC0415
 
     # Számlasablonok (2.3.0b2): a beépített beolvasók után ezek olvassák az ismeretlen szolgáltatók számláit.
-    szamlak.SABLONOK[:] = await hass.async_add_executor_job(sablon.betolt, Path(hass.config.config_dir) / sablon.MAPPA_NEV)
+    szamlak.SABLONOK[:] = await hass.async_add_executor_job(sablon.osszes_betolt, hass.config.config_dir)
     # D árszabás: az MVM negyedórás rugalmas árlistája (közös minden otthonnak) és a még közzé nem tett napok
     # HUPX-ból számolt ára. Indulás után, majd 3 óránként ellenőrzi (az MVM-lista letöltése naponta legfeljebb egyszer,
     # a másnapi HUPX-ár délután jelenik meg); új árnál minden otthon újraszámol.

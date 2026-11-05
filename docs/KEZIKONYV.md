@@ -7,7 +7,7 @@
 > A Rezsikövető **tájékoztató jellegű** számítás. Nem helyettesíti a szolgáltató számláját; a valódi összeg mindig a számlán szerepel.
 
 > [!NOTE]
-> **Újdonságok a 2.3.0 bétában:** lapozós tablet- és mobilnézet – Fiókok és Témák ([7.0](#70-lapozós-nézet-fiókok-és-témák-230-béta)), ismeretlen számla kiolvasása AI-val és saját beolvasó ([9.9](#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-béta-kísérleti)), korrekciós leolvasás és a saját szenzor szerinti állás a Mérőknél ([8.](#8-mérőállás-rögzítése-mérőcsere)).
+> **Újdonságok a 2.3.0-ban:** lapozós tablet- és mobilnézet – Fiókok, Témák és Mátrix ([7.0](#70-lapozós-nézet-fiókok-és-témák-230)), ismeretlen számla kiolvasása AI-val és saját beolvasó ([9.9](#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-kísérleti)), korrekciós leolvasás és a saját szenzor szerinti állás a Mérőknél ([8.](#8-mérőállás-rögzítése-mérőcsere)).
 >
 > **Újdonságok a 2.2.0-ban:** számlák e-mailből ([9.8](#98-számlák-e-mailből--lépésről-lépésre)), **Saját díjak** a kártyán ([13.1](#131-saját-díjak-a-panelről)), a fix díj a számlákból ([13.2](#132-a-fix-díj-a-számlákból)), a díjeltérés gombjai a kártyán ([13.3](#133-ha-a-számla-eltér-a-havidíjtól)), MVM-számla 15 jegyű mérőszámmal ([15.](#15-gyakori-kérdések-és-hibaelhárítás)).
 
@@ -51,7 +51,7 @@ Fő tudása:
 
 - **Számlára pontos számítás:** nettó tételsoros díjak ÁFÁ-val, egész kWh-s kedvezményes keret, számlánkénti alapdíj, gáz MJ-ban havi fűtőértékkel. Valódi MVM-, DAKÖV-, ALFÖLDVÍZ- és HVSZ-számlákon ellenőrizve.
 - **Átalányos (részszámlás) fiókok:** havi fizetendő, várható éves egyenleg, az átalány összevetése a valódi fogyasztással.
-- **Többhavi, utólagos számlázás:** kéthavi és négyhavi víz, negyedéves szemétszállítás.
+- **Többhavi, utólagos számlázás:** kéthavi és négyhavi víz, negyedéves szemétszállítás. Víznél a folyó időszak – a kártyán és a Fogyasztás táblázatban a fogyasztás eddig, a várható mennyiség és díj, az átalány – a számlázási időszakra szól (a legutóbbi számla vége utántól az ütem szerint), alatta a havi rész; az előzmények havonta zárulnak.
 - **Távhő:** mért melegvíz, légtérfogat szerinti alapdíjak, havi hődíj-átalány, a fűtési idény utáni korrekció.
 - **H-tarifa** két regiszterrel (téli 1.81 és nyári 1.82).
 - **Víz** fő- és locsolási almérővel (az almérő vize a csatornadíjból levonódik).
@@ -387,6 +387,7 @@ A **kézi leolvasás mindig erősebb** a szenzornál: a Rezsikövető a szenzor 
 - A kártya fejlécében a legutóbbi számla tetején álló **elszámolt mennyiség** is látszik („Számla szerint elszámolt: ivóvíz 28 m³, csatorna 22 m³”, időszakkal; átalánynál „átalány” jelöléssel). Víznél az átalány napi forintja és mennyisége nem jelenik meg – a számla szerinti elszámolt mennyiség a mérvadó; a kiállított számla fizetendője mellett, egy sorban a számlázott időszak mért fogyasztása áll.
 - A fenti ütem a **DAKÖV**-é; 2026 márciusától kéthavonta számláz, diktálni a záró hónap 20–25-én lehet, különben átalányt számláz.
 - Beépített vízművek: **DAKÖV**, **ALFÖLDVÍZ** (lásd 6.5.1), **DRV** (6.5.2) és **Fővárosi Vízművek** (6.5.3); más vízműnél válaszd az **Egyedi** díjszabást, és add meg a díjakat a kártya **Saját díjak** gombjával ([13.1](#131-saját-díjak-a-panelről)) vagy felülírással ([13. fejezet](#13-díjak-díjszabások-felülírás)).
+- **Mezőföldvíz:** a részszámláit (2.3.0 óta) beépített saját beolvasó olvassa ([9.9](#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-kísérleti)); a díjakat a Saját díjak adja meg.
 - **Településenként más díj:** sok vízműnél (pl. Mezőföldvíz, vagy az önkormányzati tulajdonú településeken) a víz- és csatornadíj, az alapdíj településenként eltér. Ilyenkor is az **Egyedi** díjszabás a jó, a saját számlád díjaival: **Saját díjak** → ivóvíz (Ft/m³), csatorna (Ft/m³), alapdíj (Ft/hó), bruttóban, „érvényes ettől” dátummal. Ha a beépített vízmű díja nálad más, a beépített díjszabás mellett is ugyanígy felülírhatod.
 
 #### 6.5.1 ALFÖLDVÍZ (Dél-Alföld)
@@ -489,7 +490,7 @@ A bal oldali menüben: **Rezsikövető**. (Mobilon a bal felső ☰ gombbal nyí
 
 **Több otthon:** ha több háztartást is felvettél (pl. a saját otthonod és egy szülőé), a fejléc alatt **fülsor** jelenik meg, mint a böngészőben: minden otthonnak egy fül, rajta a neve és az e havi esedékes összeg; narancs pötty jelzi, ha ott teendő van. Mindig csak a kiválasztott otthon kártyái látszanak; a panel böngészőnként megjegyzi az utoljára nyitott fület. (Billentyűzettel: ← →.)
 
-### 7.0 Lapozós nézet: Fiókok és Témák (2.3.0 béta)
+### 7.0 Lapozós nézet: Fiókok és Témák (2.3.0)
 
 Szélesebb kijelzőn (900 px felett: tablet fekvő helyzetben, notebook, asztali gép) a panel nem egymás alá rakja a kártyákat, hanem **lapokra** bontja az otthont. Az otthonok fülei alatt egy második fülsor van, jobbra a nézetváltó: **Fiókok** · **Témák**.
 
@@ -497,7 +498,10 @@ Szélesebb kijelzőn (900 px felett: tablet fekvő helyzetben, notebook, asztali
 
 - **Áttekintés:** az otthon összesítője (7.1) és fiókonként egy **csempe** – következő számla és várható kelte, éves egyenleg, folyószámla; narancs csík: teendő van. A csempére koppintva a fiók lapja nyílik.
 - **Fiókonként egy lap:** a fiók kártyája (7.2) a teljes szélességben, három (keskenyebb kijelzőn két) hasábban – fent a következő számla, a folyószámla és a folyó időszak, alatta az ütem, a keret, a számlák, jobbra lent a gombok. Egy fiók egy képernyőn, görgetés nélkül.
+- **Mátrix:** a fiókfülek után – ugyanaz, mint a Témák nézet Mátrix lapja (lent): elszámolási mátrix és számlanaptár az otthon összes fiókjáról.
 - **Lapozás:** a fülekre koppintva, a lap alatti **‹ ›** nyilakkal vagy pöttyökkel, ujjal **vízszintesen húzva**, billentyűzeten a fülsoron **← →**.
+
+![Fiókok nézet tableten – egy fiók (Víz) egy lapon, három hasábban; fent a fiókfülek, a sor végén a Mátrix, jobbra a Fiókok · Témák váltó](kepek/40_tablet_fiok.png)
 
 **Témák nézet** – minden fiók egy táblázatban, egymás mellett összevethetően, alul összesítő sorral:
 
@@ -505,15 +509,30 @@ Szélesebb kijelzőn (900 px felett: tablet fekvő helyzetben, notebook, asztali
 |---|---|
 | Áttekintés | mint a Fiókok nézetben |
 | Számlák | következő számla és várható kelte (késik / elmaradt jelzéssel), ebben a hónapban, utolsó számla, utolsó 12 hónap, folyószámla |
-| Fogyasztás | folyó időszak és eltelt rész, fogyasztás és díj eddig, várható fogyasztás és díj, napi átlag, kedvezményes keret |
-| Egyenleg | „ha ma lenne az elszámolás”, éves egyenleg, elszámolási év, várható éves költség, befizetve, folyószámla |
-| Mérők | utolsó rögzített állás és napja (alatta a mérő), **saját szenzor szerint most** (a szenzoros csatornák kalibrált mostani állása – H-tarifánál téli/nyári, A2-nél csúcs/völgy, almérő; élőben frissül; alatta a **korrekció**: szorzó, hány leolvasásból, hány napból), következő leolvasás és diktálás, **Mérőállás** gomb |
+| Fogyasztás | folyó időszak és eltelt rész, fogyasztás (több regiszteres mérőnél – H-tarifa, A2 – regiszterenként is) és díj eddig, várható fogyasztás és díj (átalánynál az átalány, alatta összehasonlításként a mért fogyasztás szerinti díj – gáznál évszak szerint súlyozva; diktálás után a következő számláig a diktált állás szerinti díj), napi átlag, kedvezményes keret. Mérő nélküli (fix díjas) fióknál csak az időszak és a várható díj – havi, negyedéves díjnál nincs időarányos rész |
+| Egyenleg | „ha ma lenne az elszámolás”, éves egyenleg, elszámolási év, várható éves költség, befizetve, folyószámla. A közös folyószámlás fiókok (MVM: egy ügyfél áramfiókjai, pl. A1 + H) **egy sorban**: az összegek összeadva, a folyószámla egyszer (az összesen-sorban is) |
+| Mérők | utolsó rögzített állás és napja (alatta a mérő; víznél az **almérő** állása és mérője is), **saját szenzor szerint most** (a szenzoros csatornák kalibrált mostani állása – H-tarifánál téli/nyári, A2-nél csúcs/völgy, almérő; élőben frissül), következő leolvasás és diktálás, **Mérőállás** gomb. Minden mérőállás egész szám, ahogy az óra számlálója mutatja (a tört rész elhagyva). A korrekciós szorzó a Mérőállás ablakban, korrekciós leolvasás után látszik |
+| Mátrix | két nézet. **Elszámolás:** soronként egy fiók, oszloponként a kártya szakaszai sorban – mérés (szenzor / leolvasás / nincs mérő), elszámolás módja (átalány / diktálás szerint / mért / fix díj), ütem, folyó időszak eltelt-csíkkal, várható díj, következő számla, diktálás, éves elszámolás („ha ma lenne”), folyószámla. **Számlanaptár:** fiók × hónap (az elmúlt 8 és a következő 3 hónap) – a beérkezett számlák típusjellel (E elszámoló, R részszámla, Sz számla, Ő előírás, S sztornó áthúzva), a várhatók szaggatott kerettel az ütem szerint, a még nem érkezett számla narancs „?”-lel, a diktálási ablak (D) és az éves elszámolás (É). A cella színe az állapot: zöld pontos / mért, sárga becsült, kék átalány, narancs figyelj rá, szürke nem vonatkozik. Felül a narancs cellák listája („amire figyelj”); egy cellára vagy számlára koppintva felül a magyarázat (miből jön az érték), onnan a fiók lapja is nyitható. A számlanaptárban egy beérkezett számlára koppintva: sorszám (ha nincs: „kézzel rögzítve”), honnan jött (számlafájlból beolvasva – PDF / XML, Díjnet –, AI-val kiolvasva, kézzel rögzítve), megjegyzés, fizetési határidő és a fizetés (mikor, hogyan) |
+
+![Témák → Számlák: következő számla, várható kelte (késik / elmaradt), ebben a hónapban, utolsó számla, utolsó 12 hónap, folyószámla](kepek/41_temak_szamlak.png)
+
+![Témák → Fogyasztás: folyó időszak eltelt-csíkkal, fogyasztás és díj eddig, várható, napi átlag, kedvezményes keret](kepek/42_temak_fogyasztas.png)
+
+![Témák → Egyenleg: a közös folyószámlás áramfiókok (Villany A1 + Villany H) egy sorban, a folyószámla egyszer](kepek/43_temak_egyenleg.png)
+
+![Témák → Mérők: utolsó rögzített állás és mérő (víznél az almérő is), következő leolvasás és diktálás, Mérőállás gomb](kepek/44_temak_merok.png)
+
+![Mátrix → Elszámolás: fiókonként a kártya szakaszai, a cella színe az állapot; felül a teendők és a kiválasztott cella magyarázata](kepek/45_matrix_elszamolas.png)
+
+![Mátrix → Számlanaptár: fiók × hónap, típusjellel (E, R, Sz, S), várható (~) és még nem érkezett (?) számlák, diktálási ablak (D); felül egy számla részletei – sorszám, forrás, határidő, fizetés](kepek/46_matrix_naptar.png)
 
 Ha a saját szenzor szerinti állás eltér az órától, a **Mérőállás** ablakban rögzíts **korrekciós leolvasást** (8.).
 
 Egy sorra koppintva a fiók lapja nyílik a Fiókok nézetben. Előjel: **plusz** = visszatérítés / túlfizetés, **mínusz** = ráfizetés / fizetendő.
 
 **Mobilon (900 px alatt)** ugyanez, keskenyre szabva: a fülsor tömör (ikon + név), görgetéskor a fejléc alatt marad; egy fiók egy lapon (a megszokott kártya), ujjal lapozható; az Áttekintésen a két nagy szám egymás mellett, az e-mailes blokk összecsukva, a csempék két oszlopban; a **Témák** lapjai táblázat helyett **fiókonként egy kis kártyán** (címke – érték), alul összesítő kártyával.
+
+![Mobilon: tömör fülsor, egy fiók (Villany A1) egy lapon, ujjal lapozható; jobb felül a Fiókok · Témák váltó](kepek/47_mobil.png)
 
 **Melyik nézet?** Alapból automatikus: 900 px felett tablet, alatta mobil – elforgatáskor magától vált. Eszközönként rögzíthető: ⚙ → **Panel beállításai** → „Megjelenítés ezen az eszközön”: automatikus / tablet / mobil / **minden egymás alatt** (a korábbi nézet: összesítő és alatta az összes kártya). A választott nézetet (Fiókok/Témák) és lapot a böngésző megjegyzi.
 
@@ -524,7 +543,7 @@ Egy sorra koppintva a fiók lapja nyílik a Fiókok nézetben. Előjel: **plusz*
 - **Ebben a hónapban esedékes számlák** – a számlázási ütem szerint ebben a hónapban **kiállított és még várható** számlák összege. Alatta fiókonként: melyik, mikor, mennyi; „késik”, ha egy várt számla elmaradt.
 - **Havi átlag** – az átalány havi része (teljes hónapos időszakban pontosan a havi átalány, a 30 és a 31 napos hónapban ugyanannyi; egyébként napra leosztva, egy átlagos hónapra), illetve a több hónapra számlázott díjak havi része. Ez a „mennyibe kerül egy hónap” átlagosan. Ha a folyó időszak a hónapnál lényegesen rövidebb vagy hosszabb (pl. az éves leolvasás után a diktálásig tartó 15 nap), a díja egy átlagos hónapra arányosítva (az alapdíj egyszer); a kártyán a Várható alatt „havi átlagban kb. …”.
 - **MVM folyószámla** – ha a legutóbbi MVM-villanyszámlán a fizetendő más tételeket is tartalmaz (lásd 7.1.1), a folyószámla egyenlege a számla kibocsátásakor (mínusz: túlfizetés, neked jár), és ha van talált számlahiba, hogy kijavításuk után várhatóan mennyi lesz (pótszámla: +, reklamáció: −).
-- **Figyelmeztetések** (sárga/kék sávok; piros: lejárt, még nem fizetett számla – ha már fizetted, jelöld a Részletek → Számlák listában): várható keretátlépés, várható ráfizetés az elszámoláskor, elmaradt számla, fel nem ismert számlafájl, **talált számlahibák** (7.1.1), fix díjas fióknál az eltérés a havidíjtól (gombokkal: *Ez az új havidíj* / *Egyszeri eltérés – rendben*, lásd [13.3](#133-ha-a-számla-eltér-a-havidíjtól); ugyanezek a gombok a fiók kártyáján, a figyelmeztetés alatt is). **Egy teendőre koppintva** a panel a fiók kártyájára ugrik, és egy pillanatra kiemeli. A rendezettnek jelölt számlahibák rejtve vannak; a lista alatti *Rendezett számlahibák mutatása* előhozza őket. Ha nincs teendő: „Nincs teendő.”
+- **Figyelmeztetések** (sárga/kék sávok; piros: lejárt, még nem fizetett számla – ha már fizetted, jelöld a Részletek → Számlák listában): várható keretátlépés, várható ráfizetés az elszámoláskor, elmaradt számla, fel nem ismert számlafájl, **talált számlahibák** (7.1.1), fix díjas fióknál az eltérés a havidíjtól (gombokkal: *Ez az új havidíj* / *Egyszeri eltérés – rendben*, lásd [13.3](#133-ha-a-számla-eltér-a-havidíjtól); ugyanezek a gombok a fiók kártyáján, a figyelmeztetés alatt is), **késő várt számla** (átalány, fix díj, diktálás: „a … közötti várt számla (570 Ft) … óta késik”) – ha a szolgáltató erről soha nem állít ki számlát (pl. sztornózta, és másképp számolta el), a **Nem jön számla – törlés…** gomb megerősítés után törli a becslést: eltűnik a kártyáról, a fejlécből, a folyószámla várható soraiból és az e havi esedékességből; a számlák, befizetések és egyenlegek nem változnak. A következő ütem szerinti számlát továbbra is várja (ha az is elmarad, az is törölhető); ha a törölt időszakról mégis jön számla, ugyanúgy beolvassa, és a következő valódi számla után a törlés hatástalan. **Automatikus rendezés:** ha egy várt számla nem jön meg, de egy későbbi számla valószínűleg elszámolta, a Rezsikövető magától rendezettnek veszi – csak a becslés tűnik el (kártya, fejléc, folyószámla várható sorai), a számlák, befizetések és egyenlegek nem változnak; az Áttekintés 30 napig kék tájékoztatóban mutatja („… nem jött meg – egy későbbi számla (sorszám) elszámolta, automatikusan rendezve”). Úton lévő (lezárt, saját számítású) számlánál elég, ha azóta későbbi kelte számla jött a fióknak vagy egy társfióknak; késő várt számlánál (átalány, fix díj, diktálás), ha a várt kelte után jött egy társfiók számlája. Társfiók: a közös folyószámla fiókjai – az MVM-nél a fizetendő a folyószámla szerint, az összes áramfiók összevonva, így egy másik áramfiók számlája is elszámolhatja. Ugyanezért közös a számlázási időszak is: ha az egyik áramfiók diktálás szerint számláz (pl. A1), az átalányos társfiók (pl. H-tarifa) folyó időszaka is a diktálások között tart, és a következő számlája a mért fogyasztás díja. **Egy teendőre koppintva** a panel a fiók kártyájára ugrik, és egy pillanatra kiemeli. A rendezettnek jelölt számlahibák rejtve vannak; a lista alatti *Rendezett számlahibák mutatása* előhozza őket. Ha nincs teendő: „Nincs teendő.”
 
 A címkék melletti **ⓘ** gomb buborékban elmagyarázza az adott sort; máshova koppintva bezárul. A fiókkártyán a két sornál hosszabb magyarázó sor (pl. az éves egyenleg részletezése keskeny kijelzőn) nem jelenik meg teljes hosszában: a megnevezése mögötti ⓘ buborékjában olvasható, a meglévő magyarázat fölött. Hogy mi számít hosszúnak, a kijelző szélességétől függ; elforgatáskor újra eldől.
 
@@ -580,7 +599,7 @@ A címkére állva (vagy a ⓘ-re koppintva) a forrás magyarázata látszik.
 
 A fejléc alatt: a szolgáltató, a számlázási ütem, az **éves leolvasás** (napja és óraállása), a **következő éves leolvasás** és a **diktálás** (a következő ablak, pl. „okt. 8–14.”). Új fióknál, az első számla előtt a **kezdőállás** is (birtokba vétel / új mérő napja és állása); ha még nincs éves leolvasás rögzítve, „Éves leolvasás: még nincs rögzítve” ⓘ. Jobb felül a kék **📊** ikon megnyitja az **éves összevetést** ([7.4](#74-éves-összevetés)); a **⋮** menüben: **Éves összevetés**, **Előzmények** (HA előzmény-nézet), **Beállítások** (a fiók entitásai; koppintásra az entitás beállításai, „Eszköz oldala”), **Kapcsolódó**.
 
-![Villany A1 kártya (átalány, szaldós napelem) – fejléc: következő számla, folyószámla, folyó időszak](kepek/03_kartya_villany_a1.png)
+![Villany A1 kártya (átalányos, de diktálás szerint számlázva; közös folyószámla az A1 + H-val) – fejléc: következő számla, folyószámla, folyó időszak; alatta a kedvezményes keret és a még nem érkezett számla](kepek/03_kartya_villany_a1.png)
 
 Sorról sorra (a fiók típusától függően nem mindegyik jelenik meg):
 
@@ -602,20 +621,20 @@ Sorról sorra (a fiók típusától függően nem mindegyik jelenik meg):
 | **Éves / Félévi egyenleg** | várható költség az elszámolási ciklusra, szemben a befizetett + még hátralévő részszámlákkal. Mínusz: az elszámoló számla várható összege; „átalányhoz képest +X Ft” (narancs) = valódi ráfizetés. |
 | **Számlák** | az utolsó 12 hónap számláinak összege, a következő számla várható napja és összege |
 
-![Villany H kártya téli/nyári táblázattal](kepek/04_kartya_villany_h.png)
+![Villany H kártya (átalány) téli/nyári táblázattal, „ha ma lenne az elszámolás” és éves egyenleg](kepek/04_kartya_villany_h.png)
 
-![Gáz kártya](kepek/05_kartya_gaz.png)
+![Gáz kártya (átalány): az éves (MJ-os) kedvezményes keret, „ha ma lenne az elszámolás” és éves egyenleg](kepek/05_kartya_gaz.png)
 
 **Többhavi, utólagos számlázás (víz, szemétszállítás):**
 
 - A **számla hónapjában** a kártya a számla által elszámolt (lezárt) időszakot mutatja: *Ebben a hónapban fizetendő* (a kiállított vagy az átalány szerint várható összeg), a számlázott időszak fogyasztása és tételes díja.
 - **Számla nélküli hónapban** a folyó időszak látszik **szürkén**, felül: „Ebben a hónapban nincs számla – a következő … körül, kb. … Ft”.
 
-![Víz kártya tételes díjjal](kepek/06_kartya_viz.png)
+![Víz kártya (DAKÖV, kéthavi átalány) tételes díjjal: vízdíj, csatornadíj (főmérő − locsolási almérő), alapdíj](kepek/06_kartya_viz.png)
 
 A víznél a **Díj a mért fogyasztás szerint** táblázat tételesen mutatja: vízdíj (főmérő), csatornadíj (főmérő − locsolási almérő), alapdíj, összesen.
 
-![Szemétszállítás kártya](kepek/07_kartya_hulladek.png)
+![Szemétszállítás kártya (fix negyedéves díj)](kepek/07_kartya_hulladek.png)
 
 ### 7.3 A kártya gombjai
 
@@ -823,6 +842,7 @@ Ha a záró állás ellentmond a meglévőknek (a mérő nem mehet visszafelé),
 | MOHU – hulladék | ✅ | – | fizetendő |
 | Magyar Telekom – otthoni összevont | ✅ (Díjnet AMDOCS-XML) | ✅ (XML nélkül is) | fizetendő, kelte, határidő, elszámolt hónap, fizetési mód |
 | One Magyarország (volt DIGI) | – | ✅ | fizetendő, kelte, határidő, időszak, fizetési mód |
+| Mezőföldvíz – víz (2.3.0, beépített saját beolvasó) | – | ✅ (részszámla, átalány) | fizetendő, kelte, határidő, időszak, díjtételek, elszámolt ivóvíz/csatorna; mérőállás nincs a számlán – a fiókot a számlamappa választja |
 
 Ha egy számlához XML és PDF is van, az XML-t olvassa (pontosabb). Becsült állást nem vesz át.
 
@@ -947,9 +967,11 @@ Ha a fióknak még nincs **számlamappája**, a Rezsikövető létrehoz egyet (`
 
 ---
 
-### 9.9 Ismeretlen számla kiolvasása AI-val, saját beolvasó (2.3.0 béta, kísérleti)
+### 9.9 Ismeretlen számla kiolvasása AI-val, saját beolvasó (2.3.0, kísérleti)
 
 > Részletes, képes leírás: [AI-os számlaolvasó](AI_szamlaolvaso.md).
+
+> **Beépített saját beolvasók:** a tagok által beküldött (személyes adat nélküli) beolvasók a Rezsikövetővel érkeznek, AI és fájlmásolás nélkül működnek – jelenleg: **Mezőföldvíz** (víz, részszámla). Ha ugyanilyen azonosítójú saját beolvasód is van a `hu_rezsi_sablonok` mappában, az a saját az erősebb.
 
 Ha a Rezsikövető egy PDF-számlát nem ismer fel (más szolgáltató, pl. egy helyi vízmű), a választott **AI** kiolvassa belőle az adatokat, te ellenőrzöd és jóváhagyod – és a számla ugyanúgy bekerül, mint egy felismert.
 
@@ -971,7 +993,7 @@ Ha a Rezsikövető egy PDF-számlát nem ismer fel (más szolgáltató, pl. egy 
 4. Két gomb: **Csak átvétel**, vagy **Átvétel és beolvasó mentése** (ajánlott, lásd lent).
 5. A számla a **jóváhagyásra várók** közé kerül („AI-val kiolvasva” címkével): ott látod, mi változna vele (fogyasztás, költség, egyenleg, átvett mérőállások), és ott **Jóváhagyás** vagy **Elvetés**.
 
-**Saját beolvasó (2.3.0 béta):** az „Átvétel és beolvasó mentése” a jóváhagyott adatokból helyi beolvasót (sablont) készít ehhez a szolgáltatóhoz. A **következő számláit már AI nélkül**, helyben, ingyen olvassa be – ugyanúgy jóváhagyásra várnak, mint bármely mappába érkezett számla („saját beolvasóval” címkével). A mappában már ott lévő, korábban fel nem ismert számlái is magától előkerülnek.
+**Saját beolvasó (2.3.0):** az „Átvétel és beolvasó mentése” a jóváhagyott adatokból helyi beolvasót (sablont) készít ehhez a szolgáltatóhoz. A **következő számláit már AI nélkül**, helyben, ingyen olvassa be – ugyanúgy jóváhagyásra várnak, mint bármely mappába érkezett számla („saját beolvasóval” címkével). A mappában már ott lévő, korábban fel nem ismert számlái is magától előkerülnek.
 
 - A beolvasó csak akkor mentődik, ha a számlán **pontosan azt** olvassa ki, amit jóváhagytál, és nincs benne személyes adat (csak a szolgáltató neve, adószáma, a mezők feliratai és általános minták). Ellentmondásos számlából nem készül.
 - Helye: `config/hu_rezsi_sablonok/<szolgáltató>.yaml` – olvasható, a HA-mentésbe bekerül, és **megosztható** (pl. GitHub-hibajegyben, hogy beépített beolvasó legyen belőle).

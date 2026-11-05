@@ -596,4 +596,5 @@ def szelet_dict(s) -> dict[str, Any]:
         "ar_kedvezmenyes": float(s.egysegar_kedvezmenyes),
         "ar_piaci": float(s.egysegar_piaci),
         "becsult": s.becsult,
+        "csatorna": s.csatorna,  # vetelezes / h_teli / … / almero (víz: a locsolási almérő levonása a csatornadíjból)
     }

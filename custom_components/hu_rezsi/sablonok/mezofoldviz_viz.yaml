@@ -1,0 +1,67 @@
+# Rezsikövető beépített számlabeolvasó – Mezőföldi Regionális Víziközmű Kft. (Mezőföldvíz), víziközmű-részszámla.
+# Személyes adat nélkül; a minták: DATUM = dátum, SZAM = szám, (...) = a kiolvasott érték.
+azonosito: mezofoldviz_viz
+nev: Mezőföldvíz Kft. – víz
+kozmu: viz
+verzio: 1
+formatum: 1
+felismeres:
+  szovegek:
+  - Mezőföldi Regionális Víziközmű Korlátolt Felelősségű Társaság
+  - 11283144-2-17
+  - ivóvíz
+allando:
+  szolgaltato_nev: Mezőföldi Regionális Víziközmű Korlátolt Felelősségű Társaság
+  szolgaltato_adoszam: 11283144-2-17
+  kozmu: viz
+alap_tipus: resz
+mezok:
+  kelte:
+    minta: Számla[ \t]+kelte:[ \t]*({DATUM})
+    szoveg: tabla
+    tipus: datum
+  fizetesi_hatarido:
+    minta: Fizetési[ \t]+határidő:[ \t]*({DATUM})
+    szoveg: tabla
+    tipus: datum
+  idoszak_tol:
+    minta: Elszámolt[ \t]+időszak:[ \t]*({DATUM})
+    szoveg: tabla
+    tipus: datum
+  idoszak_ig:
+    minta: Elszámolt[ \t]+időszak:[ \t]*{DATUM}[ \t]*-[ \t]*({DATUM})
+    szoveg: tabla
+    tipus: datum
+  fizetendo:
+    minta: Fizetendő[ \t]+összeg:[ \t]*({SZAM})
+    szoveg: tabla
+    tipus: osszeg
+  sorszam:
+    minta: Számla[ \t]+sorszáma:[ \t]*([A-Za-z\d]{7,13})
+    szoveg: tabla
+    tipus: szoveg
+merok: []
+tetelek:
+- sor: Ivóvíz\-szolgáltatás\ alapdíj[ \t]+\S*\d\S*[ \t]+(?P<mennyiseg>{SZAM})[ \t]*hó[ \t]*(?P<egysegar>{SZAM})[ \t]+[^\d\s][^\d\n]*?[ \t]+{SZAM}[ \t]+{SZAM}[ \t]+(?P<brutto>{SZAM})
+  megnevezes: Ivóvíz-szolgáltatás alapdíj
+  egyseg: hó
+- sor: vízmérőn\ mért\ ivóvíz[ \t]+\S*\d\S*[ \t]+(?P<mennyiseg>{SZAM})[ \t]*m3[ \t]*(?P<egysegar>{SZAM})[ \t]+\S*\d\S*[ \t]+{SZAM}[ \t]+{SZAM}[ \t]+(?P<brutto>{SZAM})
+  megnevezes: vízmérőn mért ivóvíz
+  egyseg: m3
+- sor: mérőn\ mért\ elvezetett[ \t]+\S*\d\S*[ \t]+(?P<mennyiseg>{SZAM})[ \t]*m3[ \t]*(?P<egysegar>{SZAM})[ \t]+\S*\d\S*[ \t]+{SZAM}[ \t]+{SZAM}[ \t]+(?P<brutto>{SZAM})
+  megnevezes: mérőn mért elvezetett
+  egyseg: m3
+- sor: Rezsicsökkentés\ kedv\.\ miatti\ kerekítés[ \t]+{SZAM}[ \t]+{SZAM}[ \t]+(?P<brutto>{SZAM})
+  megnevezes: Rezsicsökkentés kedv. miatti kerekítés
+- sor: Bruttó\ érték\ kerekítése[ \t]*{SZAM}[ \t]+AHK[ \t]*(?P<brutto>{SZAM})
+  megnevezes: Bruttó érték kerekítése
+mennyisegek:
+- minta: Ivóvíz[ \t:]*({SZAM})[ \t]*m3
+  megnevezes: Ivóvíz
+  egyseg: m3
+- minta: Csatorna[ \t:]*({SZAM})[ \t]*m3
+  megnevezes: Csatorna
+  egyseg: m3
+ellenorzes:
+  keszult: '2026-11-04'
+  mintaszamla_ujjlenyomat: bd7ad1614c54acba

@@ -5,10 +5,6 @@
   </picture>
 </p>
 
-> [!WARNING]
-> **A main ágon most a 2.3.0 béta (2.3.0b9) van.** A stabil változat a **2.2.1** – a HACS ezt telepíti, amíg a béta változatok megjelenítését be nem kapcsolod (HACS → Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta új funkciói (AI-beolvasó, saját beolvasó) kísérletiek; hibát a GitHub Issues-ban jelezz.
-
-
 # Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
 
 > [!IMPORTANT]
@@ -34,13 +30,11 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 | Tervek – adatmodell, díjszabás-formátum, elszámoló motor, ütemterv | fejlesztő | [`docs/terv/`](docs/terv/) |
 | Változások | mindenki | [CHANGELOG](CHANGELOG.md) |
 
-## Újdonságok a 2.3.0 bétában (2026. november 4.)
+## Újdonságok a 2.3.0-ban (2026. november 5.)
 
-> Béta – a HACS-ban a béta változatok megjelenítésével telepíthető.
-
-- **Tablet és mobil: lapozós nézet.** Fiókonként egy lap (Fiókok), vagy minden fiók témánként egy táblázatban / kártyán (Témák: Számlák, Fogyasztás, Egyenleg, Mérők) – görgetés helyett. Útmutató: [kézikönyv 7.0](docs/KEZIKONYV.md#70-lapozós-nézet-fiókok-és-témák-230-béta).
-- **Ismeretlen számla kiolvasása AI-val (kísérleti)** – a személyes adatok kitakarásával, jóváhagyással; az első számlából **saját beolvasó** készül, a szolgáltató következő számláit már AI nélkül olvassa. Útmutató: [AI-os számlaolvasó – részletes leírás](docs/AI_szamlaolvaso.md) és [kézikönyv 9.9](docs/KEZIKONYV.md#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-béta-kísérleti).
-- **Mérők:** a saját szenzor szerinti mostani állás és a korrekciós szorzó; **korrekciós leolvasás** a Mérőállás ablakban (nem diktálás, nem időszakhatár).
+- **Tablet és mobil: lapozós nézet.** Fiókonként egy lap (Fiókok, a végén a Mátrix), vagy minden fiók témánként egy táblázatban / kártyán (Témák: Számlák, Fogyasztás, Egyenleg, Mérők, Mátrix) – görgetés helyett. Útmutató: [kézikönyv 7.0](docs/KEZIKONYV.md#70-lapozós-nézet-fiókok-és-témák-230).
+- **Ismeretlen számla kiolvasása AI-val (kísérleti)** – a személyes adatok kitakarásával, jóváhagyással; az első számlából **saját beolvasó** készül, a szolgáltató következő számláit már AI nélkül olvassa. Útmutató: [AI-os számlaolvasó – részletes leírás](docs/AI_szamlaolvaso.md) és [kézikönyv 9.9](docs/KEZIKONYV.md#99-ismeretlen-számla-kiolvasása-ai-val-saját-beolvasó-230-kísérleti).
+- **Mérők:** a saját szenzor szerinti mostani állás; víznél az almérő is; a mérőállások egész számmal; **korrekciós leolvasás** a Mérőállás ablakban (nem diktálás, nem időszakhatár).
 
 ## Újdonságok a 2.2.0-ban (2026. november 4.)
 
@@ -63,7 +57,7 @@ Minden változás: [CHANGELOG](CHANGELOG.md).
 - **Gáz kedvezményes keret a fizetés módja szerint:** diktálásnál havonta súlyozott (MVM-táblázat, télen több), a kedvezményes évben (aug. 1. – júl. 31.) halmozva; átalánynál éves. Lakossági (20 m³/h alatti és feletti mérő) és fogyasztói közösségi díjszabás az MVM árlapja szerint.
 - **MVM sávkorrekció:** a kedvezményes keret (mérőnként 2 523 kWh/év, napi arányosan) az A1, a B (vezérelt) és a H-tarifa nyári (1.82) regiszterén jár, felette lakossági piaci ár. A keret az elszámolási évben – az éves elszámoló leolvasástól a következő éves elszámoló leolvasásig – halmozódik, ahogy az MVM számláz: a korábban ki nem használt keret később jóváíródik, de a következő elszámolási évre nem vihető át. A H-tarifa téli (1.81) fogyasztására nincs keret, és a keretbe sem számít bele.
 - **Átalányos (részszámlás) fiókok:** havi fizetendő, „ha ma lenne az elszámolás”, várható éves/félévi egyenleg, az átalány összevetése a valódi fogyasztással.
-- **Többhavi, utólagos számlázás:** kéthavi víz (DAKÖV), negyedéves szemétszállítás (MOHU).
+- **Többhavi, utólagos számlázás:** kéthavi víz (DAKÖV), negyedéves szemétszállítás (MOHU). Víznél a folyó időszak (fogyasztás, várható díj) is a számlázási időszak.
 - **Számlák** automatikusan egy mappából (pl. a Díjnet-integráció letöltései), e-mailből, feltöltéssel a panelről (PDF/XML), bemásolással vagy kézzel. Felismeri: MVM Next áram és gáz, DAKÖV, ALFÖLDVÍZ, HVSZ (távhő), MOHU, Magyar Telekom, One.
 - **Éves összevetés grafikon:** a kártya grafikon-ikonjára felugró ablak – havi fogyasztás vagy költség az előző év ugyanazon hónapjaival, összesítéssel és táblázattal. Ritka (pl. éves) gázleolvasásnál a havi bontást egy profil-szenzor (pl. a kazán becsült gázfogyasztása) adja.
 - **Automatikus mérő-korrekció:** a szenzor (pl. Shelly) és a valódi óra eltérését a leolvasásokból becsli és kiigazítja; a kézi eltolás-ugrást nem veszi fogyasztásnak.

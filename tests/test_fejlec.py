@@ -112,3 +112,15 @@ def test_fix_dij_honap_az_egyseg():
     assert folyo_idoszak(f, date(2026, 12, 31))["eddig"] == 5772
     havi = f | {"idoszak": {"tol": "2026-10-01", "ig": "2026-11-01", "honapok": 1}, "varhato": {"osszeg": 9689}}
     assert (folyo_idoszak(havi, date(2026, 10, 8))["eddig"], folyo_idoszak(havi, date(2026, 10, 8))["honapok"]) == (9689, 1)
+
+
+def test_atalany_varhato_dij_az_atalany():
+    """Átalánynál a várható díj az átalány; a mért díj csak összehasonlítás. Diktálás után a mért (diktált) díj."""
+    f = MERT | {"reszszamlas": True, "szenzor": True, "atalany": {"havi": 5000, "idoszak_ft": 5100}}
+    fo = folyo_idoszak(f)
+    assert (fo["varhato"], fo["varhato_atalany"], fo["varhato_mert"], fo["tajekoztato"]) == (5100, 5100, 7500, True)
+    assert folyo_idoszak(f | {"atalany": {"havi": 11560}})["varhato"] == 11560
+    dikt = folyo_idoszak(f | {"diktalt_szamla": {"tol": "2026-09-14", "datum": "2026-10-05", "osszeg": 6900}})
+    assert (dikt["varhato"], dikt["tajekoztato"], "varhato_atalany" in dikt) == (7500, False, False)
+    # Diktálás szerint számlázott fióknál a mért díj marad.
+    assert folyo_idoszak(f | {"diktalas_szerint": True})["varhato"] == 7500

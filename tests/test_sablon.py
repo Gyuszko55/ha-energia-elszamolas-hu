@@ -135,3 +135,59 @@ def test_azonos_datumu_mezok_kulon_feliratot_kapnak():
     s = S.keszit(adat, sz, sz)
     assert "kelte" in s["mezok"]["kelte"]["minta"] and "kelte" not in s["mezok"]["idoszak_ig"]["minta"]
     assert S.onproba(s, adat, sz, sz) == []
+
+
+def test_koztes_szamoszlopok_helye_megmarad():
+    """Nettó díj és ÁFA % a tételsorban az egységár és a bruttó díj között: a bruttót olvassa, ne egy köztes számot."""
+    sz = ("PÉLDAVÍZ Kft.  Adószám: 12345678-2-07  ivóvíz\nSzámla sorszáma: 1234ABC56\nSzámla kelte: 2026.09.02\n"
+          "Fizetendő összeg:   3 315 Ft\n"
+          " Alapdíj                2026.09.01-      1 hó     286,30 Ft/hó      286,30     27      363,60\n"
+          " Ivóvíz díj             2026.09.01-      5 m3     238,86 Ft/m3    1 194,30     27    1 516,76\n")
+    adat = A.normalizal({"szolgaltato_nev": "PÉLDAVÍZ Kft.", "szolgaltato_adoszam": "12345678-2-07", "kozmu": "viz",
+                         "sorszam": "1234ABC56", "kelte": "2026-09-02", "fizetendo": 3315, "tipus": "resz",
+                         "tetelek": [{"megnevezes": "Alapdíj", "mennyiseg": 1, "egyseg": "hó", "egysegar": "286,30", "brutto": "363,60"},
+                                     {"megnevezes": "Ivóvíz díj", "mennyiseg": 5, "egyseg": "m3", "egysegar": "238,86", "brutto": "1 516,76"}]})
+    s = S.keszit(adat, sz, sz)
+    assert S.onproba(s, adat, sz, sz) == []
+    masik = sz.replace("5 m3     238,86 Ft/m3    1 194,30     27    1 516,76", "7 m3     238,86 Ft/m3    1 672,02     27    2 123,47")
+    assert [t["brutto"] for t in S.alkalmaz(s, masik, masik)["tetelek"]] == [363.6, 2123.47]
+
+
+MEZOFOLDVIZ = """                                                     Víziközmű-szolgáltatás 1. részszámla
+                                                     Számla sorszáma: 12345VKV26
+Szolgáltató neve:     Mezőföldi Regionális Víziközmű
+                      Korlátolt Felelősségű Társaság
+Adószám:              11283144-2-17                                     Próba Péter
+  Elszámolt időszak:               2026.10.01-2026.10.31                   Felhasználási hely azonosító:900000001
+  Fizetendő összeg:                                    4 495 Ft            Felhasználó neve:                  Próba Péter
+  Fizetési határidő:                                2026.11.10
+Számla sorszáma:     12345VKV26                                                                        Számla kelte:   2026.10.02
+Elszámolt mennyiség:Ivóvíz 7 m3, Csatorna 7 m3
+ Ivóvíz-szolgáltatás alapdíj                        2026.10.01-                                    1 hó         286,30 Ft/hó            286,30        27             363,60
+ 9999999 számú vízmérőn mért ivóvíz                 2026.10.01-                                    7 m3        238,86 Ft/m3           1 672,02        27           2 123,47
+ 9999999 számú mérőn mért elvezetett                2026.10.01-                                    7 m3        226,08 Ft/m3           1 582,56        27           2 009,85
+ Rezsicsökkentés kedv. miatti kerekítés                                                                                                   -0,79       27               -1,00
+ Bruttó érték kerekítése                                                                                                                   0,03    AHK                  0,03
+ Fizetendő összeg:                                                                                                                                                    4 495
+"""
+
+
+def test_beepitett_mezofoldviz(tmp_path: Path):
+    """A Rezsikövetővel érkező beépített beolvasó (kitalált adatokkal); a saját azonos azonosítójú az erősebb."""
+    from custom_components.hu_rezsi import szamlak
+    osszes = S.osszes_betolt(tmp_path)
+    sab = next(s for s in osszes if s["azonosito"] == "mezofoldviz_viz")
+    assert sab["_beepitett"]
+    d = S.alkalmaz(sab, MEZOFOLDVIZ, MEZOFOLDVIZ)
+    assert (d["sorszam"], d["kelte"], d["fizetesi_hatarido"], d["fizetendo"], d["tipus"]) == ("12345VKV26", "2026-10-02", "2026-11-10", 4495, "resz")
+    assert (d["idoszak_tol"], d["idoszak_ig"]) == ("2026-10-01", "2026-10-31")
+    assert sorted(t["brutto"] for t in d["tetelek"]) == [-1, 0.03, 363.6, 2009.85, 2123.47]
+    assert S.szemelyes(sab, []) == []
+    (tmp_path / S.MAPPA_NEV).mkdir()
+    (tmp_path / S.MAPPA_NEV / "mezofoldviz_viz.yaml").write_text((S.BEEPITETT / "mezofoldviz_viz.yaml").read_text(encoding="utf-8"), encoding="utf-8")
+    assert [s.get("_beepitett", False) for s in S.osszes_betolt(tmp_path) if s["azonosito"] == "mezofoldviz_viz"] == [False]
+    szamlak.SABLONOK[:] = osszes
+    try:
+        assert szamlak.sablonnal(MEZOFOLDVIZ, MEZOFOLDVIZ, "m.pdf").forras == "sablon:mezofoldviz_viz"
+    finally:
+        szamlak.SABLONOK[:] = []

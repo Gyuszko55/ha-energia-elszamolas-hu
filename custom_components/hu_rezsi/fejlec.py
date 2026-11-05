@@ -19,8 +19,10 @@ from datetime import date, timedelta
 from typing import Any
 
 try:
+    from .szamlak import ervenytelenek
     from .varhato_szamlak import varhato_szamlak
 except ImportError:  # tesztben a csomag mappája közvetlenül a path-on van
+    from szamlak import ervenytelenek
     from varhato_szamlak import varhato_szamlak
 
 HORIZONT_NAP = 400  # a következő számla akkor is kell, ha messze van (pl. negyedéves szemétszállítás)
@@ -73,16 +75,23 @@ def kovetkezo_szamla(f: dict[str, Any], szamlak: dict[str, dict[str, Any]], ma: 
     x = dict(lista[0])
     if not x["tol"] and x["forras"] in ("atalany", "fix"):
         # A már kiállított számla utáni (következő) részszámla időszaka: a legutóbbi számla végétől az ütem szerint.
-        vegek = [y["idoszak"][1] for y in szamlak.values() if y.get("idoszak") and y["idoszak"][1] and y.get("tipus") != "storno"]
+        # A stornó és az általa érvénytelenített számla időszaka nem számít kiszámlázottnak.
+        kihagy = ervenytelenek(szamlak)
+        vegek = [y["idoszak"][1] for k, y in szamlak.items() if y.get("idoszak") and y["idoszak"][1] and k not in kihagy]
         if vegek:
             tol = date.fromisoformat(max(vegek)[:10]) + timedelta(days=1)
             ho = int((f.get("utem") or {}).get("szamlazas_honap") or 1)
+            # A lemondott (soha meg nem érkező) várt számla időszaka kimarad: a következő az utána jövő.
+            for _ in {x.get("kovetkezo_datum") for x in f.get("lemondott_szamlak") or []}:  # várt kelte szerint egyszer
+                tol = _honap_mulva(tol, ho)
             x["tol"], x["ig"] = tol.isoformat(), (_honap_mulva(tol, ho) - timedelta(days=1)).isoformat()
     dij = fiz = x["osszeg"]
     if es.get("kovetkezo_osszeg_brutto") is not None and es.get("kovetkezo_osszeg") == x["osszeg"]:
         dij = int(es["kovetkezo_osszeg_brutto"])
     ki = {"tol": x["tol"], "ig": x["ig"], "dij": dij, "fizetendo": fiz, "kelte": x["kelte"], "forras": x["forras"], "folyo": False,
           "kesik": bool(es.get("elmaradt"))}
+    if ki["kesik"] and es.get("kovetkezo_datum"):
+        ki["varva"] = str(es["kovetkezo_datum"])[:10]  # a várt kelte: ezzel mondható le (soha meg nem érkező számla)
     if x["forras"] == "atalany":
         return ki | {"cimke": "pontos", "magyarazat": "A szerződött átalány szerint – a mérőállástól független."}
     if x["forras"] == "fix":
@@ -131,7 +140,9 @@ def folyo_idoszak(f: dict[str, Any], ma: date | None = None) -> dict[str, Any] |
         }
     else:
         c, m = _cimke_meres(f)
-    atalany = bool(f.get("reszszamlas") and not f.get("diktalas_szerint"))
+    dk = f.get("diktalt_szamla") or {}
+    # Átalány – kivéve, ha a legutóbbi számla után diktáltál: akkor a következő számla a diktált állás szerint jön.
+    atalany = bool(f.get("reszszamlas") and not f.get("diktalas_szerint") and not (dk and not dk.get("becsult")))
     if atalany:
         m += " Tájékoztató: a számla az átalány szerint jön; a különbség az elszámoláskor rendeződik."
     be = (f.get("atalany") or {}).get("betaplalas") if atalany else None
@@ -144,10 +155,21 @@ def folyo_idoszak(f: dict[str, Any], ma: date | None = None) -> dict[str, Any] |
             "magyarazat": m + " Szaldós napelem: nettó fogyasztás (vételezés − betáplálás), ezt veti össze a szolgáltató az átalánnyal.",
             "tajekoztato": True,
         }
+    varhato, extra = v.get("osszeg"), {}
+    a_ = f.get("atalany") or {}
+    adij = a_.get("idoszak_ft") if a_.get("idoszak_ft") is not None else (
+        a_["havi"] * (i.get("honapok") or 1) if a_.get("havi") is not None else None)
+    if atalany and adij is not None:
+        # Átalánynál a várható díj az átalány (a számla ennyiről jön) – a mért fogyasztás díja (gáznál az évszak
+        # szerinti súlyozással) csak összehasonlítás. Diktálás után a következő számláig a diktált állás számít
+        # (az a következő számla), utána újra az átalány.
+        mert, varhato = varhato, round(adij)
+        extra = {"varhato_atalany": varhato, "varhato_mert": mert}
+        m = f"Várható díj: az átalány ({varhato} Ft) – a számla ennyiről jön. A mért fogyasztás szerint {mert} Ft lenne (összehasonlítás). " + m
     return {
-        "tol": i["tol"], "ig": i["ig"], "eddig": e.get("osszeg"), "varhato": v.get("osszeg"),
+        "tol": i["tol"], "ig": i["ig"], "eddig": e.get("osszeg"), "varhato": varhato,
         "eltelt_nap": round(eltelt), "napok": round(eltelt + hatra), "napi_atlag": v.get("napi_atlag"),
-        "cimke": c, "magyarazat": m, "tajekoztato": atalany,
+        "cimke": c, "magyarazat": m, "tajekoztato": atalany, **extra,
     }
 
 

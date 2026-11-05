@@ -1,18 +1,46 @@
 # Változások
 
-## Rezsikövető 2.3.0b9 – béta, 2026-11-04
+## Rezsikövető 2.3.0 – 2026-11-05
+
+Végleges kiadás: a 2.3.0b1–b10 bétákban megjelent újdonságok és javítások (lent, bétánként). Kiemelve: lapozós tablet- és mobilnézet (Fiókok, Témák), **Mátrix** (elszámolási mátrix és számlanaptár), ismeretlen számla kiolvasása AI-val és saját beolvasó (kísérleti), beépített Mezőföldvíz-beolvasó, korrekciós leolvasás, ki nem számlázott várt számlák automatikus rendezése, MVM közös számlázási időszak, több havonta számlázott víz számlázási időszaka, MVM-stornó párosítás és folyószámla-javítások.
+
+### 2.3.0b10
+
+- **Beépített saját beolvasók:** a Rezsikövetővel érkező, személyes adat nélküli beolvasók (`custom_components/hu_rezsi/sablonok/`) – AI és fájlmásolás nélkül. Az első: **Mezőföldvíz** (víz, részszámla; kelte, határidő, időszak, fizetendő, díjtételek, elszámolt ivóvíz/csatorna). Azonos azonosítónál a felhasználó saját beolvasója az erősebb. A korábban fel nem ismert számlákat frissítés után újraolvassa.
+- **Mérők (Témák):** a korrekciós sorok kikerültek; víznél az **almérő** állása (és mérője) a főmérő alatt. (A szeletek csatornája – `csatorna` – a panel-adatban.)
+- **Mérőállás mindig egész szám** a panelen (rögzített, éves, kezdő, záró, átvett és a saját szenzor szerinti is, élőben) – ahogy az óra számlálója mutatja, a tört rész elhagyva (mint az indítókártyán).
+- **Fogyasztás (Témák):** mérő nélküli (fix díjas: havi, negyedéves díj) fióknál nincs időarányos eltelt-sáv és „díj eddig” – csak a várható (időszaki) díj; az „eddig” összesen sem tartalmazza.
+- **Késő várt számla törlése:** az Áttekintés teendői között a késő várt számlánál (átalány, fix díj, diktálás) „Nem jön számla – törlés…” gomb – megerősítés után csak a becslés tűnik el (kártya, fejléc, folyószámla várható sorai, e havi esedékesség); számla, befizetés, egyenleg nem változik; a következő valódi számla után hatástalan. (Pl. MVM közös folyószámla: sztornózott, másképp elszámolt H-tarifás átalány-részszámla.)
+- **Ki nem számlázott várt számlák automatikus rendezése:** ha egy várt számla nem jön meg, de egy későbbi számla valószínűleg elszámolta, a Rezsikövető magától rendezettnek veszi (csak a becslés tűnik el; számla, befizetés, egyenleg nem változik), és az Áttekintés 30 napig tájékoztat róla. *Úton lévő* (lezárt, saját számítású) számla: ha azóta későbbi kelte számla jött a fióknak vagy egy társfióknak; *késő várt* (átalány, fix díj, diktálás) számla: ha a várt kelte után egy társfiók számlája jött. Társfiók = közös folyószámla (MVM: a fizetendő a folyószámla szerint, az áramfiókok összevonva). Tárolva: `rendezett_uton` / `lemondott_szamlak` (`auto`, a rendező számla sorszáma); a naplóban info sor.
+- **MVM közös számlázási időszak:** egy ügyfél áramfiókjait az MVM együtt számlázza – ha a közös folyószámla egyik fiókja diktálás szerint számláz (pl. A1), a többi átalányos fiók (pl. H-tarifa) is, azonos időszakkal (pl. 10.09-i leolvasás után 10.10-től a következő diktálásig); a következő számla a mért fogyasztás díja. A várható kelte is közös: a társfiókok legutóbbi számlájától az ütem szerint (a számlák együtt jönnek).
+- **Várható díj átalánynál:** az átalány összege (a számla ennyiről jön) – a kártya Folyó időszakában és a Fogyasztás táblázat „Várható díj” oszlopában; alatta összehasonlításként a mért fogyasztás szerinti díj (gáznál az évszak szerinti súlyozással). Ha a legutóbbi számla után diktáltál, a következő számláig a diktált állás szerinti díj, utána újra az átalány.
+- **Több havonta számlázott víz:** a folyó időszak (a kártyán és a Fogyasztás táblázatban: fogyasztás eddig, eltelt napok, várható mennyiség és díj, átalány) a számlázási időszak – a legutóbbi számla vége utántól az ütem szerint (pl. DAKÖV kéthavi: 10.01–11.30, ALFÖLDVÍZ négyhavi: 09.01–12.31), nem a naptári hónap; a havi rész alatta. A havi lezárás (előzmények) marad havi. Az átalány időszaki összege (`atalany.idoszak_ft`) a számlázási időszak napjai szerint.
+- **Mátrix (új lap a Témák és a Fiókok nézetben is – ott a fiókfülek után):** két nézet, a fiókok meglévő adataiból. *Elszámolás:* fiók × szakasz (mérés, elszámolás módja, ütem, folyó időszak, várható díj, következő számla, diktálás, éves elszámolás, folyószámla), a cella színe az állapot (pontos/mért, becsült, átalány, figyelj rá, nem vonatkozik). *Számlanaptár:* fiók × hónap (−8…+3 hónap): beérkezett számlák típusjellel, várhatók az ütem szerint, még nem érkezett számla, diktálási ablak, éves elszámolás. Felül a teendők; cellára koppintva a magyarázat és a fiók lapja. A számlanaptárban a számlára koppintva a sorszám (kézi rögzítésnél, ha nincs: „kézzel rögzítve”), a forrás (beolvasott fájl / AI / kézzel), megjegyzés, határidő és fizetés.
+- **Regiszterenkénti fogyasztás:** több regiszteres mérőnél (H-tarifa téli/nyári, A2 csúcs/völgy) a fiók kártyájának Folyó időszaka és a Fogyasztás táblázat a fogyasztást regiszterenként is mutatja.
+- Javítás (átnézés): közös folyószámla nélkül (pl. mért gáz) az úton lévő időszakot csak olyan saját számla rendezi automatikusan, amelynek az időszaka eléri – egy késve jött korábbi számla nem; MVM közös folyószámlán marad a „bármely későbbi számla” szabály.
+- Javítás (átnézés): több havonta számlázott, mért víznél a folyó számlázási időszak havi lezárásai nem „úton lévő” számlák (nem számítanak kétszer); hónap végi számlavégnél a számlázási időszak nem csúszik el.
+- Javítás (átnézés): ugyanarra a várt keltére adott két „Nem jön számla” lemondás (két gyors kérés) nem tolja el kétszer a következő részszámla időszakát; a második kérés nem ír új bejegyzést.
+- **Egyenleg (Témák):** a közös folyószámlás áramfiókok (MVM A1 + H) egy sorban – az összegek összeadva, a folyószámla egyszer; az összesen-sor sem számolja kétszer.
+- Javítás (folyószámla): a sztornózott számla befizetése is számít, ha a stornó előtt fizették (a szolgáltató túlfizetésként viszi tovább, pl. „túlfizetés miatt levont” az újra kiállított számlán) – eddig kimaradt, és a folyószámla hamis tartozást mutatott. A stornó utáni (beszámítással) „fizetett” jelölés továbbra sem befizetés.
+- Javítás (MVM stornó): a sztornózott számla sorszáma a PDF „Stornózott számla száma” sorából is (eddig csak „Sztornózott számla sorszáma” alakban ismerte fel), és a hivatkozás nélküli stornó-XML-hez a PDF-párból; hivatkozás nélkül a párosítás a stornónál korábbi számlát választja, nem a vele egy napon újra kiállítottat. A régi, párosítatlan stornók egyszeri utólagos párosítása (`storno_potlas`; csak a hivatkozás – befizetés, mérőállás nem változik). Hatás: az újra kiállított számla időszaka nem számít kétszer (pl. „utolsó 12 hónap”).
+- Javítás (Mátrix): az úton lévő időszak vége egy nappal korábbinak látszott; az automatikus rendezés tájékoztatójában a számla sorszáma kétszer volt escape-elve.
+- Javítás: az átalány következő részszámlájának időszaka a sztornózott számla végéből indult (most: az érvényes számlák végéből).
+- Javítás (saját beolvasó készítése): ha a tételsorban az egységár és a bruttó díj között további számoszlopok
+  állnak (nettó díj, ÁFA %), a beolvasó a bruttó díjat olvassa, ne egy köztes számot (pl. Mezőföldvíz-számla).
+
+### 2.3.0b9
 
 - Részletes, képes leírás az AI-os számlaolvasóról: [docs/AI_szamlaolvaso.md](docs/AI_szamlaolvaso.md).
 - Javítás: a figyelmeztetés-sorra (pl. a „Kiolvasás AI-val” gombra) kattintva egy üres („undefined”) buborék jelent meg.
 - Javítás (saját beolvasó): ha két mező értéke azonos (pl. a kelte és az időszak vége ugyanaz a nap), a második mező
   nem ülhet az első feliratára – egy felirat csak egy mezőé.
 
-## Rezsikövető 2.3.0b8 – béta, 2026-11-04
+### 2.3.0b8 – béta, 2026-11-04
 
 > Béta: a HACS-ban a béta változatok megjelenítésével telepíthető. Az új funkciók (AI-beolvasó, saját beolvasó)
 > kísérletiek; hibát a GitHub Issues-ban jelezz.
 
-### Új
+#### Új
 - **Ismeretlen számla kiolvasása AI-val (kísérleti):** a fel nem ismert szöveges PDF-számlát a választott AI Task
   entitás (pl. Gemini, OpenAI, helyi Ollama) kiolvassa; elküldés előtt a személyes adatok kitakarása (feliratos név-
   és címsorok – a következő sorban álló érték is –, felirat nélküli címek, az összes otthon ismert adatai, a HA
@@ -40,7 +68,7 @@
   Visszajelzés a panel tetején: eltérés a szenzorhoz, szorzó előtte → utána. Szolgáltatás: `hu_rezsi.leolvasas_rogzites`
   új `korrekcio` mezője.
 
-### Javítások
+#### Javítások
 - A panel delegált kattintás-figyelői minden újrarajzoláskor újra bekötődtek – egy kattintás többször is lefuthatott.
 - Az AI-val kiolvasott számla a számlamappa újraolvasásakor is megmarad (és a fájlja nem lesz újra „ismeretlen”).
 - Méretváltáskor (pl. elforgatás) és a korrekció visszajelzésekor egy nyitott ablak nem tűnik el.
