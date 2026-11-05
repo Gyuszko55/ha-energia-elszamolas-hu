@@ -283,9 +283,9 @@
       },
       "error": {
         "hitelesites": "Login failed: wrong address or password. Many providers need a separate app password – see the steps above.",
-        "hitelesites_gmail": "Google refused the login: an app password is needed, not your usual password. Create one at https://myaccount.google.com/apppasswords (2-Step Verification must be on) and paste it.",
-        "hitelesites_yahoo": "Yahoo refused the login: an app password is needed. Create one: https://login.yahoo.com/account/security → Generate app password.",
-        "hitelesites_icloud": "iCloud refused the login: an app-specific password is needed. Create one: https://account.apple.com → Sign-In and Security → App-Specific Passwords.",
+        "hitelesites_gmail": "Google refused the login: an app password is needed, not your usual password. Create one at {gmail_url} (2-Step Verification must be on) and paste it.",
+        "hitelesites_yahoo": "Yahoo refused the login: an app password is needed. Create one: {yahoo_url} → Generate app password.",
+        "hitelesites_icloud": "iCloud refused the login: an app-specific password is needed. Create one: {icloud_url} → Sign-In and Security → App-Specific Passwords.",
         "hitelesites_outlook": "Microsoft (Outlook, Hotmail) no longer accepts password logins from mail programs. Forward the bill e-mails to a Gmail or Freemail address and use that.",
         "hitelesites_freemail": "Freemail refused the login: check the address and password, and that mail-program (IMAP) access is enabled in the freemail.hu settings.",
         "hitelesites_citromail": "Citromail refused the login: check the address and password, and that mail-program (IMAP) access is enabled in the citromail.hu settings.",
@@ -477,17 +477,6 @@
       "options": {
         "tarsashaz": "Condominium / housing cooperative",
         "csaladi": "Family consumer community"
-      }
-    },
-    "szobaszam": {
-      "options": {
-        "1": "1",
-        "1.5": "1.5",
-        "2": "2",
-        "2.5": "2.5",
-        "3": "3",
-        "3.5": "3.5",
-        "4": "4"
       }
     },
     "tuzhely": {
@@ -1011,11 +1000,11 @@
     },
     "email_hiba": {
       "title": "Rezsikövető: can't read the \"{postafiok}\" mailbox",
-      "description": "Can't log in to the \"{postafiok}\" mailbox of {otthon}, so bills arriving by e-mail are not imported.\n\nProblem: {hiba}\n\n**Fix:** Settings → Devices & services → Rezsikövető → {otthon} → \"{postafiok}\" → ⋮ → Reconfigure and enter the password again (Gmail: a new app password at https://myaccount.google.com/apppasswords). The issue disappears once login works; other mailboxes and the accounts keep working."
+      "description": "Can't log in to the \"{postafiok}\" mailbox of {otthon}, so bills arriving by e-mail are not imported.\n\nProblem: {hiba}\n\n**Fix:** Settings → Devices & services → Rezsikövető → {otthon} → \"{postafiok}\" → ⋮ → Reconfigure and enter the password again (Gmail: a new app password at {gmail_url}). The issue disappears once login works; other mailboxes and the accounts keep working."
     },
     "jelszo_hianyzik": {
       "title": "Rezsikövető: enter the mailbox password again ({postafiok})",
-      "description": "The \"{postafiok}\" mailbox of {otthon} has no password – expected after a restore, as backups don't contain it.\n\n**Fix:** Settings → Devices & services → Rezsikövető → {otthon} → \"{postafiok}\" → ⋮ → Reconfigure (Gmail: app password at https://myaccount.google.com/apppasswords)."
+      "description": "The \"{postafiok}\" mailbox of {otthon} has no password – expected after a restore, as backups don't contain it.\n\n**Fix:** Settings → Devices & services → Rezsikövető → {otthon} → \"{postafiok}\" → ⋮ → Reconfigure (Gmail: app password at {gmail_url})."
     }
   }
 }

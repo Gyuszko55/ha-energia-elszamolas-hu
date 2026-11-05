@@ -1,5 +1,12 @@
 # Változások
 
+## Rezsikövető 2.3.1 – 2026-11-05
+
+Karbantartás a Home Assistant Marketplace (HACS) katalógusához – a működés nem változik.
+
+- A Home Assistant integráció-ellenőrzője (hassfest) hibátlan: a `backup` és az `energy` a manifest `after_dependencies` listájában; a fordításokban nincs link (az alkalmazásjelszó-oldalak címe helykitöltővel kerül a hibaüzenetbe és a javítási jelzésbe); a gázátalány szobaszám-választójának feliratai (1, 1,5 … 4) a kódban; a manifest kulcsai sorrendben.
+- GitHub Actions: HACS-ellenőrzés és hassfest minden változáskor.
+
 ## Rezsikövető 2.3.0 – 2026-11-05
 
 Végleges kiadás: a 2.3.0b1–b10 bétákban megjelent újdonságok és javítások (lent, bétánként). Kiemelve: lapozós tablet- és mobilnézet (Fiókok, Témák), **Mátrix** (elszámolási mátrix és számlanaptár), ismeretlen számla kiolvasása AI-val és saját beolvasó (kísérleti), beépített Mezőföldvíz-beolvasó, korrekciós leolvasás, ki nem számlázott várt számlák automatikus rendezése, MVM közös számlázási időszak, több havonta számlázott víz számlázási időszaka, MVM-stornó párosítás és folyószámla-javítások.

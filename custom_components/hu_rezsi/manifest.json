@@ -2,9 +2,16 @@
   "domain": "hu_rezsi",
   "name": "Rezsikövető",
   "after_dependencies": [
+    "backup",
+    "energy",
     "lovelace",
     "recorder"
   ],
+  "codeowners": [
+    "@Gyuszko55",
+    "@Krissz55555"
+  ],
+  "config_flow": true,
   "dependencies": [
     "file_upload",
     "frontend",
@@ -12,11 +19,6 @@
     "panel_custom",
     "websocket_api"
   ],
-  "codeowners": [
-    "@Gyuszko55",
-    "@Krissz55555"
-  ],
-  "config_flow": true,
   "documentation": "https://github.com/Gyuszko55/ha-energia-elszamolas-hu",
   "integration_type": "service",
   "iot_class": "calculated",
@@ -24,5 +26,5 @@
   "requirements": [
     "pypdf>=4.0"
   ],
-  "version": "2.3.0"
+  "version": "2.3.1"
 }

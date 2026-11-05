@@ -411,7 +411,7 @@ class FiokFlow(ConfigSubentryFlow):
         mezok: dict[Any, Any] = {}
         if ds == "gaz/mero_nelkuli":
             mezok[vol.Required(CONF_SZOBASZAM, default=str(self._alap(CONF_SZOBASZAM, "2")))] = SelectSelector(
-                SelectSelectorConfig(options=list(SZOBASZAMOK), translation_key="szobaszam", mode=SelectSelectorMode.DROPDOWN)
+                SelectSelectorConfig(options=[SelectOptionDict(value=v, label=v.replace(".", ",")) for v in SZOBASZAMOK], mode=SelectSelectorMode.DROPDOWN)
             )
             mezok[vol.Required(CONF_TUZHELY, default=self._alap(CONF_TUZHELY, "3_4_langu"))] = SelectSelector(
                 SelectSelectorConfig(options=list(TUZHELYEK), translation_key="tuzhely", mode=SelectSelectorMode.LIST)
@@ -682,6 +682,7 @@ class PostafiokFlow(ConfigSubentryFlow):
                 "levelezo": f" – {lv['nev']}" if lv and lv["nev"] else "",
                 "lepesek": email_szamlak.lepesek_szoveg(lv["kulcs"] if lv else "alap"),
                 "jelszo_megjegyzes": "Üresen hagyva a régi jelszó marad." if self._szerkesztes and self._regi.get(CONF_JELSZO) else "",
+                **email_szamlak.JELSZO_URL,  # a hibaüzenetek linkjei (hassfest: URL nem lehet a fordításban)
             },
         )
 

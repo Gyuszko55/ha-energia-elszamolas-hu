@@ -579,7 +579,8 @@ class EmailFigyelo:
         ir.async_create_issue(
             self.hass, DOMAIN, issue_id(sid), is_fixable=False, severity=ir.IssueSeverity.WARNING,
             translation_key="jelszo_hianyzik" if err.tipus == "jelszo_hianyzik" else "email_hiba",
-            translation_placeholders={"otthon": self.entry.title, "postafiok": sub.title, "hiba": str(err)[:300]},
+            translation_placeholders={"otthon": self.entry.title, "postafiok": sub.title, "hiba": str(err)[:300],
+                                      **es.JELSZO_URL},
         )
 
     async def _ertesitok(self, er: es.Eredmeny) -> list[dict[str, Any]]:

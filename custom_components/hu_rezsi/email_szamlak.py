@@ -89,6 +89,11 @@ HITELESITES_SZOVEGEK = {
 }
 
 
+# Az alkalmazásjelszó oldalai: a fordítások helykitöltői (gmail_url, yahoo_url, icloud_url).
+JELSZO_URL = {"gmail_url": "https://myaccount.google.com/apppasswords", "yahoo_url": "https://login.yahoo.com/account/security",
+              "icloud_url": "https://account.apple.com"}
+
+
 def hitelesites_szoveg(szerver: str) -> str:
     return HITELESITES_SZOVEGEK.get(levelezo_szerverbol(szerver),
                                     "A bejelentkezés nem sikerült: hibás e-mail cím vagy jelszó (sok levelezőnél külön "

@@ -283,9 +283,9 @@
       },
       "error": {
         "hitelesites": "A bejelentkezés nem sikerült: hibás e-mail cím vagy jelszó. Sok levelezőnél külön alkalmazásjelszó kell – lásd a fenti lépéseket.",
-        "hitelesites_gmail": "A Google nem engedte be: ide alkalmazásjelszó kell, nem a szokásos jelszavad. Készíts egyet itt: https://myaccount.google.com/apppasswords (ehhez a kétlépcsős azonosításnak bekapcsolva kell lennie), és azt másold be.",
-        "hitelesites_yahoo": "A Yahoo nem engedte be: ide alkalmazásjelszó kell. Készíts egyet: https://login.yahoo.com/account/security → Alkalmazásjelszó létrehozása.",
-        "hitelesites_icloud": "Az iCloud nem engedte be: ide alkalmazásspecifikus jelszó kell. Készíts egyet: https://account.apple.com → Bejelentkezés és biztonság → Alkalmazásspecifikus jelszavak.",
+        "hitelesites_gmail": "A Google nem engedte be: ide alkalmazásjelszó kell, nem a szokásos jelszavad. Készíts egyet itt: {gmail_url} (ehhez a kétlépcsős azonosításnak bekapcsolva kell lennie), és azt másold be.",
+        "hitelesites_yahoo": "A Yahoo nem engedte be: ide alkalmazásjelszó kell. Készíts egyet: {yahoo_url} → Alkalmazásjelszó létrehozása.",
+        "hitelesites_icloud": "Az iCloud nem engedte be: ide alkalmazásspecifikus jelszó kell. Készíts egyet: {icloud_url} → Bejelentkezés és biztonság → Alkalmazásspecifikus jelszavak.",
         "hitelesites_outlook": "A Microsoft (Outlook, Hotmail) jelszóval már nem enged be levelezőprogramot. Állíts be továbbítást egy Gmail- vagy Freemail-címre, és azt add meg.",
         "hitelesites_freemail": "A Freemail nem engedte be: ellenőrizd a címet és a jelszót, és hogy a freemail.hu Beállításaiban engedélyezve van-e a levelezőprogramos (IMAP) hozzáférés.",
         "hitelesites_citromail": "A Citromail nem engedte be: ellenőrizd a címet és a jelszót, és hogy a citromail.hu Beállításaiban engedélyezve van-e a levelezőprogramos (IMAP) hozzáférés.",
@@ -477,17 +477,6 @@
       "options": {
         "tarsashaz": "Társasház / lakásszövetkezet",
         "csaladi": "Családi fogyasztói közösség"
-      }
-    },
-    "szobaszam": {
-      "options": {
-        "1": "1",
-        "1.5": "1,5",
-        "2": "2",
-        "2.5": "2,5",
-        "3": "3",
-        "3.5": "3,5",
-        "4": "4"
       }
     },
     "tuzhely": {
@@ -1011,11 +1000,11 @@
     },
     "email_hiba": {
       "title": "Rezsikövető: nem tudom olvasni a(z) „{postafiok}” e-mail fiókot",
-      "description": "A(z) {otthon} otthon „{postafiok}” e-mail fiókjába nem tudok belépni, ezért az e-mailben érkező számlák most nem kerülnek be.\n\nMi a baj: {hiba}\n\n**Javítás:** Beállítások → Eszközök és szolgáltatások → Rezsikövető → {otthon} → „{postafiok}” → ⋮ → Újrakonfigurálás, és add meg újra a jelszót (Gmailnél új alkalmazásjelszót: https://myaccount.google.com/apppasswords). A jelzés magától eltűnik, amint a belépés sikerül; a többi e-mail fiók és a fiókok számolása addig is működik."
+      "description": "A(z) {otthon} otthon „{postafiok}” e-mail fiókjába nem tudok belépni, ezért az e-mailben érkező számlák most nem kerülnek be.\n\nMi a baj: {hiba}\n\n**Javítás:** Beállítások → Eszközök és szolgáltatások → Rezsikövető → {otthon} → „{postafiok}” → ⋮ → Újrakonfigurálás, és add meg újra a jelszót (Gmailnél új alkalmazásjelszót: {gmail_url}). A jelzés magától eltűnik, amint a belépés sikerül; a többi e-mail fiók és a fiókok számolása addig is működik."
     },
     "jelszo_hianyzik": {
       "title": "Rezsikövető: add meg újra az e-mail fiók jelszavát ({postafiok})",
-      "description": "A(z) {otthon} otthon „{postafiok}” e-mail fiókjához nincs jelszó – visszaállítás után ez így van rendjén, mert a mentés a jelszót nem tartalmazza.\n\n**Javítás:** Beállítások → Eszközök és szolgáltatások → Rezsikövető → {otthon} → „{postafiok}” → ⋮ → Újrakonfigurálás (Gmailnél alkalmazásjelszó: https://myaccount.google.com/apppasswords)."
+      "description": "A(z) {otthon} otthon „{postafiok}” e-mail fiókjához nincs jelszó – visszaállítás után ez így van rendjén, mert a mentés a jelszót nem tartalmazza.\n\n**Javítás:** Beállítások → Eszközök és szolgáltatások → Rezsikövető → {otthon} → „{postafiok}” → ⋮ → Újrakonfigurálás (Gmailnél alkalmazásjelszó: {gmail_url})."
     }
   }
 }
