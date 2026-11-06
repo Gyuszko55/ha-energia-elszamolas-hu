@@ -1,5 +1,9 @@
 # Változások
 
+## Rezsikövető 2.4.0b3 – 2026-11-06
+
+- **Számlanaptár (Mátrix): diktálási ablak áramnál is, éves leolvasás ablakkal.** A „D” jel eddig csak ott látszott, ahol a számla a következő ablakot közli (víz); most az áramszámlán közölt havi ablakból (pl. „minden hónap 8–14.”) is – a mostani hónapé, ha még nem múlt el, különben a következőé; közös MVM-számlázásnál (A1 + H) a csoport másik fiókjáé. Az „É” jel az éves leolvasás ablakát mutatja (pl. „É 14.–dec. 1.”), a jel fölé húzva a pontos dátumokkal. Az Elszámolás nézet Diktálás oszlopa is ezt mutatja („havonta”).
+
 ## Rezsikövető 2.4.0b2 – 2026-11-05
 
 - **Javítás: téves „lejárt számla” indulás után.** Közvetlenül a HA indulása után, amíg az első számolás nem futott le, a Díjneten fizetett számlák befizetetlennek látszottak: a hangutasítás lejártnak mondta őket, és az indulás utáni pótló értesítés is tévesen szólhatott. Most az értesítő ilyenkor nem küld (10 perc múlva újra próbálja), a hangutasítás pedig azt feleli: „A számlák adatai még töltődnek, próbáld újra pár perc múlva.” A próbaüzenet is megvárja.

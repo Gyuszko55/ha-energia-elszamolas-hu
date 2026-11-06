@@ -8,7 +8,7 @@
 # Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
 
 > [!WARNING]
-> **A main ágon most a 2.4.0 béta (2.4.0b2) van.** A stabil változat a **2.3.1** – ezt telepíti a Marketplace (HA 2026.11-től) és a HACS, amíg a béta változatokat be nem kapcsolod (Marketplace: a Rezsikövető oldalán a béta-/pre-release kapcsoló; HACS: Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta újdonsága az értesítés a fizetési határidő előtt és a hangutasítások („Van befizetendő számlám?”, „Mennyi lesz a következő gázszámla?”, „Hol tartok a keretben?” …); hibát a GitHub Issues-ban jelezz.
+> **A main ágon most a 2.4.0 béta (2.4.0b3) van.** A stabil változat a **2.3.1** – ezt telepíti a Marketplace (HA 2026.11-től) és a HACS, amíg a béta változatokat be nem kapcsolod (Marketplace: a Rezsikövető oldalán a béta-/pre-release kapcsoló; HACS: Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta újdonsága a számlanaptár diktálási és éves leolvasási jele, az értesítés a fizetési határidő előtt és a hangutasítások („Van befizetendő számlám?”, „Mennyi lesz a következő gázszámla?”, „Hol tartok a keretben?” …); hibát a GitHub Issues-ban jelezz.
 
 > [!IMPORTANT]
 > **Tájékoztató jellegű számítás, nem helyettesíti a szolgáltatói számlát.** A valódi összeg mindig a szolgáltató számláján szerepel.

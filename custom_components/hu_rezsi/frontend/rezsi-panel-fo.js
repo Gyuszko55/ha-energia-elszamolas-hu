@@ -776,7 +776,24 @@ class HuRezsiPanel extends HTMLElement {
   // ---- Mátrix (2.3.0b10): fiók × elszámolási szakasz, ill. fiók × hónap (számlanaptár) ----
   // A cella színe az állapot (pontos/mért, becsült, átalány, teendő, nem vonatkozik); koppintásra a magyarázat felül.
   // Csak a meglévő panel-adatból – új számolás nincs mögötte.
-  _mxCellak(f, ma) {
+  // A következő diktálási ablak [tól, ig] (ISO): az ütemből (víz: a számlán közölt következő ablak), ennek híján a
+  // számlán közölt havi ablakból (MVM áram: minden hónap pl. 8–14.) – a mostani hónapé, ha még nem múlt el, különben
+  // a következőé. havi: true, ha a havi ablakból jön. Közös MVM-számlázásnál (pl. A1 + H) a fiók saját számláin
+  // nincs ablak: ilyenkor a csoport (fejlec.egyenleg.kozos) másik fiókjáé – ugyanazon a napon diktálható mindkét óra.
+  _mxDiktalas(f, ma, tarsak = []) {
+    if (f.utem?.kovetkezo_diktalas) return { dk: f.utem.kovetkezo_diktalas, havi: false };
+    const ablak = (x) => [...(x.szamlak || [])].filter((y) => Array.isArray(y.diktalasi_ablak) && y.tipus !== "storno")
+      .sort((a, b) => (b.kelte || "").localeCompare(a.kelte || ""))[0]?.diktalasi_ablak;
+    const kozos = f.fejlec?.egyenleg?.kozos;
+    const da = ablak(f) || (kozos ? tarsak.filter((t) => t !== f && t.fejlec?.egyenleg?.kozos === kozos).map(ablak).find(Boolean) : null);
+    if (!da || f.megszunt) return null;
+    const ho = new Date(ma.getFullYear(), ma.getMonth() + (ma.getDate() > da[1] ? 1 : 0), 1);
+    const utolso = new Date(ho.getFullYear(), ho.getMonth() + 1, 0).getDate(), p2 = (n) => String(n).padStart(2, "0");
+    const hh = `${ho.getFullYear()}-${p2(ho.getMonth() + 1)}`;
+    return { dk: [`${hh}-${p2(Math.min(da[0], utolso))}`, `${hh}-${p2(Math.min(da[1], utolso))}`], havi: true };
+  }
+
+  _mxCellak(f, ma, tarsak = []) {
     const fe = f.fejlec || {}, fo = fe.folyo || {}, kv = fe.kovetkezo || {}, u = f.utem || {}, es = f.esedekes || {}, eg = fe.egyenleg;
     const fix = f.fix_dij, resz = f.reszszamlas, mod = f.elszamolas_mod, p = u.szamlazas_honap || 1;
     const diktSz = mod === "diktalas" || f.diktalas_szerint;
@@ -815,11 +832,12 @@ class HuRezsiPanel extends HTMLElement {
       c.kov = { s: kv.kesik ? "tenni" : kv.forras === "atalany" ? "ata" : kv.cimke === "pontos" ? "ok" : "becs", t: kel ? `${fejNap(kel)} körül` : "–",
         sub: `${ft(kv.fizetendo ?? kv.dij)}${kv.kesik ? " · késik" : ""}`, r: `${kv.tol ? `${nap(kv.tol)} – ${nap(kv.ig)} időszakra. ` : ""}${kv.magyarazat || ""}` };
     }
-    const dk = u.kovetkezo_diktalas;
+    const dkx = this._mxDiktalas(f, ma, tarsak), dk = dkx?.dk;
     if (dk) {
       const kozel = (new Date(dk[0]) - ma) / 864e5 <= 30;
-      c.dikt = { s: kozel ? "tenni" : "ok", t: `${fejNap(dk[0])} – ${fejNap(dk[1])}`, sub: kozel ? "hamarosan" : null,
-        r: "A diktálási ablak a díjszabás, ill. a számla szerint. A diktált állás a következő számláig felülírja az átalányt." };
+      c.dikt = { s: kozel ? "tenni" : "ok", t: `${fejNap(dk[0])} – ${fejNap(dk[1])}`, sub: kozel ? (dkx.havi ? "havonta · hamarosan" : "hamarosan") : (dkx.havi ? "havonta" : null),
+        r: dkx.havi ? "A számlán közölt havi diktálási ablak (minden hónapban ezekben a napokban diktálható a mérőállás); itt a legközelebbi."
+          : "A diktálási ablak a díjszabás, ill. a számla szerint. A diktált állás a következő számláig felülírja az átalányt." };
     } else c.dikt = diktSz ? { s: "ok", t: "havonta", r: "Diktálás havonta, a szolgáltató ablakában (vagy a szenzor adja)." } : { s: "na", t: "–", r: "Ennél a fióknál nincs diktálás." };
     const ke = u.kovetkezo_elszamolas, el = f.elszamolas || {};
     if (ke && !fix) {
@@ -847,7 +865,7 @@ class HuRezsiPanel extends HTMLElement {
     this._mxAll = this._mxAll || {};
     const all = (this._mxAll[h.entry_id] = this._mxAll[h.entry_id] || { nezet: "elszamolas", val: null });
     const fiokok = h.fiokok.filter((f) => !f.hiba && !f.megszunt);
-    const cellak = Object.fromEntries(fiokok.map((f) => [f.sid, this._mxCellak(f, ma)]));
+    const cellak = Object.fromEntries(fiokok.map((f) => [f.sid, this._mxCellak(f, ma, fiokok)]));
     const e = esc(h.entry_id);
     // Teendők: a narancs cellák (közös folyószámla csak egyszer).
     const tenni = [];
@@ -905,7 +923,9 @@ class HuRezsiPanel extends HTMLElement {
           const kel = uton.length ? null : kv.kelte || f.esedekes?.kovetkezo_datum;
           const varh = [];
           if (kel) { const d = new Date(kel + "T12:00:00"); for (let j = 0; j < 4; j++) { const x = new Date(d.getFullYear(), d.getMonth() + j * p, Math.min(d.getDate(), 28)); varh.push({ h: `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`, n: j ? null : kel, elso: !j }); } }
-          const dk = f.utem?.kovetkezo_diktalas, ke = f.fix_dij ? null : f.utem?.kovetkezo_elszamolas;
+          const dk = this._mxDiktalas(f, ma, fiokok)?.dk, lv = f.fix_dij ? null : f.utem?.kovetkezo_leolvasas;
+          const ke = f.fix_dij || lv ? null : f.utem?.kovetkezo_elszamolas;
+          const tartam = (a, b) => (a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${+b.slice(8)}.` : `${+a.slice(8)}.–${HONAP[+b.slice(5, 7) - 1]} ${+b.slice(8)}.`);
           return `<tr>${fiokCella(f, cellak[f.sid].utem.t)}${honapok.map((m) => {
             const t = (f.szamlak || []).filter((x) => (x.kelte || "").slice(0, 7) === m).sort((a, b) => a.kelte.localeCompare(b.kelte)).map((x) =>
               tetel(x.tipus === "storno" ? "na" : x.tipus === "resz" ? "ata" : "ok", TB[x.tipus] || "?", Number(x.osszeg),
@@ -915,7 +935,8 @@ class HuRezsiPanel extends HTMLElement {
                   nf: !!x.fizetes.nincs_fizetendo, l: !!x.fizetes.lejart } : null }, x.tipus === "storno" ? " mxstorno" : ""));
             if (uton.length && m === maHo) t.push(tetel("tenni", "?", uton[0].osszeg_brutto ?? uton[0].osszeg, { fiok: f.nev, cim: "még nem érkezett számla", o: uton[0].osszeg_brutto ?? uton[0].osszeg, i: [uton[0].tol, uton[0].ig], uton: true }, " mxvarhato"));
             varh.filter((v) => v.h === m).forEach((v) => t.push(tetel(v.elso ? "becs" : "na", "~", kv.fizetendo ?? kv.dij, { fiok: f.nev, cim: v.elso ? "következő várható számla" : "ütem szerint várható", o: kv.fizetendo ?? kv.dij, n: v.n, var: true }, " mxvarhato")));
-            if (dk && dk[0].slice(0, 7) === m) t.push(`<span class="mxjel" title="Diktálási ablak">D ${+dk[0].slice(8)}–${+dk[1].slice(8)}.</span>`);
+            if (dk && dk[0].slice(0, 7) === m) t.push(`<span class="mxjel" title="Diktálási ablak: ${esc(nap(dk[0]))} – ${esc(nap(dk[1]))}">D ${tartam(dk[0], dk[1])}</span>`);
+            if (lv && lv[0].slice(0, 7) === m) t.push(`<span class="mxjel" title="Éves leolvasás (elszámolás) ablaka: ${esc(nap(lv[0]))} – ${esc(nap(lv[1]))}">É ${tartam(lv[0], lv[1])}</span>`);
             if (ke && ke.slice(0, 7) === m) t.push(`<span class="mxjel" title="Éves elszámolás, leolvasás">É ${+ke.slice(8)}.</span>`);
             return `<td class="${t.length ? "mxnc" : "mxures"}${m === maHo ? " mxmostosz" : ""}">${t.join("")}</td>`;
           }).join("")}</tr>`;
@@ -929,7 +950,7 @@ class HuRezsiPanel extends HTMLElement {
         }).join("")}</tr>`).join("")}</tbody></table>`;
     }
     const jelm = all.nezet === "naptar"
-      ? `<span class="mx-ok"><span class="mxbetu">E</span>elszámoló</span><span class="mx-ata"><span class="mxbetu">R</span>részszámla</span><span class="mx-ok"><span class="mxbetu">Sz</span>számla, <span class="mxbetu">Ő</span>előírás</span><span class="mx-na"><span class="mxbetu">S</span>sztornó</span><span class="mx-becs mxvarhato"><span class="mxbetu">~</span>következő várható</span><span class="mx-tenni mxvarhato"><span class="mxbetu">?</span>még nem érkezett</span><span><span class="mxjel">D</span>diktálási ablak</span><span><span class="mxjel">É</span>éves elszámolás</span>`
+      ? `<span class="mx-ok"><span class="mxbetu">E</span>elszámoló</span><span class="mx-ata"><span class="mxbetu">R</span>részszámla</span><span class="mx-ok"><span class="mxbetu">Sz</span>számla, <span class="mxbetu">Ő</span>előírás</span><span class="mx-na"><span class="mxbetu">S</span>sztornó</span><span class="mx-becs mxvarhato"><span class="mxbetu">~</span>következő várható</span><span class="mx-tenni mxvarhato"><span class="mxbetu">?</span>még nem érkezett</span><span><span class="mxjel">D</span>diktálási ablak</span><span><span class="mxjel">É</span>éves leolvasás, elszámolás</span>`
       : Object.entries(ALL).map(([k, n]) => `<span class="mx-${k}"><i class="mxnegyzet"></i>${n}</span>`).join("");
     return `<div class="mxlap"><div class="mxfej">${teendo}${valto}</div><div class="mxreszlet" aria-live="polite">${reszlet}</div>
       <div class="tablagorgeto mxgorgo">${tabla}</div><div class="mxjelm">${jelm}</div>

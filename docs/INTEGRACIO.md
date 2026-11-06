@@ -1,4 +1,4 @@
-# Rezsikövető integráció (2.4.0b2 – béta, 2026-11-05)
+# Rezsikövető integráció (2.4.0b3 – béta, 2026-11-06)
 
 > **Tájékoztató jellegű számítás, a hivatalos számlát nem helyettesíti.**
 > A 0.1 a v1 YAML-csomag tudását hozza integrációként. A víz, a gáz MJ-alapú elszámolása és a napelem a következő lépcsőkben jön (lásd `docs/terv/04_UTEMTERV.md`).
