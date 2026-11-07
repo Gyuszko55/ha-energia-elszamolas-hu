@@ -49,6 +49,7 @@ def test_uton_rendezett_kimarad():
     lz = [{"tol": "2026-09-29", "ig": "2026-10-09", "osszesen_ft": 5004, "mennyiseg": 102.4}]
     u = _uton_szamlak(sub, t, lz, date(2026, 11, 5))
     assert [(x["tol"], x["ig"], x["osszeg"]) for x in u] == [("2026-09-30", "2026-10-09", 5004)]
+    assert u[0]["kezdet"] == "2026-09-29"  # a kijelzett kezdet a leolvasás napja; a tol marad azonosító
     t["rendezett_uton"] = [{"tol": "2026-09-30", "ig": "2026-10-09", "osszeg": 5004}]
     assert _uton_szamlak(sub, t, lz, date(2026, 11, 5)) == []
 

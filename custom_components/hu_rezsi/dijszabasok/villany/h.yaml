@@ -24,7 +24,7 @@ verziok:
           keret: {tipus: nincs}
           ar: energia_teli
         - nev: nyari           # idényen kívül (1.82): az A1 szabályai és árai, a H-mérőre külön 2523 kWh/év kerettel
-                               # (csak az idényen kívüli napokra, az elszámolási évben halmozva), felette piaci ár
+                               # (csak az idényen kívüli napokra, az idényen belül halmozva), felette piaci ár
           dijszabas: villany/a1
           sajat_keret: true
     dijak:

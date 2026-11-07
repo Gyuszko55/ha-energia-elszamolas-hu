@@ -124,3 +124,10 @@ def test_atalany_varhato_dij_az_atalany():
     assert (dikt["varhato"], dikt["tajekoztato"], "varhato_atalany" in dikt) == (7500, False, False)
     # Diktálás szerint számlázott fióknál a mért díj marad.
     assert folyo_idoszak(f | {"diktalas_szerint": True})["varhato"] == 7500
+
+
+def test_lezart_idoszak_kijelzett_kezdete_a_leolvasas_napja():
+    """Lezárt, még nem számlázott diktálásos időszak: a tol azonosító marad, a kezdet a leolvasás napja."""
+    f = MERT | {"uton_szamlak": [{"tol": "2026-10-02", "kezdet": "2026-10-01", "ig": "2026-11-01", "osszeg": 4000, "mennyiseg": 60}]}
+    k = kovetkezo_szamla(f, {}, date(2026, 11, 6))
+    assert (k["tol"], k["kezdet"], k["ig"]) == ("2026-10-02", "2026-10-01", "2026-11-01")

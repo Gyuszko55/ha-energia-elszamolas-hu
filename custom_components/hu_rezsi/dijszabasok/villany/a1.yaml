@@ -20,14 +20,15 @@ verziok:
       keret:
         tipus: napi_aranyos
         ev_mennyiseg: 2523     # kWh/év; a számlán a keret egész kWh (26 nap → 180 kWh)
+        ev_kezdet: "08-01"     # kedvezményes év: aug. 1. – júl. 31. (4/2011. NFM rendelet 6. § (3)), nem az éves leolvasás
         kerekites: 0
         tetel_hatar: "08-01"   # MVM: a számla aug. 1-jén két tételre bomlik, a keret tételenként kerekítve (2023–2025 számlák)
-        # Az elszámolási évben HALMOZVA: a kedvezményes rész az év elejétől a halmozott fogyasztás és a halmozott
-        # keret kisebbike (a ki nem használt keret később jár; MVM-számlán „sávkorrekció”). Elszámolási év: az éves
-        # elszámoló leolvasástól a következő éves elszámoló leolvasásig; a keret csak ezen belül csoportosítható át,
-        # a következő évre nem vihető át. Ugyanígy működik a B (vezérelt) és a H-tarifa nyári (1.82) regiszterén,
-        # mérőnként külön 2523 kWh-val; felette lakossági piaci ár.
-        # Ellenőrizve: Kertes ház 2024/25 éve (2524 vs 2523 kWh) és 2026-08-09–09-09 (221+52=273 kWh).
+        # A kedvezményes évben HALMOZVA: a kedvezményes rész az év elejétől a halmozott fogyasztás és a halmozott
+        # keret kisebbike (a ki nem használt keret később jár; MVM-számlán „sávkorrekció”). A kedvezményes év aug. 1.
+        # – júl. 31.; a keret csak ezen belül csoportosítható át, az éves leolvasásnak nincs köze hozzá. Ugyanígy
+        # működik a B (vezérelt) tarifán, és külön mérő, külön 2523 kWh a H-tarifa nyári (1.82) regiszterén, ahol az
+        # év az idény eleje (6. § (1)); felette lakossági piaci ár.
+        # Ellenőrizve: Kertes ház számlái 2024/25-től, és 2026-08-09–09-09 (221+52=273 kWh: csak aug. 1–8. maradéka).
         osszesitett: true
       alapdij:
         mod: idoszakonkent     # számlánként 1 havi alapdíj, nem napra arányosítva

@@ -81,7 +81,7 @@ from .szamla_import import (
     IMPORT_VERZIO, befizetesek_egyesitese, folyoszamla_meta, hozzatartozik, mappas_adatok_torlese, regiszter_rogzit, szamla_meta, atalany_szamitas, esedekes, rogzit, szamla_statisztika, szamlazasi_ablak,
     szamlazasi_eltolas, ujraertekel, sajat_ertek, kezi_idoszak_potlas, automatikus_rendezes, storno_parositas,
 )
-from . import fizetes, kimutatas, sziget_ha
+from . import fizetes, kifogas, kimutatas, sziget_ha
 from .modell import kovetkezo_idopont, szenzor_ertek, frissitesi_perc, FORRAS_PROBAK
 from .motor.kovetkezo_szamla import diktalas_szerint_szamlaz, kovetkezo_szamla_idoszak
 from .modell import utem_szerinti_diktalas, kezdo_origo_szinkron, kezdopont, mero_szinkron, diktalasi_ablak, diktalasi_hatarok, betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
@@ -97,7 +97,7 @@ from .motor.egyenleg import (
     honap_mulva,
     varhato_elszamolas,
 )
-from .motor.elszamolas import _hozzarendeles, _keret_nyers, _kerekit_keret, _modhoz, elszamolt_mennyiseg, eves_keret_kezdete, futoertek, idenyszak
+from .motor.elszamolas import aram_ev_kezdete, _hozzarendeles, _keret_nyers, _kerekit_keret, _modhoz, elszamolt_mennyiseg, eves_keret_kezdete, futoertek, idenyszak
 from .motor.dijszabas import DijszabasHiba, DijszabasTar
 from .motor.elorejelzes import NyitottIdoszak, idoszak, nyitott
 from .motor.elszamolas import szamol
@@ -150,6 +150,7 @@ class FiokAllapot:
     nyitott: NyitottIdoszak | None = None
     eves_bazis: date | None = None
     eves_fogyasztas: Decimal | None = None
+    eves_kezdet: date | None = None  # az Éves fogyasztás számolásának kezdete (áram: a jogszabály szerinti év)
     aktualis_ar: Decimal | None = None
     utolso_lezart: dict[str, Any] | None = None
     egyenleg: EvesEgyenleg | None = None
@@ -208,7 +209,7 @@ def _uton_szamlak(sub: ConfigSubentry, tarolt: dict[str, Any], lezartak: list[di
             continue
         out.append({"tol": (tol + timedelta(days=1)).isoformat() if dikt else lz["tol"],
                     "ig": (ig if dikt else ig - timedelta(days=1)).isoformat(), "osszeg": int(lz["osszesen_ft"]),
-                    "mennyiseg": lz.get("mennyiseg")})
+                    "mennyiseg": lz.get("mennyiseg"), "kezdet": lz["tol"]})  # kezdet: a kijelzett kezdőnap (a leolvasás napja)
     return out
 
 
@@ -1247,9 +1248,20 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         ny = self._viz_potlek(sub, fiok, ny, tol, ig, most)
         keret_ev = self._gaz_eves_keret(sub, fiok, szamlalo, most)
         eves = None
-        if fiok.eves_bazis:
+        # Éves fogyasztás: áramnál a jogszabály szerinti évtől (kedvezményes év, H: a nyári idény elejétől), a többi
+        # közműnél az éves leolvasástól. Az első adat előtt nincs mit számolni: onnan indul.
+        eves_kezdet = fiok.eves_bazis
+        if sub.data.get(CONF_KOZMU) == "villany":
             try:
-                bazis = datetime.combine(fiok.eves_bazis, datetime.min.time())
+                jogi = aram_ev_kezdete(self.tar.felold(_hozzarendeles(fiok, most.date()), most.date(), fiok.szolgaltato, fiok.feluliras), most.date())
+            except DijszabasHiba:
+                jogi = None
+            if jogi:
+                elsok = [sz.pontok[0].ido.date() for sz in szamlalok if sz.pontok]
+                eves_kezdet = max([jogi, *elsok])
+        if eves_kezdet:
+            try:
+                bazis = datetime.combine(eves_kezdet, datetime.min.time())
                 eves = sum(
                     (sz.fogyasztas(bazis, most)[0] for sz, cs in zip(szamlalok, fiok.csatornak, strict=True) if cs.szerep != "almero"),
                     Decimal(0),
@@ -1355,7 +1367,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 elszamolas = None
                 if not diktalt_e.get("becsult") and diktalt_e["tol"] not in {x.get("tol") for x in tarolt.get("rendezett_uton") or []}:
                     uton = [*(uton or []), {"tol": diktalt_e["tol"], "ig": diktalt_e["datum"],
-                                            "osszeg": diktalt_e["osszeg"], "mennyiseg": diktalt_e["mennyiseg"]}]
+                                            "osszeg": diktalt_e["osszeg"], "mennyiseg": diktalt_e["mennyiseg"],
+                                            "kezdet": (d(diktalt_e["tol"]) - timedelta(days=1)).isoformat()}]
         if not diktalas_szerint or (diktalt_e or {}).get("kozos"):
             self._kozos_ip.pop(sid, None)
         szamla_allasok = self._szamla_alapu_allasok(tarolt, most) if atalany_e else None
@@ -1486,7 +1499,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 ig=ig,
                 nyitott=ny,
                 eves_bazis=fiok.eves_bazis,
-                eves_fogyasztas=eves,
+                eves_fogyasztas=eves, eves_kezdet=eves_kezdet,
                 aktualis_ar=self._aktualis_ar(fiok, ny, most),
                 utolso_lezart=lezartak[-1] if lezartak else None,
                 egyenleg=egyenleg,
@@ -2502,42 +2515,32 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             self.hass, f"{sab['uzenet']} Fájl: {sab['fajl']} (megosztható – személyes adatot nem tartalmaz).",
             title="Rezsikövető – új számlabeolvasó", notification_id=f"{DOMAIN}_sablon_{sab['azonosito']}")
 
-    async def eves_kimutatas(self, sid: str, ev_tol: date | None = None) -> dict[str, Any]:
-        """Éves elszámolási kimutatás (MVM villany, A1 és H): a két éves leolvasás közötti év a mérőállások és a díjszabás
-        szerint, számlánként szembeállítva az elszámoló számlákkal (kimutatas.kimutatas). ev_tol: a választott év
-        kezdő leolvasása (alapból a legutóbbi teljes év)."""
+    async def kifogas_tervezet(self, sid: str, ev_tol: date | None = None) -> dict[str, Any]:
+        """Számlakifogás-tervezet az éves kimutatásból és a közös folyószámla kivonatából (kifogas.tervezet)."""
+        k = await self.eves_kimutatas(sid, ev_tol, kifogashoz=True)
+        return kifogas.tervezet(k, self.folyoszamla(sid, True))
+
+    async def eves_kimutatas(self, sid: str, ev_tol: date | None = None, kifogashoz: bool = False) -> dict[str, Any]:
+        """Elszámolási kimutatás (MVM villany, A1 és H) a jogszabály szerinti időszakokra: A1 kedvezményes év (aug. 1. –
+        júl. 31.), H nyári és téli idény; az éves leolvasás nem fordulópont. A számlánkénti összevetés az időszakot érintő
+        számlákat veti össze egészben (nyomtatott értékkel), a mérőállások és a díjszabás szerint (kimutatas.kimutatas).
+        ev_tol: a választott időszak első napja (alapból az utolsó lezárt). kifogashoz: az összevetés a választott időszak
+        első számlájától a legutóbbi számláig tart, mert a kimaradt fogyasztást későbbi számla pótolhatja."""
         sub = self.fiokok()[sid]
         tarolt = self.tarolo.fiok(sid)
         dsz = sub.data.get(CONF_DIJSZABAS)
         if dsz not in ("villany/a1", "villany/h"):
-            raise ValueError("Éves kimutatás csak A1 és H díjszabású villanyfióknál készül.")
+            raise ValueError("A kimutatás csak A1 és H díjszabású villanyfióknál készül.")
         fiok = self._otthon_bazissal(sub, fiok_motorba(dict(sub.data), tarolt))
-        # Évhatárok: a fiók éves (elszámoló) leolvasásai – a szerződésváltás miatti kényszerített évkezdet nélkül –, a
-        # mérő kezdőállása és az otthon közös éves leolvasása.
-        napok = {d(lo["datum"]) for m in tarolt.get("merok", []) for lo in m.get("leolvasasok", [])
-                 if lo.get("elszamolasi") and not lo.get("evkezdet")}
-        if origo := tarolt.get("kezdo_origo"):
-            napok.add(d(origo["datum"]))
-        if kozos := self._otthon_eves_leolvasas("villany"):
-            napok.add(kozos)
-        jeloltek = kimutatas.ev_jeloltek(sorted(napok))
-        if not jeloltek:
-            raise ValueError("Ehhez két éves leolvasás (vagy kezdőállás és éves leolvasás) kell.")
-        # Alapból a legutóbbi legalább ~5 hónapos év (a H-idényváltás is jelölt elszámoló leolvasás lehet).
-        alap = next((x for x in jeloltek if (x[1] - x[0]).days >= 150), jeloltek[0])
-        tol, ig = next((x for x in jeloltek if ev_tol and x[0] == ev_tol), alap)
-        csatorna_alias = {"vetelezes": ("vetelezes", "fo")}
+        origo = tarolt.get("kezdo_origo")
+        # A rögzített állások mellett a számlák bontásából számolt év- és idényhatár is pontos állás (nem becslés).
+        hatarok_ = [u for u in kimutatas.evhatar_allasok(dsz, tarolt.get("szamlak") or {}, lambda c: kimutatas.tarolt_pontok(tarolt, c, folytonos=True)) if u["mod"] == "tetelek"]
+
+        def pontok_(csat: str) -> list[tuple[date, Decimal]]:
+            return sorted(kimutatas.tarolt_pontok(tarolt, csat, folytonos=True) + [(d(u["datum"]), Decimal(str(u["allas"]))) for u in hatarok_ if u["csatorna"] == csat])
 
         def allas(csat: str, nap: date) -> tuple[Decimal, bool] | None:
-            pontok = sorted(
-                [(d(lo["datum"]), Decimal(str(lo["allas"])))
-                 for m in tarolt.get("merok", []) for lo in m.get("leolvasasok", [])
-                 if (lo.get("csatorna") or "vetelezes") in csatorna_alias.get(csat, (csat,)) and lo.get("tipus") != "automatikus"]
-                # a mérő kezdőállása (beépítés) is mérőállás – nincs mindig leolvasásként rögzítve
-                + [(d(m["beepitve"]), Decimal(str(k)))
-                   for m in tarolt.get("merok", []) if m.get("beepitve")
-                   and (k := m.get("kezdo_allas" if csat == "vetelezes" else f"kezdo_{csat}")) not in (None, "")]
-            )
+            pontok = pontok_(csat)
             pontos = [a for n, a in pontok if n == nap]
             if pontos:
                 return pontos[-1], True
@@ -2551,13 +2554,47 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         def arak(azon: str, nap: date) -> dict[str, Any]:
             return self.tar.felold(azon, nap, sub.data[CONF_SZOLGALTATO], fiok.feluliras).dijak
 
-        a1 = self.tar.felold("villany/a1", ig, sub.data[CONF_SZOLGALTATO], fiok.feluliras)
+        ma = date.today()
+        a1 = self.tar.felold("villany/a1", ma, sub.data[CONF_SZOLGALTATO], fiok.feluliras)
         keret = (a1.szabalyok.get("keret") or {})
+        hatar = keret.get("ev_kezdet") or "08-01"
+        szl = tarolt.get("szamlak") or {}
+        csatornak = ("h_teli", "h_nyari") if dsz == "villany/h" else ("vetelezes",)
+        mind = [p for c in csatornak for p in pontok_(c)]
+        if not mind:
+            raise ValueError("Ehhez legalább egy mérőállás kell.")
+        elso, utolso = min(p[0] for p in mind), max(p[0] for p in mind)
+        lista = kimutatas.jogi_lista(dsz, ma, elso, hatar)
+        # Alapból az utolsó lezárt időszak (H: nyári idény); ha még nincs, a folyamatban lévő.
+        alap = next((x for x in lista if x["allapot"] == "lezart" and x["fajta"] != "teli"), lista[0])
+        val = next((x for x in lista if ev_tol and x["tol"] == ev_tol), alap)
+        erintett = kimutatas.elszamolok(szl, val["tol"] - timedelta(days=1), min(val["ig"], ma))
+        erintett = [x for x in erintett if d(x["idoszak"][1]) >= val["tol"]]
+        tol = d(erintett[0]["idoszak"][0]) - timedelta(days=1) if erintett else val["tol"] - timedelta(days=1)
+        # A mérő felszerelése csak akkor az eleje, ha előtte tényleg nincs mérőállás (a nyitó dátum önmagában nem évhatár).
+        kezdo = bool(origo) and d(origo["datum"]) >= tol and elso >= d(origo["datum"])
+        if kezdo:
+            tol = d(origo["datum"])
+        tol = max(tol, elso)
+        if kifogashoz:
+            osszes = kimutatas.elszamolok(szl, tol, ma)
+            ig = d(osszes[-1]["idoszak"][1]) if osszes else min(val["ig"], ma, utolso)
+        else:
+            ig = max(d(erintett[-1]["idoszak"][1]) if erintett else tol, min(val["ig"], ma, utolso))
         eredmeny = kimutatas.kimutatas(
-            dsz, tol, ig, allas, tarolt.get("szamlak") or {}, arak,
-            keret_ev=Decimal(str(keret.get("ev_mennyiseg", 2523))), tetel_hatar=keret.get("tetel_hatar"),
-            kezdo=bool(origo) and d(origo["datum"]) == tol,
+            dsz, tol, ig, allas, szl, arak,
+            keret_ev=Decimal(str(keret.get("ev_mennyiseg", 2523))), tetel_hatar=keret.get("tetel_hatar"), kezdo=kezdo,
         )
+        if kifogashoz and ig > (idoszak_ig := max(d(erintett[-1]["idoszak"][1]) if erintett else tol, min(val["ig"], ma, utolso))) and not kimutatas.kesobbi_szamla_kell(eredmeny, idoszak_ig):
+            # A későbbi számlákra csak akkor van szükség, ha az időszak fogyasztását pótolják.
+            ig = idoszak_ig
+            eredmeny = kimutatas.kimutatas(
+                dsz, tol, ig, allas, szl, arak,
+                keret_ev=Decimal(str(keret.get("ev_mennyiseg", 2523))), tetel_hatar=keret.get("tetel_hatar"), kezdo=kezdo,
+            )
+        eredmeny["valasztott"] = val["tol"].isoformat()
+        eredmeny["jogi_idoszakok"] = kimutatas.jogi_idoszakok(
+            dsz, ma, pontok_, allas, szl, arak, keret_ev=Decimal(str(keret.get("ev_mennyiseg", 2523))), hatar=hatar, valasztott=val["tol"])
         ugyfel = max(((x.get("kelte") or "", x["ugyfel"]) for x in (tarolt.get("szamlak") or {}).values() if x.get("ugyfel")), default=None)
         dij_a1 = arak("villany/a1", ig)
         # Pénzügyi teljesítés: az elszámoló sorok fizetése, és az év összes (nem sztornó) számlája – amelynek időszaka az
@@ -2583,8 +2620,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             "nyitott_db": sum(1 for a_ in fizetendo if not a_["fizetve"]),
             "jovairas_ft": sum(b_["fizetes"]["osszeg"] for b_ in bef if b_["fizetes"] and (b_["fizetes"]["osszeg"] or 0) < 0),
         }
+        allas_napok = sorted({tol.isoformat(), ig.isoformat(), *(s["ig"] for s in eredmeny["sorok"]),
+                              # a választott időszak két határa is látszódjon, ha van rá mérőállás
+                              *(n_.isoformat() for c in (("h_teli", "h_nyari") if dsz == "villany/h" else ("vetelezes",))
+                                for n_ in (val["tol"] - timedelta(days=1), val["ig"]) if tol <= n_ <= ig and allas(c, n_))})
         return eredmeny | {
-            "fiok": sub.title, "jeloltek": [[a.isoformat(), b.isoformat()] for a, b in jeloltek],
+            "fiok": sub.title, "jeloltek": [{"tol": x["tol"].isoformat(), "ig": x["ig"].isoformat(), "fajta": x["fajta"], "nev": x["nev"], "allapot": x["allapot"]} for x in lista],
             "ugyfel": ugyfel[1] if ugyfel else {}, "mero": (tarolt.get("merok") or [{}])[-1].get("gyari_szam"),
             "szolgaltato": (self.tar.szolgaltatok.get(sub.data.get(CONF_SZOLGALTATO)) or {}).get("nev"),
             "dijak": {"a1": {k: float(v) for k, v in dij_a1.items() if isinstance(v, (int, float, Decimal))},
@@ -2592,9 +2633,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             "keret_ev": float(keret.get("ev_mennyiseg", 2523)),
             "allasok": {
                 c: {x: (float(v[0]) if (v := allas(c, date.fromisoformat(x))) else None)
-                    for x in sorted({tol.isoformat(), ig.isoformat(), *(s["ig"] for s in eredmeny["sorok"])})}
+                    for x in allas_napok}
                 for c in (("h_teli", "h_nyari") if dsz == "villany/h" else ("vetelezes",))
             },
+            "allasok_becsult": sorted({x for c in (("h_teli", "h_nyari") if dsz == "villany/h" else ("vetelezes",)) for x in allas_napok
+                                       if (v := allas(c, date.fromisoformat(x))) and not v[1]}),
+            "merocsere": len(tarolt.get("merok") or []) > 1,
         }
 
     async def tetelek(self, sid: str, tol: date, ig: date) -> dict[str, Any]:
@@ -3221,9 +3265,9 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 tarolt["szamlak"][k]["allasok"] = v
             tarolt["allas_potlas"] = 1
             valtozott = True
-        if tarolt.get("tetel_potlas", 0) < 1 and tarolt.get("szamlak"):
-            # MVM áram: a számlarészletező tételei (az éves kimutatáshoz) és a levont részszámlák (az XML-ben nincsenek
-            # benne – a PDF-párból) – az utolsó ~2 év számláira.
+        if tarolt.get("tetel_potlas", 0) < 3 and tarolt.get("szamlak"):
+            # MVM áram: a számlarészletező tételei (az éves kimutatáshoz; 3: minden tétel a saját időszakával) és a levont
+            # részszámlák (az XML-ben nincsenek benne – a PDF-párból) – az utolsó ~2 év számláira.
             hatar = (date.today() - timedelta(days=800)).isoformat()
             jeloltek = [(k, x["fajl"]) for k, x in tarolt["szamlak"].items()
                         if x.get("fajl") and x.get("forras") == "mvm_aram" and x.get("tipus") != "storno" and x.get("kelte", "") >= hatar]
@@ -3240,7 +3284,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
 
             for k, v in (await self.hass.async_add_executor_job(potol_tetel)).items():
                 tarolt["szamlak"][k].update(v)
-            tarolt["tetel_potlas"] = 1
+            tarolt["tetel_potlas"] = 3
             valtozott = True
         if tarolt.get("meta_potlas", 0) < 5 and tarolt.get("szamlak"):
             # Gáz: az elszámoló számlák végleges fűtőértéke és korrekciós tényezője (pl. 1,018) a lefedett hónapokra –
@@ -3495,10 +3539,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         keret = _modhoz(fiok, e.szabalyok.get("keret")) or {}
         if not keret.get("ev_mennyiseg"):
             return None
-        if beallitas.reszszamlas(sub.data) and fiok.eves_bazis:
+        if beallitas.reszszamlas(sub.data) and fiok.eves_bazis and not keret.get("ev_kezdet"):
             tol = eves_keret_kezdete(fiok.eves_bazis, ma)  # az évfordulón megújul, új éves leolvasás nélkül is
         else:
             tol = date(ma.year if (ma.month, ma.day) >= (8, 1) else ma.year - 1, 8, 1)
+        if szamlalo.pontok and (elso := szamlalo.pontok[0].ido.date()) > tol:
+            tol = elso  # év közben indult mérés: a felhasznált mennyiség az első adattól
         try:
             felh = elszamolt_mennyiseg(szamlalo, tol, ma + timedelta(days=1), e.szabalyok.get("atvaltas"), fiok)
         except NincsAdat:
@@ -3689,9 +3735,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
 
 def _utolso_szamla(tarolt: dict[str, Any]) -> dict[str, Any] | None:
     sz = tarolt.get("szamlak") or {}
-    if not sz:
+    torolt = szamlak.sztornozott_kulcsok(sz)  # a stornó és az általa érvénytelenített számla nem „utolsó számla”
+    jo = {k: x for k, x in sz.items() if x.get("tipus") != "storno" and k not in torolt}
+    if not jo:
         return None
-    sorszam, x = max(sz.items(), key=lambda kv: kv[1]["kelte"])
+    sorszam, x = max(jo.items(), key=lambda kv: kv[1]["kelte"])
     return {"sorszam": sorszam, **x, "szamlak_szama": len(sz)}
 
 

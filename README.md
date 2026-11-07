@@ -7,9 +7,6 @@
 
 # Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
 
-> [!WARNING]
-> **A main ágon most a 2.4.0 béta (2.4.0b3) van.** A stabil változat a **2.3.1** – ezt telepíti a Marketplace (HA 2026.11-től) és a HACS, amíg a béta változatokat be nem kapcsolod (Marketplace: a Rezsikövető oldalán a béta-/pre-release kapcsoló; HACS: Rezsikövető → ⋮ → Újraletöltés → „Béta verziók mutatása”). A béta újdonsága a számlanaptár diktálási és éves leolvasási jele, az értesítés a fizetési határidő előtt és a hangutasítások („Van befizetendő számlám?”, „Mennyi lesz a következő gázszámla?”, „Hol tartok a keretben?” …); hibát a GitHub Issues-ban jelezz.
-
 > [!IMPORTANT]
 > **Tájékoztató jellegű számítás, nem helyettesíti a szolgáltatói számlát.** A valódi összeg mindig a szolgáltató számláján szerepel.
 
@@ -27,11 +24,17 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 |---|---|---|
 | **Telepítési és kezelési kézikönyv** – telepítéstől a hibaelhárításig, mezőnként | aki telepíti és beállítja | [Markdown](docs/KEZIKONYV.md) · [PDF](docs/Rezsikoveto_kezikonyv.pdf) |
 | **Képes útmutató** – a mindennapi használat számozott képekkel (A4, nyomtatható) | aki használja | [PDF](docs/Rezsikoveto_kepes_utmutato.pdf) |
-| **A panel értékei** – infografika: az összesítő és a fiókkártyák (mért, átalányos) értékei számozva, miből számolódnak (A4, nyomtatható) | aki használja | [HTML](docs/rendszer/Panel_ertekei.html) · [PDF](docs/rendszer/Panel_ertekei.pdf) |
-| **Számlafeldolgozás** – folyamatábra: mit bont ki a számlából, melyik mérőállást fogadja el, mit számol belőle, hogyan veti össze a saját méréssel (A4 fekvő, nyomtatható) | aki érteni akarja | [HTML](docs/rendszer/Szamlafeldolgozas.html) · [PDF](docs/rendszer/Szamlafeldolgozas.pdf) |
 | Integráció – műszaki leírás, számlák felvitele | haladó | [Markdown](docs/INTEGRACIO.md) |
 | Tervek – adatmodell, díjszabás-formátum, elszámoló motor, ütemterv | fejlesztő | [`docs/terv/`](docs/terv/) |
 | Változások | mindenki | [CHANGELOG](CHANGELOG.md) |
+
+## Újdonságok a 2.4.0-ban (2026. november 7.)
+
+- **Értesítés a határidő előtt, hangon is:** a telefonodra szól (Home Assistant mobilalkalmazás), ha egy számla határideje közeleg – alapból 3 nappal előtte, beállítható, ki-be kapcsolható –, és egyszer, ha lejárt és még nincs befizetve. Az Assisttól meg is kérdezheted: *„Van befizetendő számlám?”*, *„Mennyi lesz a következő gázszámla?”*, *„Mennyi a rezsi eddig?”*, *„Hol tartok a keretben?”*, *„Mennyi volt az utolsó villanyszámla?”*. Útmutató: [kézikönyv 7.5.2–7.5.3](docs/KEZIKONYV.md#752-értesítés-a-mobilra-a-fizetési-határidő-előtt-240).
+- **Számlakifogás-tervezet az éves kimutatásból:** részletes, szerkeszthető levél mellékletekkel (számlánkénti összevetés, levezetés, folyószámla-egyeztetés, számlajegyzék). Előtte ellenőriz, és ha valami nem jön ki, levél helyett az okot mutatja. Szabály alapú, AI nélkül; tájékoztató, nem jogi tanács.
+- **Kedvezményes keret a jogszabály szerinti évre:** áramnál aug. 1. – júl. 31., a H-tarifánál a nyári idény. Az éves kimutatás és az Éves fogyasztás szenzor is ezekre az időszakokra áll, az éves leolvasás csak az átalány elszámolásához tartozik.
+- **Év- és idényhatár a mérőállások között (◆):** a számla bontásából számolt állás, innen számol a kedvezményes év.
+- **„MVM Áram” egy sorban:** a közös folyószámlás áramfiókok a táblázatokban összevonva. **Diktálás kész jelzése** a Mátrixban és a fiók lapján; a számlanaptárban a diktálási és az éves leolvasási ablak áramnál is.
 
 ## Újdonságok a 2.3.0-ban (2026. november 5.)
 
@@ -41,7 +44,6 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 
 ## Újdonságok a 2.2.0-ban (2026. november 4.)
 
-- **Értesítés a határidő előtt, hangon is:** a telefonodra szól (Home Assistant mobilalkalmazás), ha egy számla határideje közeleg – alapból 3 nappal előtte, beállítható, ki-be kapcsolható –, és egyszer, ha lejárt és még nincs befizetve. Az Assisttól meg is kérdezheted: *„Van befizetendő számlám?”*, *„Mennyi lesz a következő gázszámla?”*, *„Mennyi a rezsi eddig?”*, *„Hol tartok a keretben?”*, *„Mennyi volt az utolsó villanyszámla?”*. Útmutató: [kézikönyv 7.5.2–7.5.3](docs/KEZIKONYV.md#752-értesítés-a-mobilra-a-fizetési-határidő-előtt-240).
 - **Számlák e-mailből:** a Rezsikövető maga kiolvassa a postafiókból a szolgáltatók e-mailes számláit (csak olvas, semmit nem töröl), és a számla tartalma – mérő gyári száma, mérési pont, szolgáltató – alapján a jó fiókba sorolja. Beállítás a panelen a **📧 Számlák e-mailből** gombbal, pár kattintással. Útmutató: [kézikönyv 9.8](docs/KEZIKONYV.md#98-számlák-e-mailből--lépésről-lépésre) és [Számlák e-mailből (PDF)](docs/Szamlak_emailbol.pdf).
 - **Saját díjak a fiókkártyán:** a víz- és a fix díjas fiókoknál (hulladék, közös költség, internet/TV/telefon) a településenként vagy edényméret szerint eltérő díjak a saját számláról, bruttóban, „érvényes ettől” dátummal – a Fejlesztői eszközök nélkül.
 - **A fix díj a számlákból:** ha a havidíjat kézzel nem adtad meg, és a legutóbbi két teljes időszakos számla ugyanannyi, de eltér a beépített díjtól (pl. MOHU), a Rezsikövető a számlák díját veszi át, értesítéssel.
@@ -59,7 +61,7 @@ Minden változás: [CHANGELOG](CHANGELOG.md).
 - **Gázmérő nélküli gázátalány** (csak gáztűzhely): havi fix MJ szobaszám és tűzhely szerint (MVM-táblázat), 2,465 Ft/MJ.
 - **Dinamikus fiók-varázsló:** csak a választott díjszabáshoz tartozó kérdések.
 - **Gáz kedvezményes keret a fizetés módja szerint:** diktálásnál havonta súlyozott (MVM-táblázat, télen több), a kedvezményes évben (aug. 1. – júl. 31.) halmozva; átalánynál éves. Lakossági (20 m³/h alatti és feletti mérő) és fogyasztói közösségi díjszabás az MVM árlapja szerint.
-- **MVM sávkorrekció:** a kedvezményes keret (mérőnként 2 523 kWh/év, napi arányosan) az A1, a B (vezérelt) és a H-tarifa nyári (1.82) regiszterén jár, felette lakossági piaci ár. A keret az elszámolási évben – az éves elszámoló leolvasástól a következő éves elszámoló leolvasásig – halmozódik, ahogy az MVM számláz: a korábban ki nem használt keret később jóváíródik, de a következő elszámolási évre nem vihető át. A H-tarifa téli (1.81) fogyasztására nincs keret, és a keretbe sem számít bele.
+- **MVM sávkorrekció:** a kedvezményes keret (mérőnként 2 523 kWh/év, napi arányosan) az A1, a B (vezérelt) és a H-tarifa nyári (1.82) regiszterén jár, felette lakossági piaci ár. A keret áramnál a kedvezményes évben (aug. 1. – júl. 31.) halmozódik: a korábban ki nem használt keret később jóváíródik, de a következő évre nem vihető át; a H-tarifa nyári regiszterén a nyári idényben jár. Az éves leolvasás a keretet nem nullázza. A H-tarifa téli (1.81) fogyasztására nincs keret, és a keretbe sem számít bele.
 - **Átalányos (részszámlás) fiókok:** havi fizetendő, „ha ma lenne az elszámolás”, várható éves/félévi egyenleg, az átalány összevetése a valódi fogyasztással.
 - **Többhavi, utólagos számlázás:** kéthavi víz (DAKÖV), negyedéves szemétszállítás (MOHU). Víznél a folyó időszak (fogyasztás, várható díj) is a számlázási időszak.
 - **Számlák** automatikusan egy mappából (pl. a Díjnet-integráció letöltései), e-mailből, feltöltéssel a panelről (PDF/XML), bemásolással vagy kézzel. Felismeri: MVM Next áram és gáz, DAKÖV, ALFÖLDVÍZ, HVSZ (távhő), MOHU, Magyar Telekom, One.

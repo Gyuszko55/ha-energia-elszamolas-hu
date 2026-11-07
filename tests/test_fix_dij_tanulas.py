@@ -107,3 +107,14 @@ def test_mero_nelkuli_gaz_teves_tanulas_visszavonva(monkeypatch):
 def test_mero_nelkuli_gaz_nincs_sajat_havidij(monkeypatch):
     k, sub, tarolt, _, _ = _gaz_atalany(monkeypatch, tanult=False)
     assert k._sajat_dij_mezok(sub) == []
+
+
+def test_utolso_szamla_nem_storno():
+    t = {"szamlak": {
+        "a": {"tipus": "elszamolo", "kelte": "2026-02-04", "osszeg": 100},
+        "s": {"tipus": "storno", "kelte": "2026-02-27", "osszeg": -100, "sztornozott": "a", "stornoz": "a"},
+        "b": {"tipus": "elszamolo", "kelte": "2026-02-20", "osszeg": 90},
+    }}
+    u = K._utolso_szamla(t)
+    assert u["sorszam"] == "b" and u["szamlak_szama"] == 3
+    assert K._utolso_szamla({"szamlak": {}}) is None

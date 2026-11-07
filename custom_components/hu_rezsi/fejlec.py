@@ -39,6 +39,10 @@ def _honap_mulva(d: date, n: int) -> date:
     raise ValueError(d)
 
 
+def _elozo_nap(iso: str) -> str:
+    return (date.fromisoformat(iso[:10]) - timedelta(days=1)).isoformat()
+
+
 def _cimke_meres(f: dict[str, Any]) -> tuple[str, str]:
     """A folyó időszak várható díjának megbízhatósága a mérés forrása szerint."""
     v = f.get("varhato") or {}
@@ -64,6 +68,7 @@ def kovetkezo_szamla(f: dict[str, Any], szamlak: dict[str, dict[str, Any]], ma: 
         diktalt = bool(dk) and not dk.get("becsult") and any(x.get("ig") == dk.get("datum") for x in uton)
         return {
             "tol": min(x["tol"] for x in uton), "ig": max(x["ig"] for x in uton),
+            "kezdet": min(x.get("kezdet") or x["tol"] for x in uton),  # a kijelzett kezdet: a leolvasás napja
             "dij": sum(int(x.get("osszeg_brutto", x["osszeg"])) for x in uton), "fizetendo": sum(int(x["osszeg"]) for x in uton),
             "kelte": None, "forras": "diktalas" if diktalt else "meres", "cimke": "pontos", "folyo": False,
             "magyarazat": ("Lezárt időszak: a záró mérőállás megvan, a számla még nem érkezett meg. "
@@ -100,9 +105,9 @@ def kovetkezo_szamla(f: dict[str, Any], szamlak: dict[str, dict[str, Any]], ma: 
     if x["forras"] == "diktalas" or (dk and f.get("diktalas_szerint")):
         if dk.get("becsult"):
             c, m = _cimke_meres(f)
-            return ki | {"tol": dk["tol"], "ig": dk["datum"], "dij": int(dk["osszeg"]), "fizetendo": int(dk["osszeg"]), "cimke": c,
+            return ki | {"tol": dk["tol"], "kezdet": _elozo_nap(dk["tol"]), "ig": dk["datum"], "dij": int(dk["osszeg"]), "fizetendo": int(dk["osszeg"]), "cimke": c,
                          "magyarazat": f"A szolgáltató diktálás szerint számláz; a következő diktálásig ({dk['datum']}). {m}"}
-        return ki | {"cimke": "pontos", "magyarazat": f"A diktált mérőállás ({dk.get('datum') or x['ig']}) szerint, a díjszabással számolva."}
+        return ki | {"kezdet": _elozo_nap(x["tol"]) if x["tol"] else None, "cimke": "pontos", "magyarazat": f"A diktált mérőállás ({dk.get('datum') or x['ig']}) szerint, a díjszabással számolva."}
     # Mért fiók: a folyó időszak a végéig előrevetítve.
     i = f.get("idoszak") or {}
     v = (f.get("varhato") or {}).get("osszeg")

@@ -17,6 +17,7 @@ verziok:
       keret:
         tipus: napi_aranyos
         ev_mennyiseg: 2523
+        ev_kezdet: "08-01"     # kedvezményes év: aug. 1. – júl. 31. (4/2011. NFM rendelet 6. § (3)), nem az éves leolvasás
         kerekites: 0
         osszesitett: true
       alapdij:

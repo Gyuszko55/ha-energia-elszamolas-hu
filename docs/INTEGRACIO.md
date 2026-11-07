@@ -1,4 +1,4 @@
-# Rezsikövető integráció (2.4.0b3 – béta, 2026-11-06)
+# Rezsikövető integráció (2.4.0, 2026-11-07)
 
 > **Tájékoztató jellegű számítás, a hivatalos számlát nem helyettesíti.**
 > A 0.1 a v1 YAML-csomag tudását hozza integrációként. A víz, a gáz MJ-alapú elszámolása és a napelem a következő lépcsőkben jön (lásd `docs/terv/04_UTEMTERV.md`).
@@ -100,7 +100,7 @@ A fel nem ismert fájlt a mappából törölve a figyelmeztetés is eltűnik.
 
 Villanyfióknál az **Elszámolás módja** mező dönti el az időszakot és a fizetés módját:
 
-- **Diktálás** – időszak: az előző diktálás másnapjától a diktálás napjáig (`idoszak_mod: diktalas`); határ a számlákból jött leolvasás és elszámolt időszak, valamint a `diktalt: true` jelölésű leolvasás (`hu_rezsi.leolvasas_rogzites`). Keret: napi rész × az időszak napjai. Elmaradt diktálásnál a várható határ havonta tolódik.
+- **Diktálás** – időszak: az előző diktálás napjától a diktálás napjáig (`idoszak_mod: diktalas`; az úton lévő időszak `tol` mezője azonosítóként a másnap, a kijelzett kezdet a `kezdet`); határ a számlákból jött leolvasás és elszámolt időszak, valamint a `diktalt: true` jelölésű leolvasás (`hu_rezsi.leolvasas_rogzites`). Keret: napi rész × az időszak napjai. Elmaradt diktálásnál a várható határ havonta tolódik.
 - **Átalány** – részszámlás; a havi mennyiség a fiókban beírt *Átalány mennyisége havonta*, különben a legutóbbi MVM-számla „A következő részszámla becsült mennyisége” sora (PDF-ből; XML+PDF párnál a 13 hónapon belüli számlák PDF-jéből).
 - **Távleolvasás** – naptári hónap, keret: napi rész × a hónap napjai.
 
@@ -159,7 +159,7 @@ Közmű: „Hulladékszállítás (fix díj)”. Nincs mérő: a költség a dí
 | Fogyasztás az időszakban | |
 | Hátralévő kedvezményes keret | Attribútum: várható keretátlépés napja |
 | Aktuális egységár | A következő egység ára – a HA Energia irányítópulthoz ár-entitásként is megadható |
-| Éves fogyasztás | Az utolsó elszámoló (éves) leolvasás óta |
+| Éves fogyasztás | Áramnál a jogszabály szerinti év eleje óta (aug. 1., H-tarifánál a nyári idény eleje, ápr. 16.), a többi közműnél az utolsó elszámoló (éves) leolvasás óta; `ev_kezdete` attribútum |
 | Várható elszámolás | „Ha ma lenne az elszámolás”: az utolsó valódi elszámoló számla időszakának vége óta mért fogyasztás költsége (alapdíjjal) és az azóta kiállított számlák különbsége. Pozitív: visszatérítés, negatív: ráfizetés. Ha nincs elszámoló számla, az első számla időszakától számol. |
 | Utolsó számla | A számlamappából feldolgozott legutóbbi számla összege (sorszám, kelte, típus) |
 | Utolsó lezárt időszak | Az időszak végén automatikusan lezárul (a következő időszak első napján 01:00 után) |
@@ -170,7 +170,7 @@ A háztartáson: **Rezsi eddig összesen** és **Rezsi várható összesen**.
 
 | Szolgáltatás | Mire jó |
 |---|---|
-| `hu_rezsi.leolvasas_rogzites` | Kézi vagy szolgáltatói leolvasás. Az „elszámoló” leolvasástól indul az éves keret, és ott kettéválik az időszak. |
+| `hu_rezsi.leolvasas_rogzites` | Kézi vagy szolgáltatói leolvasás. Az „elszámoló” leolvasástól indul az átalány elszámolási éve, és ott kettéválik az időszak; áramnál a kedvezményes keret ettől független (aug. 1. – júl. 31.). |
 | `hu_rezsi.leolvasas_torles` | Egy nap leolvasásainak törlése |
 | `hu_rezsi.merocsere` | A régi mérő lezárása és új nyitása – a fogyasztás folytonos marad |
 | `hu_rezsi.feluliras` | Díj felülírása dátumtól, pl. `dijak.energia_piaci` |
@@ -214,6 +214,14 @@ A háztartáson: **Rezsi eddig összesen** és **Rezsi várható összesen**.
 - **Hangutasítások – LLM-eszközök:** `llm.py` (HA 2026.x `llm` platform; `manifest.json` `after_dependencies`: `llm`): `async_get_tools` az Assist API-nak (`LLM_API_ASSIST`) szándékonként egy `IntentTool`-t ad: `hu_rezsi__befizetendo_szamlak`, `__kovetkezo_szamla`, `__koltseg_eddig`, `__kedvezmenyes_keret`, `__utolso_szamla` (paraméter: `kozmu`). Régebbi HA-n a fájl nem töltődik be; ott az Assist API a regisztrált szándékokat magától adja az ügynöknek.
 - **Tesztek:** `tests/test_hatarido_ertesites.py`, `tests/test_hang.py`, `tests/test_panel_beallitas.py`.
 
+## Éves kimutatás és számlakifogás-tervezet (2.4.0)
+
+- **Websocket:** `hu_rezsi/eves_kimutatas` és `hu_rezsi/kifogas_tervezet` (`entry_id`, `sid`, elhagyható `ev_tol`). A választó (`jeloltek`, `valasztott`) áramnál a jogszabály szerinti időszakokat adja (A1: aug. 1. – júl. 31., H: nyári és téli idény); `jogi_idoszakok`: az utolsó lezárt, a folyamatban lévő és a választott. `allasok_becsult`: a két mérőállás közt arányosan becsült napok.
+- **Modulok:** `kimutatas.py` (az összevetés), `kifogas.py` (a levél, szabály alapú). Állapot: `kesz`, `nincs_elteres`, `nem_keszitheto`; a blokkoló okok a `figyelmeztetesek` között (hiányzó időszak, nem levezethető eltérés, eltérő nyomtatott egyenleg, negatív fogyasztás, a mérés előtt induló számla).
+- **Mérőcsere:** a kimutatás a mérőállásokat a régi mérő záróállásától folytatja (`tarolt_pontok(folytonos=True)`), ezért a táblázatban az új mérő állása nem a valódi állás; a tervezet erre figyelmeztet.
+- **Év- és idényhatár (◆):** `evhatar_allasok` – A1: júl. 31., H: ápr. 15. és júl. 31. Csak akkor készül, ha a számla tételei kiadják a két mérőállás különbségét; `tipus: evhatar`, a diktálásnak nem számít.
+- **Régi formájú számla:** nincs kiszámlázott mennyiség, a tételek dátuma nem a fogyasztás időszaka; ilyenkor az évre nincs hiány-számítás.
+
 ## AI-számlabeolvasó (2.3.0b1) – műszaki jegyzet
 
 - **Folyamat:** fel nem ismert PDF (`ismeretlen_fajlok`) → `hu_rezsi/ai_kiolvasas` → kitakarás → `ai_task.generate_data` (kötött `structure`, 90 s időkorlát) → helyőrzők visszaírása → `normalizal` → `szamla_ellenorzo.ellenoriz` → a panel jóváhagyó ablaka → `hu_rezsi/ai_atvetel` (szerveroldali újraellenőrzés) → függő számla `{"fajl", "sorszam", …, "ai": <jóváhagyott adat>}` → a meglévő `hu_rezsi/fuggo_dontes` (előnézet: `_fuggo_elonezet`; a Számla az `ai` adatból: `ai_beolvaso.szamlava`, forrás `"ai"`). Jóváhagyás/elvetés után a fájl kikerül az `ismeretlen_fajlok`/`nem_olvasott_fajlok` közül. Az AI válasza és a számla szövege nem tárolódik.
@@ -221,7 +229,6 @@ A háztartáson: **Rezsi eddig összesen** és **Rezsi várható összesen**.
 - **Szabályok:** kötelező sorszám/kelte/fizetendő; szó szerinti egyezés (számok bármely magyar tagolással – a szöveg összes számából épített halmaz; dátumok ÉÉÉÉ.HH.NN / ÉÉÉÉ-HH-NN / „ÉÉÉÉ. hónap NN.”; szövegek szóköz nélkül); a sorszám még nincs a fiókban; tételek bruttó összege ≈ számlaérték (± tételenként 1 Ft); egységár × mennyiség ≈ bruttó (×1 / 1,27 / 1,18 / 1,05, ±0,5%); időszak és határidő; záró ≥ induló; `_illeszkedik` a fiók leolvasásaihoz (a cél mérő `_cel_mero`/`_aktiv`, másolaton); ismeretlen mérő; havi fogyasztás közművenkénti felső határa (`HAVI_MAX`).
 - **Websocket (rendszergazda):** `hu_rezsi/ai_kiolvasas` `{entry_id, sid, fajl}` → `{fajl, adat, jelolesek, szoveg, entitas, kitakarva}`; hibák: `ki_van_kapcsolva`, `nincs_ai`, `hiba` (pl. szkennelt PDF, érvénytelen fájlnév – csak a fiók mappájában lévő `.pdf`), `ai_hiba`. `hu_rezsi/ai_atvetel` `{entry_id, sid, fajl, adat, megerosit}` → `{ok: true, sorszam}` vagy `{ok: false, jelolesek}` (ellentmondás, megerősítés nélkül).
 - **Panel:** `_aiNyit`, `_aiRajzol`, `_aiGyujt`, `_aiKiemel` (a szövegben `<mark data-k="mező">`), `aiablak` dialógus; a figyelmeztetések közt `data-aifajl="sid|fájl"`; a feltöltés „nem ismertem fel” üzenete; Panel beállításai: `aibeolvasas`, `aientitas`. Beleegyezés: `window.confirm` az első bekapcsoláskor.
-- **Tesztek:** `tests/test_ai_beolvaso.py`.
 - **Sablon (2.3.0b2, `sablon.py`, HA nélkül is):** `keszit(adat, sima, tabla)` – felismerés: a szolgáltató neve + adószáma (szóköz nélkül, kisbetűvel a szövegben); mezők: az érték előtti, a soron utolsó oszlop (3+ szóköz választja el) a felirat, `_altalanosit` (a benne álló dátum/szám `{DATUM}`/`{SZAM}`, a betűhöz tapadó számjegy marad, pl. „m3”), rangsor: kettőspontos, változó rész nélküli, a szövegben az első; sorszám: karakterosztály + hossz ±3; mérősor: névvel ellátott csoportok (`gyari_szam` – alak, nem a szám –, `tol_datum`, `tol_allas`, `ig_datum`, `ig_allas`, `mod` + `mod_jelentes`, ismeretlen szónál szótő szerint), tételsor: a megnevezés szó szerint, a számok csoportban; mennyiség: megnevezés + szám + egység. `alkalmaz` → normalizal-alakú adat (vagy None: nem ez a szolgáltató), `hianyzo` (sorszam, kelte, fizetendo), `onproba` (az összevetett mezők listája), `szemelyes` (tiltott értékek + a `Kitakaro` mintái), `betolt`/`ment` (`<config>/hu_rezsi_sablonok/*.yaml`; ha már van ilyen azonosítójú, az új számlaforma `<azonosito>_<n>.yaml` – a régi is aktív). 2.3.0: a minták atomi csoportokkal (`(?>…)`, Python 3.11+) és soronként (≤ 400 karakter) illesztve, `[ \t]` köz – nincs robbanásszerű visszalépés; a sorminta az első és az utolsó kiolvasott érték között (a hosszabb szavak helyett `[^\n]*?`), a típus számlánként (`_tipus`), a felismerésben a közmű szava (`KOZMU_SZAVAK`); a személyesadat-szűrő minden mintát „visszaszövegesít” (`_lathato`).
 - **Bekötés:** `szamlak.SABLONOK` (az `async_setup` tölti be); `szamlak.sablonnal` a beépített PDF-olvasók után (`_beolvas_fajl`), Számla forrás `sablon:<azonosito>`; `hozzatartozik`: mérő nélküli sablonos számla a mappa fiókjáé. `hu_rezsi/ai_atvetel` `sablon: true` → `_sablon_keszit` (önpróba, szűrő a fiók ismert adataival és mérőszámaival, mentés) → `_sablon_utan`: újratöltés, minden otthon `_fajl_cache` ürítése és `nem_olvasott_fajlok` törlése (a fel nem ismertek újraolvasása), értesítés. Válasz: `sablon: {mentve, azonosito, nev, verzio, fajl, uzenet}`. A függő tétel `forras` mezője a panel címkéjéhez.
 - **Tesztek:** `tests/test_sablon.py` (készítés, önpróba, második – azonos formájú, más értékű – számla, más szolgáltató, személyes adat, hiányzó mező, tár és verzió, `szamlak.sablonnal`, koordinátor).

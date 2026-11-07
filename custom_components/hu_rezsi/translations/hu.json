@@ -531,7 +531,7 @@
         },
         "elszamolasi": {
           "name": "Elszámoló (éves) leolvasás",
-          "description": "Ettől indul az éves keret, és itt kettéválik az időszak."
+          "description": "Ettől indul az átalány elszámolási éve, és itt kettéválik az időszak. A kedvezményes keret áramnál ettől független (aug. 1. – júl. 31.)."
         },
         "megjegyzes": {
           "name": "Megjegyzés",

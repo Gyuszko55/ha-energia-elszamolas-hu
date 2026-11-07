@@ -531,7 +531,7 @@
         },
         "elszamolasi": {
           "name": "Billing (yearly) reading",
-          "description": "Starts the yearly allowance and splits the period here."
+          "description": "Starts the flat-rate settlement year and splits the period here. For electricity the discounted allowance does not depend on it (Aug 1 – Jul 31)."
         },
         "megjegyzes": {
           "name": "Note",

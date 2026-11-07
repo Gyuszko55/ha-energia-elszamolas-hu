@@ -232,7 +232,7 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         suggested_display_precision=1,
         ertek=lambda a: _f(a.eves_fogyasztas, 3),
         egyseg=lambda a: a.egyseg,
-        attr=lambda a: {"eves_bazis": a.eves_bazis.isoformat() if a.eves_bazis else None},
+        attr=lambda a: {"ev_kezdete": a.eves_kezdet.isoformat() if a.eves_kezdet else None, "eves_bazis": a.eves_bazis.isoformat() if a.eves_bazis else None},
         elerheto=lambda a: a.eves_fogyasztas is not None,
     ),
     FiokLeiras(

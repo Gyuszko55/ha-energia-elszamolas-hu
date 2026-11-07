@@ -115,8 +115,10 @@ def test_ertesito_nem_kuld_elso_szamolas_elott(monkeypatch):
     later = []
     monkeypatch.setattr(H, "async_call_later", lambda h, mp, cb: later.append(mp))
     e = H.Ertesito.__new__(H.Ertesito)
-    e.hass, e.adat = hass, {"kuldott": {}, "utolso": None}
+    e.hass, e.adat, e._ujra = hass, {"kuldott": {}, "utolso": None}, None
+    monkeypatch.setattr(H, "async_call_later", lambda h, mp, cb: later.append(mp) or (lambda: None))
     assert asyncio.run(e.fut()) == 0 and later == [H.UJRA_MP] and e.adat["utolso"] is None
+    assert asyncio.run(e.fut()) == 0 and later == [H.UJRA_MP]  # a második napi futás nem indít újabb újrapróbálást
 
 
 def test_llm_eszkozok(monkeypatch):

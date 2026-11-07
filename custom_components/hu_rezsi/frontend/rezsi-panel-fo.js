@@ -29,14 +29,9 @@ const nap = (iso) => {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return `${y}. ${HONAP[m - 1]} ${d}.`;
 };
-const kovNap = (iso) => {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-};
-// Diktálásos/átalányos villanynál a határ a diktálás napja: a számla szerint „előző diktálás másnapja – diktálás napja”.
+// Diktálásos/átalányos villanynál az időszak a leolvasás (diktálás) napjától a következő leolvasás napjáig tart.
 const idoszakSzoveg = (tol, ig, diktalasos) =>
-  diktalasos ? `${nap(kovNap(tol))} – ${nap(ig)}` : `${nap(tol)} – ${nap(elozoNap(ig))}`;
+  diktalasos ? `${nap(tol)} – ${nap(ig)}` : `${nap(tol)} – ${nap(elozoNap(ig))}`;
 // A következő diktálási ablak szövege (pl. „okt. 8–14.”): ebben a hónapban, ha még nem múlt el, különben a következőben.
 const kovDiktalas = (a, ig = null, ma = new Date()) => {
   // Diktálásos fióknál az az ablak, amelyik a folyó időszakot zárja (az időszak vége); különben a legközelebbi.
@@ -48,7 +43,55 @@ const kovDiktalas = (a, ig = null, ma = new Date()) => {
 // A fejléc időszakai: az idei évszám nélkül (pl. „szept. 30. – nov. 11.”).
 const fejNap = (iso) => (!iso ? "–" : iso.slice(0, 4) === String(new Date().getFullYear()) ? nap(iso).slice(6) : nap(iso));
 const fejIdoszak = (tol, ig, diktalasos) =>
-  diktalasos ? `${fejNap(kovNap(tol))} – ${fejNap(ig)}` : `${fejNap(tol)} – ${fejNap(elozoNap(ig))}`;
+  diktalasos ? `${fejNap(tol)} – ${fejNap(ig)}` : `${fejNap(tol)} – ${fejNap(elozoNap(ig))}`;
+// A fiók mérőállása egy diktálási ablakban (a legutolsó napja): a korrekciós, a becsült és az átalány szerinti állás nem számít.
+const diktLeolvasas = (f, tol, ig) => (f.leolvasasok || [])
+  .filter((l) => l.datum >= tol && l.datum <= ig && !l.korrekcio && !["almero", "betaplalas"].includes(l.csatorna)
+    && !["szamla_atalany", "kezdo", "evhatar"].includes(l.tipus) && !/\(Becs\)/.test(l.megjegyzes || ""))
+  .map((l) => l.datum).sort().pop() || null;
+// Az MVM közös folyószámlás áramfiókjai (pl. A1 + H) egy „MVM Áram” sorként a táblázatokban: az összegek összeadva, a
+// fiókok neve a tagnevek-ben. A mérőállások tarifánként külön maradnak (tagok); a sor a csoport első fiókjára mutat.
+const MVM_ARAM = "MVM Áram";
+const mvmOsszevon = (fiokok) => {
+  const ossz = (v) => { const a = v.filter((x) => typeof x === "number"); return a.length ? a.reduce((t, x) => t + x, 0) : null; };
+  const kisebb = (v) => v.filter(Boolean).sort()[0] ?? null, nagyobb = (v) => v.filter(Boolean).sort().pop() ?? null;
+  const kozos = (f) => (f.kozmu === "villany" ? f.fejlec?.egyenleg?.kozos : null);
+  const egy = (tagok) => {
+    const f0 = tagok[0], keszlet = (k) => tagok.map((t) => t[k]).filter(Boolean), kv = tagok.map((t) => t.fejlec?.kovetkezo).filter(Boolean);
+    const fo = tagok.map((t) => t.fejlec?.folyo).filter(Boolean), es = keszlet("esedekes"), ut = tagok.flatMap((t) => t.uton_szamlak || []), st = keszlet("szamla_stat");
+    const utem = { ...f0.utem };
+    for (const k of ["kovetkezo_leolvasas", "kovetkezo_elszamolas", "kovetkezo_diktalas", "diktalasi_ablak"]) utem[k] = tagok.map((t) => t.utem?.[k]).find(Boolean) ?? null;
+    const szam3 = (lista, k) => ossz(lista.map((x) => x[k]));
+    return {
+      ...f0, nev: MVM_ARAM, tagok, tagnevek: tagok.map((t) => t.nev), utem,
+      szenzor: tagok.some((t) => t.szenzor), reszszamlas: tagok.every((t) => t.reszszamlas), diktalas_szerint: tagok.every((t) => t.diktalas_szerint),
+      szamlak: tagok.flatMap((t) => (t.szamlak || []).map((x) => ({ ...x, tag: t.nev }))),
+      uton_szamlak: ut.length ? [{ tol: kisebb(ut.map((x) => x.tol)), kezdet: kisebb(ut.map((x) => x.kezdet || x.tol)), ig: nagyobb(ut.map((x) => x.ig)), osszeg: szam3(ut, "osszeg"),
+        osszeg_brutto: ut.reduce((t, x) => t + (x.osszeg_brutto ?? x.osszeg), 0), levonva: szam3(ut, "levonva") }] : null,
+      eddig: { ...f0.eddig, osszeg: szam3(keszlet("eddig"), "osszeg"), mennyiseg: ossz(keszlet("eddig").map((x) => Number(x.mennyiseg))), szeletek: [] },
+      varhato: f0.varhato && { ...f0.varhato, osszeg: szam3(keszlet("varhato"), "osszeg"), mennyiseg: ossz(keszlet("varhato").map((x) => Number(x.mennyiseg))), napi_atlag: ossz(keszlet("varhato").map((x) => Number(x.napi_atlag))) },
+      keret: null, szamla_stat: st.length ? { ...st[0], eves_osszeg: szam3(st, "eves_osszeg"), eves_db: szam3(st, "eves_db") } : f0.szamla_stat,
+      elszamolas: f0.elszamolas && { ...f0.elszamolas, egyenleg: ossz(tagok.map((t) => t.elszamolas?.egyenleg)) },
+      esedekes: es.length ? { ...es[0], kovetkezo_datum: kisebb(es.map((x) => x.kovetkezo_datum)), e_havi_osszesen: szam3(es, "e_havi_osszesen"),
+        kovetkezo_osszeg: szam3(es, "kovetkezo_osszeg"), elmaradt: es.some((x) => x.elmaradt) } : f0.esedekes,
+      fejlec: { ...f0.fejlec,
+        egyenleg: f0.fejlec.egyenleg && { ...f0.fejlec.egyenleg, kozos: MVM_ARAM },
+        folyo: fo.length ? { ...fo[0], eddig: szam3(fo, "eddig"), varhato: szam3(fo, "varhato"), napi_atlag: szam3(fo, "napi_atlag"), varhato_mert: szam3(fo, "varhato_mert"),
+          magyarazat: [...new Set(fo.map((x) => x.magyarazat).filter(Boolean))].join(" ") } : null,
+        kovetkezo: kv.length ? { ...kv[0], tol: kisebb(kv.map((x) => x.tol)), kezdet: kisebb(kv.map((x) => x.kezdet || x.tol)), ig: nagyobb(kv.map((x) => x.ig)), dij: szam3(kv, "dij"), fizetendo: szam3(kv, "fizetendo"),
+          kelte: kisebb(kv.map((x) => x.kelte)), kesik: kv.some((x) => x.kesik), cimke: kv.find((x) => x.cimke === "becsult")?.cimke || kv.find((x) => x.cimke === "mert")?.cimke || kv[0].cimke,
+          folyo: kv.every((x) => x.folyo), magyarazat: [...new Set(kv.map((x) => x.magyarazat).filter(Boolean))].join(" ") } : null },
+    };
+  };
+  const ki = [];
+  for (const f of fiokok) {
+    const k = kozos(f), tagok = k ? fiokok.filter((t) => kozos(t) === k) : [f];
+    if (tagok.length < 2) ki.push(f);
+    else if (tagok[0] === f) ki.push(egy(tagok));
+  }
+  return ki;
+};
+const tagSor = (f) => (f.tagnevek ? `<div class="kicsi tagsor">${f.tagnevek.map(esc).join(" · ")}</div>` : "");
 const rovidNap = (iso) => (iso ? `${iso.slice(0, 10).replaceAll("-", ".")}.` : "–");
 const elozoNap = (iso) => {
   const d = new Date(iso + "T12:00:00");
@@ -69,9 +112,9 @@ const UTEM = { 1: "havonta", 2: "kéthavonta", 3: "negyedévente", 4: "négyhavo
 
 // Automatikus bezárás: a csak megjelenítő ablakok (és a fiókkártya lenyitott Részletek része) ennyi másodperc
 // tétlenség után bezárulnak (panel-beállítás: hu_rezsi/panel_beallitas, alapból 10, 0 = soha). Az űrlapos ablakok
-// (mérőállás, számla, törlés, javítás, lezárás, mentés és beállítások, szenzor-hozzárendelés, e-mail varázsló) soha;
+// (mérőállás, számla, törlés, javítás, lezárás, mentés és beállítások, szenzor-hozzárendelés, e-mail varázsló, a szerkeszthető reklamációs levél) soha;
 // ha ezek közül bármelyik nyitva van (pl. egy megjelenítő ablakból nyílt), az időzítés szünetel.
-const OLVASO_ABLAKOK = new Set(["grafdlg", "reklamdlg", "evesdlg", "teteldlg", "kimutdlg", "fszdlg", "ddlg", "beallit"]);
+const OLVASO_ABLAKOK = new Set(["grafdlg", "evesdlg", "teteldlg", "kimutdlg", "fszdlg", "ddlg", "beallit"]);
 const AKTIVITAS = ["pointerdown", "pointermove", "wheel", "scroll", "keydown", "touchstart", "touchmove"];
 const SZERK_MEZO = "input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea";
 
@@ -781,16 +824,30 @@ class HuRezsiPanel extends HTMLElement {
   // a következőé. havi: true, ha a havi ablakból jön. Közös MVM-számlázásnál (pl. A1 + H) a fiók saját számláin
   // nincs ablak: ilyenkor a csoport (fejlec.egyenleg.kozos) másik fiókjáé – ugyanazon a napon diktálható mindkét óra.
   _mxDiktalas(f, ma, tarsak = []) {
-    if (f.utem?.kovetkezo_diktalas) return { dk: f.utem.kovetkezo_diktalas, havi: false };
+    // kesz: ebben az ablakban minden tarifa mérőállása megvan – a következő ablak nyitásáig (kov) nincs vele teendő.
+    // reszben: közös fióknál azok a tarifák, ahol már megvan.
+    const tagok = f.tagok || [f];
+    const allapot = (dk) => {
+      const d = tagok.map((t) => diktLeolvasas(t, dk[0], dk[1]));
+      return { kesz: d.every(Boolean) ? { datum: [...d].sort().pop() } : null, reszben: d.some(Boolean) ? tagok.filter((_, i) => d[i]).map((t) => t.nev) : null };
+    };
+    if (f.utem?.kovetkezo_diktalas) return { dk: f.utem.kovetkezo_diktalas, havi: false, ...allapot(f.utem.kovetkezo_diktalas) };
     const ablak = (x) => [...(x.szamlak || [])].filter((y) => Array.isArray(y.diktalasi_ablak) && y.tipus !== "storno")
       .sort((a, b) => (b.kelte || "").localeCompare(a.kelte || ""))[0]?.diktalasi_ablak;
     const kozos = f.fejlec?.egyenleg?.kozos;
     const da = ablak(f) || (kozos ? tarsak.filter((t) => t !== f && t.fejlec?.egyenleg?.kozos === kozos).map(ablak).find(Boolean) : null);
     if (!da || f.megszunt) return null;
-    const ho = new Date(ma.getFullYear(), ma.getMonth() + (ma.getDate() > da[1] ? 1 : 0), 1);
-    const utolso = new Date(ho.getFullYear(), ho.getMonth() + 1, 0).getDate(), p2 = (n) => String(n).padStart(2, "0");
-    const hh = `${ho.getFullYear()}-${p2(ho.getMonth() + 1)}`;
-    return { dk: [`${hh}-${p2(Math.min(da[0], utolso))}`, `${hh}-${p2(Math.min(da[1], utolso))}`], havi: true };
+    const p2 = (n) => String(n).padStart(2, "0");
+    const ablakHo = (eltol) => {
+      const ho = new Date(ma.getFullYear(), ma.getMonth() + eltol, 1), utolso = new Date(ho.getFullYear(), ho.getMonth() + 1, 0).getDate();
+      const hh = `${ho.getFullYear()}-${p2(ho.getMonth() + 1)}`;
+      return [`${hh}-${p2(Math.min(da[0], utolso))}`, `${hh}-${p2(Math.min(da[1], utolso))}`];
+    };
+    // A legutóbb megnyílt ablak: ha abban már megvan az állás, a következő nyitásáig kész.
+    const nyilt = ma.getDate() >= da[0] ? 0 : -1, utolsoAblak = ablakHo(nyilt), ua = allapot(utolsoAblak);
+    if (ua.kesz) return { dk: utolsoAblak, havi: true, kesz: ua.kesz, kov: ablakHo(nyilt + 1) };
+    const dk = ablakHo(ma.getDate() > da[1] ? 1 : 0);
+    return { dk, havi: true, reszben: allapot(dk).reszben };
   }
 
   _mxCellak(f, ma, tarsak = []) {
@@ -814,7 +871,7 @@ class HuRezsiPanel extends HTMLElement {
       const ar = havi ? fo.eltelt_honap / fo.honapok : (fo.eltelt_nap || 0) / (fo.napok || 1);
       c.folyo = { s: "ok", t: fejIdoszak(i.tol, i.ig, ["diktalas", "atalany"].includes(mod)), sub: havi ? `${fo.eltelt_honap}/${fo.honapok} hónap` : `${fo.eltelt_nap ?? "–"}/${fo.napok ?? "–"} nap`,
         bar: Math.max(0, Math.min(1, ar || 0)),
-        r: p > 1 && !fix ? "A számlázási időszak: a legutóbbi számla vége utántól az ütem szerint." : diktSz ? "A diktálás szerinti időszak: az előző leolvasás másnapjától a következő diktálásig."
+        r: p > 1 && !fix ? "A számlázási időszak: a legutóbbi számla vége utántól az ütem szerint." : diktSz ? "A diktálás szerinti időszak: a legutóbbi leolvasás (diktálás) napjától a következő diktálásig."
           : fix ? "A díj időszaka." : "Az elszámolási időszak." };
     }
     if (fo.varhato !== undefined) {
@@ -825,17 +882,21 @@ class HuRezsiPanel extends HTMLElement {
     const uton = f.uton_szamlak || [];
     if (uton.length) {
       const x = uton[0], o = x.osszeg_brutto ?? x.osszeg;
-      c.kov = { s: "tenni", t: "még nem jött", sub: `${fejNap(x.tol)} – ${fejNap(x.ig)} · ${ft(o)}`,
+      c.kov = { s: "tenni", t: "még nem jött", sub: `${fejNap(x.kezdet || x.tol)} – ${fejNap(x.ig)} · ${ft(o)}`,
         r: "A lezárt időszakra (saját számítás) még nem érkezett számla. Ha egy későbbi számla elszámolja, a Rezsikövető magától rendezettnek veszi." + (x.levonva ? " A díjat a túlfizetésből vonják le." : "") };
     } else if (kv.dij !== undefined) {
       const kel = kv.kelte || es.kovetkezo_datum;
       c.kov = { s: kv.kesik ? "tenni" : kv.forras === "atalany" ? "ata" : kv.cimke === "pontos" ? "ok" : "becs", t: kel ? `${fejNap(kel)} körül` : "–",
-        sub: `${ft(kv.fizetendo ?? kv.dij)}${kv.kesik ? " · késik" : ""}`, r: `${kv.tol ? `${nap(kv.tol)} – ${nap(kv.ig)} időszakra. ` : ""}${kv.magyarazat || ""}` };
+        sub: `${ft(kv.fizetendo ?? kv.dij)}${kv.kesik ? " · késik" : ""}`, r: `${kv.tol ? `${nap(kv.kezdet || kv.tol)} – ${nap(kv.ig)} időszakra. ` : ""}${kv.magyarazat || ""}` };
     }
     const dkx = this._mxDiktalas(f, ma, tarsak), dk = dkx?.dk;
-    if (dk) {
+    if (dkx?.kesz) {
+      c.dikt = { s: "ok", t: "✓ diktálva", sub: `${fejNap(dkx.kesz.datum)}${dkx.kov ? ` · következő: ${fejNap(dkx.kov[0])} – ${fejNap(dkx.kov[1])}` : ""}`,
+        r: `Ebben a diktálási ablakban (${nap(dk[0])} – ${nap(dk[1])}) már megvan a mérőállás, ${dkx.kov ? "a következő ablak nyitásáig" : "most"} nincs vele teendő.` };
+    } else if (dk) {
       const kozel = (new Date(dk[0]) - ma) / 864e5 <= 30;
-      c.dikt = { s: kozel ? "tenni" : "ok", t: `${fejNap(dk[0])} – ${fejNap(dk[1])}`, sub: kozel ? (dkx.havi ? "havonta · hamarosan" : "hamarosan") : (dkx.havi ? "havonta" : null),
+      const resz = dkx.reszben ? ` · kész: ${dkx.reszben.join(", ")}` : "";
+      c.dikt = { s: kozel ? "tenni" : "ok", t: `${fejNap(dk[0])} – ${fejNap(dk[1])}`, sub: (kozel ? (dkx.havi ? "havonta · hamarosan" : "hamarosan") : (dkx.havi ? "havonta" : "")) + resz || null,
         r: dkx.havi ? "A számlán közölt havi diktálási ablak (minden hónapban ezekben a napokban diktálható a mérőállás); itt a legközelebbi."
           : "A diktálási ablak a díjszabás, ill. a számla szerint. A diktált állás a következő számláig felülírja az átalányt." };
     } else c.dikt = diktSz ? { s: "ok", t: "havonta", r: "Diktálás havonta, a szolgáltató ablakában (vagy a szenzor adja)." } : { s: "na", t: "–", r: "Ennél a fióknál nincs diktálás." };
@@ -864,8 +925,16 @@ class HuRezsiPanel extends HTMLElement {
     const ma = new Date(), maHo = `${ma.getFullYear()}-${String(ma.getMonth() + 1).padStart(2, "0")}`;
     this._mxAll = this._mxAll || {};
     const all = (this._mxAll[h.entry_id] = this._mxAll[h.entry_id] || { nezet: "elszamolas", val: null });
-    const fiokok = h.fiokok.filter((f) => !f.hiba && !f.megszunt);
-    const cellak = Object.fromEntries(fiokok.map((f) => [f.sid, this._mxCellak(f, ma, fiokok)]));
+    const fiokok = mvmOsszevon(h.fiokok.filter((f) => !f.hiba && !f.megszunt));
+    const cellak = Object.fromEntries(fiokok.map((f) => {
+      const c = this._mxCellak(f, ma, fiokok);
+      // Összevont MVM-sor: ahol a tarifák eltérnek (pl. más az időszak), mindkét érték látszik.
+      if (f.tagok) for (const k of ["meres", "mod", "utem", "folyo"]) {
+        const v = [...new Set(f.tagok.map((t) => this._mxCellak(t, ma, f.tagok)[k]?.t).filter(Boolean))];
+        if (v.length > 1 && c[k]) c[k] = { ...c[k], t: v.join(" / ") };
+      }
+      return [f.sid, c];
+    }));
     const e = esc(h.entry_id);
     // Teendők: a narancs cellák (közös folyószámla csak egyszer).
     const tenni = [];
@@ -911,7 +980,7 @@ class HuRezsiPanel extends HTMLElement {
         <div class="kicsi">A sor többi cellája: ${MX_OSZL.filter((x) => x[0] !== k).map((x) => `${x[1].toLowerCase()} ${esc(cellak[sid][x[0]]?.t || "–")}`).join(" · ")}</div>
         <button type="button" class="mxnyit" data-lapra="${esc(sid)}" data-entry="${e}">A fiók lapja <ha-icon icon="mdi:chevron-right"></ha-icon></button></div>`;
     }
-    const fiokCella = (f, al) => `<td class="mxfiok km-${f.kozmu}"><div class="mxfb"><ha-icon icon="${IKON[f.kozmu] || "mdi:cash"}"></ha-icon><div><div class="mxn">${esc(f.nev)}</div><div class="kicsi">${esc(al)}</div></div></div></td>`;
+    const fiokCella = (f, al) => `<td class="mxfiok km-${f.kozmu}"><div class="mxfb"><ha-icon icon="${IKON[f.kozmu] || "mdi:cash"}"></ha-icon><div><div class="mxn">${esc(f.nev)}</div><div class="kicsi">${esc(f.tagnevek ? f.tagnevek.join(" · ") : al)}</div></div></div></td>`;
     let tabla;
     if (all.nezet === "naptar") {
       const honapok = [];
@@ -923,19 +992,22 @@ class HuRezsiPanel extends HTMLElement {
           const kel = uton.length ? null : kv.kelte || f.esedekes?.kovetkezo_datum;
           const varh = [];
           if (kel) { const d = new Date(kel + "T12:00:00"); for (let j = 0; j < 4; j++) { const x = new Date(d.getFullYear(), d.getMonth() + j * p, Math.min(d.getDate(), 28)); varh.push({ h: `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`, n: j ? null : kel, elso: !j }); } }
-          const dk = this._mxDiktalas(f, ma, fiokok)?.dk, lv = f.fix_dij ? null : f.utem?.kovetkezo_leolvasas;
+          const dkx = this._mxDiktalas(f, ma, fiokok), dk = dkx?.dk, lv = f.fix_dij ? null : f.utem?.kovetkezo_leolvasas;
           const ke = f.fix_dij || lv ? null : f.utem?.kovetkezo_elszamolas;
           const tartam = (a, b) => (a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${+b.slice(8)}.` : `${+a.slice(8)}.–${HONAP[+b.slice(5, 7) - 1]} ${+b.slice(8)}.`);
           return `<tr>${fiokCella(f, cellak[f.sid].utem.t)}${honapok.map((m) => {
             const t = (f.szamlak || []).filter((x) => (x.kelte || "").slice(0, 7) === m).sort((a, b) => a.kelte.localeCompare(b.kelte)).map((x) =>
               tetel(x.tipus === "storno" ? "na" : x.tipus === "resz" ? "ata" : "ok", TB[x.tipus] || "?", Number(x.osszeg),
-                { fiok: f.nev, cim: TN[x.tipus] || x.tipus, o: Number(x.osszeg), n: x.kelte, i: x.idoszak, sz: x.sorszam || null,
+                { fiok: x.tag ? `${f.nev} · ${x.tag}` : f.nev, cim: TN[x.tipus] || x.tipus, o: Number(x.osszeg), n: x.kelte, i: x.idoszak, sz: x.sorszam || null,
                   forr: x.forras || null, kezi: !!x.kezi, fajl: x.fajl ? (x.fajl.split(".").pop() || "").toUpperCase() : null, megj: x.megjegyzes || null,
                   hat: x.hatarido || x.fizetes?.hatarido || null, fiz: x.fizetes ? { f: !!x.fizetes.fizetve, d: x.fizetes.datum || null, m: x.fizetes.forras || null,
                   nf: !!x.fizetes.nincs_fizetendo, l: !!x.fizetes.lejart } : null }, x.tipus === "storno" ? " mxstorno" : ""));
-            if (uton.length && m === maHo) t.push(tetel("tenni", "?", uton[0].osszeg_brutto ?? uton[0].osszeg, { fiok: f.nev, cim: "még nem érkezett számla", o: uton[0].osszeg_brutto ?? uton[0].osszeg, i: [uton[0].tol, uton[0].ig], uton: true }, " mxvarhato"));
+            if (uton.length && m === maHo) t.push(tetel("tenni", "?", uton[0].osszeg_brutto ?? uton[0].osszeg, { fiok: f.nev, cim: "még nem érkezett számla", o: uton[0].osszeg_brutto ?? uton[0].osszeg, i: [uton[0].kezdet || uton[0].tol, uton[0].ig], uton: true }, " mxvarhato"));
             varh.filter((v) => v.h === m).forEach((v) => t.push(tetel(v.elso ? "becs" : "na", "~", kv.fizetendo ?? kv.dij, { fiok: f.nev, cim: v.elso ? "következő várható számla" : "ütem szerint várható", o: kv.fizetendo ?? kv.dij, n: v.n, var: true }, " mxvarhato")));
-            if (dk && dk[0].slice(0, 7) === m) t.push(`<span class="mxjel" title="Diktálási ablak: ${esc(nap(dk[0]))} – ${esc(nap(dk[1]))}">D ${tartam(dk[0], dk[1])}</span>`);
+            if (dk && dk[0].slice(0, 7) === m) t.push(dkx.kesz
+              ? `<span class="mxjel mxkesz" title="Diktálva: ${esc(nap(dkx.kesz.datum))} (ablak: ${esc(nap(dk[0]))} – ${esc(nap(dk[1]))})">D ✓ ${+dkx.kesz.datum.slice(8)}.</span>`
+              : `<span class="mxjel" title="Diktálási ablak: ${esc(nap(dk[0]))} – ${esc(nap(dk[1]))}${dkx.reszben ? ` – kész: ${esc(dkx.reszben.join(", "))}` : ""}">D ${tartam(dk[0], dk[1])}</span>`);
+            if (dkx?.kov && dkx.kov[0].slice(0, 7) === m) t.push(`<span class="mxjel" title="Következő diktálási ablak: ${esc(nap(dkx.kov[0]))} – ${esc(nap(dkx.kov[1]))}">D ${tartam(dkx.kov[0], dkx.kov[1])}</span>`);
             if (lv && lv[0].slice(0, 7) === m) t.push(`<span class="mxjel" title="Éves leolvasás (elszámolás) ablaka: ${esc(nap(lv[0]))} – ${esc(nap(lv[1]))}">É ${tartam(lv[0], lv[1])}</span>`);
             if (ke && ke.slice(0, 7) === m) t.push(`<span class="mxjel" title="Éves elszámolás, leolvasás">É ${+ke.slice(8)}.</span>`);
             return `<td class="${t.length ? "mxnc" : "mxures"}${m === maHo ? " mxmostosz" : ""}">${t.join("")}</td>`;
@@ -950,7 +1022,7 @@ class HuRezsiPanel extends HTMLElement {
         }).join("")}</tr>`).join("")}</tbody></table>`;
     }
     const jelm = all.nezet === "naptar"
-      ? `<span class="mx-ok"><span class="mxbetu">E</span>elszámoló</span><span class="mx-ata"><span class="mxbetu">R</span>részszámla</span><span class="mx-ok"><span class="mxbetu">Sz</span>számla, <span class="mxbetu">Ő</span>előírás</span><span class="mx-na"><span class="mxbetu">S</span>sztornó</span><span class="mx-becs mxvarhato"><span class="mxbetu">~</span>következő várható</span><span class="mx-tenni mxvarhato"><span class="mxbetu">?</span>még nem érkezett</span><span><span class="mxjel">D</span>diktálási ablak</span><span><span class="mxjel">É</span>éves leolvasás, elszámolás</span>`
+      ? `<span class="mx-ok"><span class="mxbetu">E</span>elszámoló</span><span class="mx-ata"><span class="mxbetu">R</span>részszámla</span><span class="mx-ok"><span class="mxbetu">Sz</span>számla, <span class="mxbetu">Ő</span>előírás</span><span class="mx-na"><span class="mxbetu">S</span>sztornó</span><span class="mx-becs mxvarhato"><span class="mxbetu">~</span>következő várható</span><span class="mx-tenni mxvarhato"><span class="mxbetu">?</span>még nem érkezett</span><span><span class="mxjel">D</span>diktálási ablak</span><span><span class="mxjel mxkesz">D ✓</span>diktálva</span><span><span class="mxjel">É</span>éves leolvasás, elszámolás</span>`
       : Object.entries(ALL).map(([k, n]) => `<span class="mx-${k}"><i class="mxnegyzet"></i>${n}</span>`).join("");
     return `<div class="mxlap"><div class="mxfej">${teendo}${valto}</div><div class="mxreszlet" aria-live="polite">${reszlet}</div>
       <div class="tablagorgeto mxgorgo">${tabla}</div><div class="mxjelm">${jelm}</div>
@@ -970,14 +1042,16 @@ class HuRezsiPanel extends HTMLElement {
       const nyit = (f) => `data-lapra="${esc(f.sid)}" data-entry="${esc(h.entry_id)}" title="${esc(f.nev)} – megnyitás a Fiókok nézetben"`;
       if (this._nezetMod() === "mobil")
         return `<div class="temakartyak">${sorok.map(({ f, cellak }) => `<div class="temakartya" role="button" tabindex="0" ${nyit(f)}>
-            <div class="tkfej">${ikon(f)}<b>${esc(f.nev)}</b><ha-icon class="tknyil" icon="mdi:chevron-right"></ha-icon></div>
+            <div class="tkfej">${ikon(f)}<div><b>${esc(f.nev)}</b>${tagSor(f)}</div><ha-icon class="tknyil" icon="mdi:chevron-right"></ha-icon></div>
             <div class="tkracs">${fej.map((n, i) => (ures(cellak[i]) ? "" : `<div class="tkc">${n || ""}</div><div class="tkv">${cellak[i]}</div>`)).join("")}</div></div>`).join("")}
           ${lab ? `<div class="temakartya osszes"><div class="tkfej"><b>Összesen</b></div><div class="tkracs">${fej.map((n, i) => (ures(lab[i]) ? "" : `<div class="tkc">${n}</div><div class="tkv">${lab[i]}</div>`)).join("")}</div></div>` : ""}</div>${megjegyzes}`;
       return `<div class="tablagorgeto"><table class="tematabla"><thead><tr><th>Fiók</th>${fej.map((x) => `<th>${x}</th>`).join("")}</tr></thead>
-        <tbody>${sorok.map(({ f, cellak }) => `<tr ${nyit(f)}><td class="tfiok">${ikon(f)}${esc(f.nev)}</td>${cellak.map((c) => `<td class="szam">${c}</td>`).join("")}</tr>`).join("")}</tbody>
+        <tbody>${sorok.map(({ f, cellak }) => `<tr ${nyit(f)}><td class="tfiok">${ikon(f)}${esc(f.nev)}${tagSor(f)}</td>${cellak.map((c) => `<td class="szam">${c}</td>`).join("")}</tr>`).join("")}</tbody>
         ${lab ? `<tfoot><tr><td>Összesen</td>${lab.map((c) => `<td class="szam">${c ?? ""}</td>`).join("")}</tr></tfoot>` : ""}</table></div>${megjegyzes}`;
     };
-    const fiokok = h.fiokok.filter((f) => !f.hiba || tema === "merok");
+    const eredeti = h.fiokok.filter((f) => !f.hiba || tema === "merok");
+    // Számlák, fogyasztás: az MVM-áramfiókok egy sorban. Az egyenleg saját csoportosítást használ, a mérők tarifánként maradnak.
+    const fiokok = ["szamlak", "fogyasztas"].includes(tema) ? mvmOsszevon(eredeti) : eredeti;
     // Várható díj: átalánynál az átalány (a fejléc folyó időszaka szerint); a mért díj összehasonlításként.
     const varhatoDij = (f) => (f.fejlec?.folyo?.varhato_atalany != null ? f.fejlec.folyo.varhato : f.varhato?.osszeg ?? null);
     if (tema === "szamlak") {
@@ -1001,10 +1075,13 @@ class HuRezsiPanel extends HTMLElement {
         const kar = kr?.osszes ? Math.min(100, (100 * kr.felhasznalt) / kr.osszes) : null;
         return sor(f, [td(fo ? `${fejNap(fo.tol)} – ${fejNap(fo.ig)}` : f.idoszak ? `${fejNap(f.idoszak.tol)} – ${fejNap(f.idoszak.ig)}` : "–"),
           td(ar != null && !f.fix_dij ? `<div class="minisav"><div style="width:${ar}%"></div></div><div class="kicsi">${fo.eltelt_nap}/${fo.napok} nap</div>` : "–"),
-          td(f.fix_dij ? "–" : `${szam(f.eddig?.mennyiseg, egys(f))}${regiszterBontas(f) ? `<div class="kicsi">${regiszterBontas(f)}</div>` : ""}`), td(f.fix_dij ? "–" : ft(f.eddig?.osszeg ?? null)),
+          td(f.fix_dij ? "–" : `${szam(f.eddig?.mennyiseg, egys(f))}${f.tagok ? `<div class="kicsi">${f.tagok.map((t) => `${esc(t.nev)}: ${szam(t.eddig?.mennyiseg, egys(t))}`).join(" · ")}</div>` : regiszterBontas(f) ? `<div class="kicsi">${regiszterBontas(f)}</div>` : ""}`), td(f.fix_dij ? "–" : ft(f.eddig?.osszeg ?? null)),
           td(f.fix_dij ? "–" : szam(f.varhato?.mennyiseg, egys(f))), td(`${ft(varhatoDij(f))}${f.fejlec?.folyo?.varhato_mert != null ? `<div class="kicsi">mérés szerint ${ft(f.fejlec.folyo.varhato_mert)}</div>` : ""}`),
           td(f.fix_dij || f.varhato?.napi_atlag == null ? "–" : szam(f.varhato.napi_atlag, egys(f))),
-          td(kar != null ? `<div class="minisav${kr.felhasznalt > kr.osszes ? " tullepve" : ""}"><div style="width:${kar}%"></div></div><div class="kicsi">${szam(Math.round(kr.felhasznalt))} / ${szam(kr.osszes, kr.egyseg)}</div>` : "–")]);
+          td(f.tagok ? (f.tagok.filter((t) => t.keret?.osszes).map((t) => {
+            const q = t.keret;
+            return `<div class="minisav${q.felhasznalt > q.osszes ? " tullepve" : ""}"><div style="width:${Math.min(100, (100 * q.felhasznalt) / q.osszes)}%"></div></div><div class="kicsi">${esc(t.nev)}: ${szam(Math.round(q.felhasznalt))} / ${szam(q.osszes, q.egyseg)}</div>`;
+          }).join("") || "–") : kar != null ? `<div class="minisav${kr.felhasznalt > kr.osszes ? " tullepve" : ""}"><div style="width:${kar}%"></div></div><div class="kicsi">${szam(Math.round(kr.felhasznalt))} / ${szam(kr.osszes, kr.egyseg)}</div>` : "–")]);
       });
       const lab = ["", "", "", ft(ossz(fiokok.map((f) => (f.fix_dij ? null : f.eddig?.osszeg)))), "", ft(ossz(fiokok.map(varhatoDij))), "", ""];
       return tabla(["Folyó időszak", "Eltelt", "Fogyasztás eddig", "Díj eddig", "Várható fogyasztás", "Várható díj", "Napi átlag", "Kedvezményes keret"], sorok, lab,
@@ -1022,7 +1099,7 @@ class HuRezsiPanel extends HTMLElement {
       const ertekek = csoportok.map(({ kozos, tagok }) => {
         const f0 = tagok[0], e = f0.fejlec?.egyenleg, evek = tagok.map((f) => f.egyenleg).filter(Boolean);
         return {
-          f: tagok.length > 1 ? { ...f0, nev: kozos } : f0, tobb: tagok.length > 1,
+          f: tagok.length > 1 ? { ...f0, nev: MVM_ARAM, tagnevek: tagok.map((t) => t.nev) } : f0, tobb: tagok.length > 1,
           hama: ossz(tagok.map(hama)), egyenleg: ossz(evek.map((v) => v.egyenleg)),
           ev: [...new Set(evek.map((v) => `${nap(v.ev_tol)} – ${nap(v.ev_ig)}`))].join("<br>") || "–",
           varhato: ossz(evek.map((v) => v.varhato_eves)), befizetve: ossz(evek.map((v) => v.befizetve)),
@@ -1312,10 +1389,17 @@ class HuRezsiPanel extends HTMLElement {
     if (!d.open) d.showModal();
   }
 
+  _reklamHtml() {
+    return `<!doctype html><html lang="hu"><head><meta charset="utf-8"><title>Számlakifogás</title><style>
+      @page { size: A4; margin: 18mm 17mm; } body { font: 10.5pt/1.42 "Segoe UI", Roboto, Arial, sans-serif; color: #000; } p { margin: 0 0 7pt; } ol, ul { margin: 0 0 7pt 17pt; padding: 0; } li { margin-bottom: 3pt; }
+      h3 { font-size: 13pt; margin: 14pt 0 6pt; } h3.uj { break-before: page; } h4 { font-size: 11pt; margin: 10pt 0 4pt; } .kiem { border: 1pt solid #333; padding: 6pt 9pt; margin: 7pt 0; } .kicsi { font-size: 9pt; }
+      table { border-collapse: collapse; width: 100%; font-size: 8.5pt; margin: 4pt 0 8pt; } td, th { border: .5pt solid #999; padding: 1.5pt 4pt; text-align: right; } td.b, th.b { text-align: left; } th { background: #eee; } tr { break-inside: avoid; } tr.o td { font-weight: 700; }
+    </style></head><body>${this.shadowRoot.querySelector("#reklambody .level")?.innerHTML || this._reklamLevel || ""}</body></html>`;
+  }
+
   _reklamNyomtat() {
-    const html = `<!doctype html><html lang="hu"><head><meta charset="utf-8"><title>Számlakifogás</title><style>
-      @page { size: A4; margin: 22mm 20mm; } body { font: 11pt/1.5 "Segoe UI", Roboto, Arial, sans-serif; color: #000; } p { margin: 0 0 10pt; }
-    </style></head><body>${this._reklamLevel || ""}</body></html>`;
+    if (!this.shadowRoot.querySelector("#reklambody .level") && !this._reklamLevel) return; // nincs levél (pl. nem készíthető el)
+    const html = this._reklamHtml();
     this._nyomtatoKeret?.remove();
     const f = (this._nyomtatoKeret = document.createElement("iframe"));
     f.setAttribute("aria-hidden", "true");
@@ -1368,7 +1452,7 @@ class HuRezsiPanel extends HTMLElement {
       const e = f.esedekes || { e_havi_szamlak: [], e_havi_varhato: 0 };
       const kiallitott = e.e_havi_szamlak.map((x) => `${nap(x.kelte)}: ${ft(x.osszeg)} (${f.kozmu === "kozos" ? "előírás" : "kiállítva"})`);
       const varhato = e.e_havi_varhato > 0 ? [`<span class="esedekesmajd">${nap(e.kovetkezo_datum)} körül kb. ${ft(e.e_havi_varhato)}${e.elmaradt ? " – késik" : ""}</span>`] : [];
-      const uton = (f.uton_szamlak || []).map((x) => `<span class="esedekesmajd">${nap(x.tol)} – ${nap(x.ig)}: ${x.levonva && !x.osszeg ? "nincs fizetendő (túlfizetésből)" : `kb. ${ft(x.osszeg)}`} (még nem érkezett)</span>`);
+      const uton = (f.uton_szamlak || []).map((x) => `<span class="esedekesmajd">${nap(x.kezdet || x.tol)} – ${nap(x.ig)}: ${x.levonva && !x.osszeg ? "nincs fizetendő (túlfizetésből)" : `kb. ${ft(x.osszeg)}`} (még nem érkezett)</span>`);
       return `<li><b>${esc(f.nev)}</b>: ${[...kiallitott, ...varhato, ...uton].join(", ")}</li>`;
     });
     return sorok.length ? `<ul class="esedekes">${sorok.join("")}</ul>` : "";
@@ -1647,7 +1731,7 @@ class HuRezsiPanel extends HTMLElement {
         <div><div class="cimke">Még nem érkezett számla ${info("Lezárt időszak, amelyre még nem jött számla – várhatóan hamarosan megérkezik. Az összeg a Rezsikövető számítása a mért fogyasztásból (becsült); a számla beérkezésekor eltűnik innen. Az otthon „ebben a hónapban esedékes” összegében is szerepel.")}</div>
           <div class="ertek${reszben && !ossz ? " fedezett" : " esedekesmajd"}">${ft(reszben ? dij : ossz)}</div>
           ${reszben ? `<div class="kicsi">${ossz ? `fizetendő kb. ${ft(ossz)} – a többit a túlfizetés fedezi` : "fizetendő 0 Ft – a túlfizetés fedezi"}</div>` : ""}
-          ${f.uton_szamlak.map((x) => `<div class="kicsi">${nap(x.tol)} – ${nap(x.ig)}: ${szam(Number(x.mennyiseg), egyseg)} · díj kb. ${ft(x.osszeg_brutto ?? x.osszeg)}</div>`).join("")}
+          ${f.uton_szamlak.map((x) => `<div class="kicsi">${nap(x.kezdet || x.tol)} – ${nap(x.ig)}: ${szam(Number(x.mennyiseg), egyseg)} · díj kb. ${ft(x.osszeg_brutto ?? x.osszeg)}</div>`).join("")}
           ${this._elsoSzamla(f, diktalasos)}</div>`);
     }
     // D (dinamikus) árszabás elemzés – csak A1 fióknál, és csak ha az elmúlt 12 hónapban volt kereten felüli
@@ -1749,9 +1833,9 @@ class HuRezsiPanel extends HTMLElement {
     const eves = u.utolso_eves_leolvasas && u.utolso_eves_leolvasas !== u.kezdo.datum ? u.utolso_eves_leolvasas : null;
     const sorok = [];
     if (elozoNap(elso.tol) === u.kezdo.datum && eves && elso.ig === eves)
-      sorok.push(`<b>${nap(elso.tol)} – ${nap(elso.ig)}</b>: a birtokba vételtől az éves leolvasásig. Ezt a szolgáltató az éves leolvasáskor (${nap(eves)}) leolvasott állással számolja el.`);
+      sorok.push(`<b>${nap(elso.kezdet || elso.tol)} – ${nap(elso.ig)}</b>: a birtokba vételtől az éves leolvasásig. Ezt a szolgáltató az éves leolvasáskor (${nap(eves)}) leolvasott állással számolja el.`);
     if (diktalasos && u.diktalasi_ablak && f.varhato)
-      sorok.push(`<b>${eves ? "Új elszámolási év" : "Folyó időszak"} (${nap(kovNap(f.idoszak.tol))} –)</b>: a következő számla a <b>${kovDiktalas(u.diktalasi_ablak, f.idoszak.ig)}</b> diktálás után készül, a diktált állás szerint – a mostani fogyasztással kb. <b>${ft(f.varhato.osszeg)}</b>.${eves ? ` ${info("Az éves leolvasás utáni első diktálási ablak kimarad, ha 20 napon belül van: az MVM a következő hónapig vár (pl. 2025: leolvasás okt. 1., a következő számla okt. 2. – nov. 10.).")}` : ""}`);
+      sorok.push(`<b>${eves ? "Új elszámolási év" : "Folyó időszak"} (${nap(f.idoszak.tol)} –)</b>: a következő számla a <b>${kovDiktalas(u.diktalasi_ablak, f.idoszak.ig)}</b> diktálás után készül, a diktált állás szerint – a mostani fogyasztással kb. <b>${ft(f.varhato.osszeg)}</b>.${eves ? ` ${info("Az éves leolvasás utáni első diktálási ablak kimarad, ha 20 napon belül van: az MVM a következő hónapig vár (pl. 2025: leolvasás okt. 1., a következő számla okt. 2. – nov. 10.).")}` : ""}`);
     if (!sorok.length) return "";
     return `<div class="elsoszamla"><div class="escim"><b>Az első számla</b> ${info(
       "Új fióknál még nincs számla, ezért a Rezsikövető a mért fogyasztásból becsül. Az MVM az éves leolvasás napjáig külön számlát küld (pl. 2025: szept. 10. – okt. 1., 12 nappal a leolvasás után); az új elszámolási év a leolvasás másnapján indul. Az első számla megérkezése után a kártya a számla adataival számol tovább.")}</div>
@@ -1771,7 +1855,7 @@ class HuRezsiPanel extends HTMLElement {
         <div class="kicsi">${f.esedekes?.szunetel ? "a számlázás szünetel" : f.megszunt ? "nem várható több számla" : "nincs adat"}</div></div>`
       : `<div class="fjblokk"><div class="cimke">Következő számla ${info(esc(k.magyarazat) + (k.kelte ? ` Várható kelte: ${nap(k.kelte)} körül.` : ""))}</div>
         <div class="ertek${k.dij > k.fizetendo && !k.fizetendo ? " fedezett" : " esedekesmajd"}">${ft(k.dij)} ${jel(k.cimke, k.magyarazat)}</div>
-        <div class="kicsi">${k.folyo ? fejIdoszak(f.idoszak.tol, f.idoszak.ig, diktalasos) : k.tol && k.ig ? `${fejNap(k.tol)} – ${fejNap(k.ig)}` : ""}${k.kesik ? `${k.tol ? " · " : ""}<span class="figyszoveg">késik</span>` : k.kelte && !k.folyo ? `${k.tol ? " · " : ""}számla ${fejNap(k.kelte)} körül` : ""}</div>
+        <div class="kicsi">${k.folyo ? fejIdoszak(f.idoszak.tol, f.idoszak.ig, diktalasos) : k.tol && k.ig ? `${fejNap(k.kezdet || k.tol)} – ${fejNap(k.ig)}` : ""}${k.kesik ? `${k.tol ? " · " : ""}<span class="figyszoveg">késik</span>` : k.kelte && !k.folyo ? `${k.tol ? " · " : ""}számla ${fejNap(k.kelte)} körül` : ""}</div>
         ${k.dij > k.fizetendo ? `<div class="kicsi turfizetes">${k.fizetendo ? `fizetendő kb. ${ft(k.fizetendo)} – a többit a túlfizetés fedezi` : "fizetendő 0 Ft – a túlfizetés fedezi"}</div>` : ""}</div>`;
     // Fix (havi) díjnál a hónap az egység: a csík és a szöveg hónapokban.
     const havi = fo && fo.honapok != null;
@@ -1813,11 +1897,11 @@ class HuRezsiPanel extends HTMLElement {
     if (!f.fix_dij && u.utolso_eves_leolvasas) {
       if (u.kezdo && !u.van_szamla && u.utolso_eves_leolvasas === u.kezdo.datum) {
         sorok.push(`Éves leolvasás: még nincs rögzítve ${info(
-          "Ha a szolgáltató leolvasója már járt itt, rögzítsd az állást a Mérőállás ablakban az „Éves (elszámoló) leolvasás” jelöléssel: innen indul az új elszámolási év és a kedvezményes keret, és ehhez igazodik a következő éves leolvasás is.")}`);
+          "Ha a szolgáltató leolvasója már járt itt, rögzítsd az állást a Mérőállás ablakban az „Éves (elszámoló) leolvasás” jelöléssel: ez hiteles mérőállás, az átalány éves elszámolása és a következő éves leolvasás ehhez igazodik. Áramnál a kedvezményes keret ettől független: aug. 1. – júl. 31. (H-tarifánál a nyári idény).")}`);
       } else {
         const be = u.eves_allas_betaplalas != null;  // napelem: mindkét regiszter
         sorok.push(`Éves leolvasás: ${nap(u.utolso_eves_leolvasas)}${u.eves_allas != null ? ` · ${be ? "1.8.0 " : ""}${allas(u.eves_allas, egys)}` : ""}${be ? ` · 2.8.0 ${allas(u.eves_allas_betaplalas, egys)}` : ""}${u.kezdo && !u.van_szamla ? ` ${info(
-          "A szolgáltató éves (elszámoló) leolvasása: eddig tartott az előző elszámolási év (a birtokba vételtől), innen indul az új – a kedvezményes keret is innen számol. Az ez előtti fogyasztást a szolgáltató ezzel az állással számolja el.")}` : ""}`);
+          "A szolgáltató éves (elszámoló) leolvasása: az átalány éves elszámolása idáig tart (a birtokba vételtől). Áramnál a kedvezményes keret ettől független: aug. 1. – júl. 31. (H-tarifánál a nyári idény). Az ez előtti fogyasztást a szolgáltató ezzel az állással számolja el.")}` : ""}`);
       }
     }
     // Napelem: a legutóbbi állás mindkét regiszteren (vételezés 1.8.0, betáplálás 2.8.0).
@@ -1828,7 +1912,10 @@ class HuRezsiPanel extends HTMLElement {
     else if (!f.fix_dij && u.kovetkezo_elszamolas && !f.megszunt)
       sorok.push(`${u.elszamolas_honap === 12 ? "Következő éves leolvasás" : "Következő elszámolás"}: ${nap(u.kovetkezo_elszamolas)} körül`);
     if (f.megszunt) sorok.push(`Lezárva: ${nap(f.megszunt.datum)} (végelszámolás)`);
-    else if (u.kovetkezo_diktalas) sorok.push(`Diktálás: ${nap(u.kovetkezo_diktalas[0])} – ${nap(u.kovetkezo_diktalas[1])}`);
+    else if ((u.kovetkezo_diktalas || u.diktalasi_ablak) && this._mxDiktalas(f, new Date())?.kesz) {
+      const dx = this._mxDiktalas(f, new Date());
+      sorok.push(`Diktálás: <strong>✓ diktálva ${nap(dx.kesz.datum)}</strong>${dx.kov ? ` (következő: ${nap(dx.kov[0])} – ${nap(dx.kov[1])})` : ""}`);
+    } else if (u.kovetkezo_diktalas) sorok.push(`Diktálás: ${nap(u.kovetkezo_diktalas[0])} – ${nap(u.kovetkezo_diktalas[1])}`);
     else if (u.diktalasi_ablak) sorok.push(`Diktálás: <strong>${kovDiktalas(u.diktalasi_ablak, ["diktalas", "atalany"].includes(f.elszamolas_mod) ? f.idoszak?.ig : null)}</strong> (minden hónap ${u.diktalasi_ablak[0]}–${u.diktalasi_ablak[1]}.)`);
     // Átalány (nem víz): amiből a havi fizetendőt számolja.
     const at = f.atalany || f.atalany_info;
@@ -2038,6 +2125,7 @@ class HuRezsiPanel extends HTMLElement {
     this.shadowRoot.getElementById("reklamnyomtat").addEventListener("click", () => this._reklamNyomtat());
     this.shadowRoot.getElementById("reklammasol").addEventListener("click", async () => {
       const txt = this.shadowRoot.querySelector("#reklambody .level")?.innerText || "";
+      if (!txt) return;
       try { await navigator.clipboard.writeText(txt); } catch { /* nem támogatott */ }
     });
   }
@@ -2063,11 +2151,38 @@ class HuRezsiPanel extends HTMLElement {
     }
     this._eves = { entryId, sid, k };
     r.getElementById("evescim").textContent = `Éves elszámolási kimutatás – ${k.fiok}`;
-    r.getElementById("evesev").innerHTML = k.jeloltek.map(([a, b]) =>
-      `<option value="${a}" ${a === k.ev_tol ? "selected" : ""}>${nap(a)} – ${nap(b)}</option>`).join("");
+    const JOGI_NEV = { ev: "kedvezményes év", nyari: "nyári idény", teli: "téli idény" };
+    r.getElementById("evesev").innerHTML = k.jeloltek.map((x) =>
+      `<option value="${x.tol}" ${x.tol === k.valasztott ? "selected" : ""}>${esc(x.nev)}. ${JOGI_NEV[x.fajta]}${x.allapot === "folyamatban" ? " (folyamatban)" : ""}</option>`).join("");
     body.innerHTML = this._evesHtml(k);
     r.getElementById("evesnyomtat").disabled = false;
-    r.getElementById("evesreklam").disabled = !k.megallapitasok.some((m) => m.hatas_ft != null);
+    r.getElementById("evesreklam").disabled = !k.megallapitasok.some((m) => m.hatas_ft != null || m.tipus === "sav_hiany");
+  }
+
+  // A jogszabály szerinti időszakok: az utolsó lezárt és a folyamatban lévő kedvezményes év (H: nyári idény), számlánként.
+  _jogiHtml(k) {
+    const sorok = k.jogi_idoszakok || [];
+    if (!sorok.length) return "";
+    const h = k.dijszabas === "villany/h", kw = (v) => (v == null ? "–" : szam(Math.round(v), "kWh")), rn = (x) => (x ? rovidNap(x) : "–");
+    const egy = (s) => {
+      const lez = s.allapot === "lezart", teli = s.fajta === "teli";
+      const cim = `${s.fajta === "ev" ? `${esc(s.nev)}. kedvezményes év` : teli ? `${esc(s.nev)}. téli idény` : `${esc(s.nev)}. nyári idény`} – ${lez ? "lezárt" : "folyamatban"}`;
+      const keretS = teli ? "A fűtési idényben nincs kedvezményes keret, a téli H-ár jár." : `Keret a teljes időszakra: ${SZAM.format(k.keret_ev)} kWh × ${s.nap} / ${s.nap > 300 ? (s.nap === 366 ? 366 : 365) : 365} nap = <b>${kw(s.keret_teljes)}</b>${s.kezdet !== s.tol ? ` (a mérés ${rn(s.kezdet)}-tól indult)` : ""}.`;
+      const ossz = teli
+        ? `<tr><td class="bal">Téli fogyasztás (${rn(s.kezdet)} – ${rn(s.eddig)})</td><td>${kw(s.mert)}</td></tr><tr><td class="bal">Számlákon téli áron${s.szamlazva_ig ? ` (${rn(s.szamlazva_ig)}-ig)` : ""}</td><td>${kw(s.szamla_teli)}</td></tr>`
+        : `<tr><td class="bal">Mért fogyasztás (${rn(s.kezdet)} – ${rn(s.eddig)})</td><td>${kw(s.mert)}</td></tr>
+           <tr><td class="bal">Járó keret eddig (${s.nap_eddig} nap)</td><td>${kw(s.keret_eddig)}</td></tr>
+           <tr><td class="bal">Ebből kedvezményes / piaci áron járna</td><td>${kw(s.kedvezmenyes)} / ${kw(s.piaci)}</td></tr>
+           ${s.szamlazva_ig ? `<tr><td class="bal">Számlázva ${rn(s.szamlazva_ig)}-ig: járó keret</td><td>${kw(s.keret_szamlazva)}</td></tr>
+           <tr><td class="bal">Számlákon kedvezményes / piaci (a tételek dátuma szerint)</td><td>${kw(s.szamla_kedvezmenyes)} / ${kw(s.szamla_piaci)}</td></tr>
+           <tr class="${s.hiany != null && Math.abs(s.hiany) >= 2 ? "evhiba" : "evossz"}"><td class="bal">${s.hiany != null && s.hiany <= -2 ? "A számlákon a mért nyári fogyasztásnál több van kedvezményes áron" : "Hiányzó kedvezményes mennyiség"}</td><td><b>${kw(s.hiany != null && s.hiany <= -2 ? -s.hiany : s.hiany)}</b>${s.hiany_ft ? ` · kb. ${ft(s.hiany_ft)}` : ""}</td></tr>` : `<tr><td class="bal" colspan="2">Erre az időszakra még nincs elszámoló számla.</td></tr>`}`;
+      const reszek = s.reszek.length ? `<div class="tablagorgeto"><table class="teteltabla evtabla"><thead><tr><th class="bal">Számla</th><th class="bal">Az időszakba eső rész</th><th>Mért</th>${teli ? "<th>Számlán téli</th>" : "<th>Keret</th><th>Számlán kedv.</th><th>Számlán piaci</th>"}</tr></thead><tbody>
+        ${s.reszek.map((r) => `<tr><td class="bal">${esc(r.sorszam)}</td><td class="bal">${rn(r.tol)} – ${rn(r.ig)}</td><td>${kw(r.mert)}</td>${teli ? `<td>${kw(r.szamla_fo)}</td>` : `<td>${kw(r.keret)}</td><td>${kw(r.szamla_fo)}</td><td>${kw(r.szamla_piaci)}</td>`}</tr>`).join("")}</tbody></table></div>` : "";
+      return `<div class="jogi"><h5>${cim}: ${rn(s.tol)} – ${rn(s.ig)}</h5><p class="kicsi">${keretS}${s.lyuk ? " Figyelem: a számlák időszakai között lyuk van, valószínűleg hiányzik egy számla." : ""}</p>
+        <div class="tablagorgeto"><table class="teteltabla evtabla evdij"><tbody>${ossz}</tbody></table></div>${reszek}</div>`;
+    };
+    return `<h4>${h ? "Jogszabály szerinti időszakok: nyári idény (ápr. 16. – okt. 14.)" : "Jogszabály szerinti időszakok: kedvezményes év (aug. 1. – júl. 31.)"}</h4>
+      <p class="kicsi">4/2011. (I. 31.) NFM rendelet 6. §. Ez független az éves leolvasástól és a fenti évválasztótól.${h ? " A H-tarifa kerete a fűtési idényen kívüli napokra jár, ezért a 2523 kWh-nak csak az időarányos része (kb. a fele) használható a nyári mérőn." : ""}</p>${sorok.map(egy).join("")}`;
   }
 
   _evesHtml(k) {
@@ -2084,10 +2199,11 @@ class HuRezsiPanel extends HTMLElement {
     const csat = h ? ["h_teli", "h_nyari"] : ["vetelezes"];
     const napok = Object.keys(k.allasok[csat[0]] || {}).sort();
     const allasSor = napok.map((x) => {
-      const esemeny = x === k.ev_tol ? (k.sorok[0]?.tol === x ? "kezdőállás" : "éves leolvasás (kezdő)") : x === k.ev_ig ? "éves leolvasás (záró)"
-        : `számla zárónapja (${esc(k.sorok.find((s) => s.ig === x)?.sorszam || "")})`;
+      const zaro = k.sorok.find((s) => s.ig === x);
+      const esemeny = x === k.ev_tol ? (k.sorok[0]?.tol === x ? "kezdőállás" : "az összevetés kezdete") : zaro?.sorszam ? `számla zárónapja (${esc(zaro.sorszam)})` : x === k.ev_ig ? "utolsó ismert állás" : "időszak határa";
+      const becs = (k.allasok_becsult || []).includes(x) ? " (két mérőállás közt arányosan becsült)" : "";
       const ert = csat.map((c) => k.allasok[c][x]);
-      return `<tr${x === k.ev_tol || x === k.ev_ig ? ' class="evossz"' : ""}><td>${nap(x)}</td><td class="bal">${esemeny}</td>${ert.map((v) => `<td>${v == null ? "–" : SZAM.format(Math.round(v))}</td>`).join("")}${h ? `<td>${SZAM.format(Math.round(ert[0] + ert[1]))}</td>` : ""}</tr>`;
+      return `<tr${x === k.ev_tol || x === k.ev_ig ? ' class="evossz"' : ""}><td>${nap(x)}</td><td class="bal">${esemeny}${becs}</td>${ert.map((v) => `<td>${v == null ? "–" : SZAM.format(Math.round(v))}</td>`).join("")}${h ? `<td>${SZAM.format(Math.round(ert[0] + ert[1]))}</td>` : ""}</tr>`;
     }).join("");
     const fogyEv = csat.reduce((t, c) => t + (k.allasok[c][k.ev_ig] - k.allasok[c][k.ev_tol]), 0);
     const sorok = k.sorok.map((s) => {
@@ -2107,12 +2223,15 @@ class HuRezsiPanel extends HTMLElement {
     const hibak = k.megallapitasok.filter((m) => m.hatas_ft != null && m.tipus !== "elteres");
     const hibaOssz = hibak.reduce((t, m) => t + m.hatas_ft, 0);
     return `
-      <p class="kicsi">Elszámolási év: <b>${nap(k.ev_tol)} – ${nap(k.ev_ig)}</b>${h ? " · téli idény okt. 15. – ápr. 15. (1.81, H-ár), nyári ápr. 16. – okt. 14. (1.82, A1-ár saját kerettel)" : ""} · ${esc(k.szolgaltato || "")}
+      <p class="kicsi">Összevetett számlák: <b>${nap(k.ev_tol)} – ${nap(k.ev_ig)}</b>${h ? " · téli idény okt. 15. – ápr. 15. (1.81, H-ár), nyári ápr. 16. – okt. 14. (1.82, A1-ár saját kerettel)" : ""} · ${esc(k.szolgaltato || "")}
         ${u.nev ? `<br>${esc(u.nev)} · azonosító: ${esc(u.azonosito || "–")} · ${esc(u.hely || "")} · mérési pont: ${esc(u.meresi_pont || "–")}` : ""}${k.mero ? ` · mérő: ${esc(k.mero)}` : ""}</p>
       ${k.hianyos ? `<div class="figyszoveg">Néhány időszakhoz nincs mérőállás – ezek kimaradtak.</div>` : ""}
+      ${this._jogiHtml(k)}
+      <h4>A számlák összevetése</h4>
+      <p class="kicsi">A választott időszakot érintő számlák egészben, a nyomtatott értékükkel: ${nap(k.ev_tol)} – ${nap(k.ev_ig)}.</p>
       <h4>Mérőállások</h4>
       <div class="tablagorgeto"><table class="teteltabla evtabla"><thead><tr><th>Nap</th><th class="bal">Esemény</th>${h ? "<th>1.81 téli</th><th>1.82 nyári</th><th>összesen</th>" : "<th>Mérőállás (kWh)</th>"}</tr></thead>
-        <tbody>${allasSor}</tbody><tfoot><tr class="evossz"><td class="bal" colspan="${h ? 4 : 2}">Fogyasztás az elszámolási évben</td><td>${kw(fogyEv)}</td></tr></tfoot></table></div>
+        <tbody>${allasSor}</tbody><tfoot><tr class="evossz"><td class="bal" colspan="${h ? 4 : 2}">Fogyasztás az összevetett időszakban</td><td>${kw(fogyEv)}</td></tr></tfoot></table></div>
       <h4>Összesítő – a számlázott időszak</h4>
       <div class="tablagorgeto"><table class="teteltabla evtabla"><thead><tr><th class="bal"></th><th>Mérés és díjszabás szerint</th><th>Számlák szerint</th><th>Különbség</th></tr></thead><tbody>
         <tr><td class="bal">Fogyasztás / kiszámlázott</td><td>${kw(o.mert)}</td><td>${kw(o.kiszamlazott)}</td><td>${kw(o.mert - o.kiszamlazott)}</td></tr>
@@ -2170,31 +2289,98 @@ class HuRezsiPanel extends HTMLElement {
     </style></head><body><h2>Éves elszámolási kimutatás – ${esc(k.fiok)}</h2>${this._evesHtml(k).replace(/<h4>[^]*?<\/table><\/div>/g, (b) => `<div class="blokk">${b}</div>`)}</body></html>`);
   }
 
-  _evesReklam() {
-    const k = this._eves?.k;
-    if (!k) return;
-    const u = k.ugyfel || {}, o = k.osszesen, h = k.dijszabas === "villany/h", ma = new Date().toLocaleDateString("hu-HU");
-    const hibak = k.megallapitasok.filter((m) => m.hatas_ft != null);
-    const levontak = k.megallapitasok.filter((m) => m.tipus === "nem_levont");
-    const ossz = hibak.reduce((t, m) => t + m.hatas_ft, 0);
-    const kw = (v) => szam(Math.round(v), "kWh");
-    const cs = h ? ["h_teli", "h_nyari"] : ["vetelezes"];
-    const all = (x) => cs.map((c) => SZAM.format(Math.round(k.allasok[c][x]))).join(" / ");
-    const level = `<p>${/MVM/i.test(k.szolgaltato || "") ? "MVM Next Energiakereskedelmi Zrt.<br>Ügyfélszolgálat (ugyfelszolgalat@mvm.hu)" : `${esc(k.szolgaltato || "Szolgáltató")}<br>Ügyfélszolgálat`}</p>
-      <p><b>Tárgy: számlakifogás – a ${nap(k.ev_tol)} – ${nap(k.ev_ig)} elszámolási év${h ? " (H-tarifa)" : ""} elszámolása; ${hibak.map((m) => esc(m.sorszam)).join(", ")} sz. számla</b></p>
-      <p>Felhasználó: ${esc(u.nev || "…")}<br>Felhasználó azonosító: ${esc(u.azonosito || "…")}<br>Felhasználási hely: ${esc(u.hely || "…")}<br>Mérési pont: ${esc(u.meresi_pont || "…")}${k.mero ? ` · Mérő: ${esc(k.mero)}` : ""}</p>
-      <p>Tisztelt Ügyfélszolgálat!</p>
-      <p>Az elszámolási évet a mérőállások és az Önök számlái alapján összesítettem (a kimutatást mellékelem). Kezdő állás (${nap(k.ev_tol)}): <b>${all(k.ev_tol)}</b>${h ? " (1.81 / 1.82)" : " kWh"}, záró állás (${nap(k.ev_ig)}, éves leolvasás): <b>${all(k.ev_ig)}</b>${h ? "" : " kWh"}. A ${o.ig ? nap(o.ig).replace(/\.$/, "") : ""}-ig kiállított elszámoló számlák a mért ${kw(o.mert)} fogyasztásra ${kw(o.kiszamlazott)}-t számláztak ki; a díj a mérés és a díjszabás szerint ${ft(o.helyes)}, a számlák szerint ${ft(o.mvm)}.</p>
-      <p>Az eltérés oka:</p><ol>${hibak.map((m) => `<li>a <b>${esc(m.sorszam)}</b> sz. számla (${nap(m.tol)} – ${nap(m.ig)}): ${esc(m.szoveg)} (${m.hatas_ft > 0 ? "kiszámlázatlan" : "túlszámlázott"}: ${ft(Math.abs(m.hatas_ft))});</li>`).join("")}</ol>
-      <p>Kérem a fenti számlák felülvizsgálatát és helyesbítését a tényleges fogyasztás szerint (becslésem szerint a különbözet összesen ${ft(Math.abs(ossz))} ${ossz >= 0 ? "a szolgáltató javára" : "a javamra"})${levontak.length ? `, a ${levontak.map((m) => esc(m.sorszam)).join(", ")} sz. részszámla levonását a következő elszámoló számlában` : ""}${k.fuggo ? `, valamint a ${nap(k.fuggo.tol)} – ${nap(k.fuggo.ig)} közötti időszak elszámolását a ${nap(k.ev_ig).replace(/\.$/, "")}-i éves leolvasás alapján` : ""}, és tájékoztatást arról, hogyan rendezik a különbözetet és hogyan alakul a folyószámla egyenlege.</p>
-      <p>Válaszukat a fenti elérhetőségeken várom.</p>
-      <p>Melléklet: éves elszámolási kimutatás (${nap(k.ev_tol)} – ${nap(k.ev_ig)})</p>
-      <p>Kelt: ${ma}</p><p>Tisztelettel:<br><br>……………………………<br>${esc(u.nev || "")}</p>`;
-    this.shadowRoot.getElementById("reklambody").innerHTML = `<div class="level">${level}</div>
-      <p class="kicsi">A forint-összegek a Rezsikövető tájékoztató számításai (a díjszabás és a mérés szerint); a szolgáltató helyesbítése ettől eltérhet. Küldés előtt nézd át, és csatold a kimutatást (Nyomtatás / PDF az éves kimutatás ablakában).</p>`;
-    this._reklamLevel = level;
-    const d = this.shadowRoot.getElementById("reklamdlg");
+  // Számlakifogás-tervezet (hu_rezsi/kifogas_tervezet): a levél szövege és a mellékletek – a szöveg szerkeszthető, nyomtatható.
+  async _evesReklam() {
+    if (!this._eves?.k) return;
+    const r = this.shadowRoot, body = r.getElementById("reklambody"), d = r.getElementById("reklamdlg");
+    body.innerHTML = `<div class="kicsi grafvar">Számolás…</div>`;
+    this._reklamLevel = "";
     if (!d.open) d.showModal();
+    let t;
+    try {
+      t = await this._hass.callWS({ type: "hu_rezsi/kifogas_tervezet", entry_id: this._eves.entryId, sid: this._eves.sid, ev_tol: this._eves.k.valasztott });
+    } catch (e) {
+      body.innerHTML = `<div class="figyszoveg">${esc(e.message || String(e))}</div>`;
+      return;
+    }
+    const figy = (lista) => lista.map((f) => `<li>${esc(f.szoveg)}</li>`).join("");
+    if (t.allapot === "nem_keszitheto") {
+      body.innerHTML = `<div class="figyszoveg"><b>A tervezet most nem készül el, mert valami nem jön ki:</b><ul>${figy(t.figyelmeztetesek.filter((f) => f.blokkolo))}</ul></div>
+        ${t.figyelmeztetesek.some((f) => !f.blokkolo) ? `<p class="kicsi">További megjegyzések:</p><ul class="kicsi">${figy(t.figyelmeztetesek.filter((f) => !f.blokkolo))}</ul>` : ""}`;
+      return;
+    }
+    if (t.allapot === "nincs_elteres") {
+      body.innerHTML = t.masik_ev
+        ? `<p>Ebben a kedvezményes évben nincs kifogásolható eltérés. A kedvezményes keret hiánya a <b>${esc(t.masik_ev)}.</b> évben van: az időszakválasztóban azt válaszd, és onnan készítsd a tervezetet.</p>`
+        : `<p>Ebben az elszámolási évben a számlák és a számítás között nincs kifogásolható eltérés.</p>`;
+      return;
+    }
+    const level = this._kifogasLevel(t);
+    body.innerHTML = `${t.figyelmeztetesek.length ? `<div class="figyszoveg"><b>Küldés előtt nézd át:</b><ul>${figy(t.figyelmeztetesek)}</ul></div>` : ""}
+      <p class="kicsi">A levél szövege itt szerkeszthető (pl. a korábbi levelezés beírható). A forint-összegek a Rezsikövető tájékoztató számításai; a szolgáltató helyesbítése ettől eltérhet. A jogszabályi hivatkozásokat ${rovidNap(t.jog_ellenorizve)} ellenőriztük; ez nem jogi tanács, küldés előtt ellenőrizd.</p>
+      <div class="level kifogas" contenteditable="true">${level}</div>`;
+  }
+
+  _kifogasLevel(t) {
+    const u = t.ugyfel || {}, o = t.osszesen, h = t.dijszabas === "villany/h", ma = new Date().toLocaleDateString("hu-HU");
+    const n = (v) => (v == null ? "–" : SZAM.format(Math.round(v))), f = (v) => (v == null ? "–" : FT.format(Math.round(v)));
+    const idsz = (i) => (i ? `${rovidNap(i[0])} – ${rovidNap(i[1])}` : "–");
+    const a1 = t.dijak?.a1 || {}, hd = t.dijak?.h || {}, afa = a1.afa ?? 27, tiz = (v) => String(v ?? "").replace(".", ",");
+    const fsz = t.folyoszamla;
+    const lista = (l) => `<ol>${l.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>`;
+    // A jogszabály szerinti időszak, és hogy melyik számla esik utána (kiegészítésként szerepel).
+    const J = t.idoszak, JNEV = J ? ({ ev: `${esc(J.nev)}. kedvezményes év`, nyari: `${esc(J.nev)}. nyári idény`, teli: `${esc(J.nev)}. téli idény` }[J.fajta]) : "";
+    const jSep = (cim, oszlop) => `<tr><td class="b" colspan="${oszlop}"><i>${cim}</i></td></tr>`;
+    const utan = (s) => J && s.tol > J.ig;
+    const uSep = (lista, i, oszlop) => (J && utan(lista[i]) && (i === 0 || !utan(lista[i - 1])) ? jSep(`Kiegészítés: a ${JNEV} utáni számlák, amelyek a fogyasztását pótolják`, oszlop) : "");
+    const jogiT = J?.reszek?.length ? `<h4>A ${JNEV} (${rovidNap(J.tol)} – ${rovidNap(J.ig)}), a számlák tételei a saját dátumuk szerint</h4>
+      <table><tr><th class="b">Számla</th><th class="b">Az időszakba eső rész</th><th>Mért</th>${J.fajta === "teli" ? "<th>Számlán téli</th>" : "<th>Keret</th><th>Számlán kedv.</th><th>Számlán piaci</th>"}</tr>
+      ${J.reszek.map((r) => `<tr><td class="b">${esc(r.sorszam)}</td><td class="b">${idsz([r.tol, r.ig])}</td><td>${n(r.mert)}</td>${J.fajta === "teli" ? `<td>${n(r.szamla_fo)}</td>` : `<td>${n(r.keret)}</td><td>${n(r.szamla_fo)}</td><td>${n(r.szamla_piaci)}</td>`}</tr>`).join("")}
+      <tr class="o"><td class="b" colspan="2">Összesen (${J.nap_eddig} nap)</td><td>${n(J.mert)}</td>${J.fajta === "teli" ? `<td>${n(J.szamla_teli)}</td>` : `<td>${n(J.keret_szamlazva)}</td><td>${n(J.szamla_kedvezmenyes)}</td><td>${n(J.szamla_piaci)}</td>`}</tr></table>
+      ${J.hiany != null && J.fajta !== "teli" ? `<p class="kicsi">A soronkénti keret kerekített, az összesen sor a teljes számlázott részre számolt keret. ${t.keret_hiany ? `Hiányzik: ${n(J.keret_szamlazva)} – ${n(J.szamla_kedvezmenyes)} = <b>${n(J.hiany)} kWh</b>, bruttó ${ft(J.hiany_ft)}.` : ""}</p>` : ""}` : "";
+    const sorokM = t.sorok.map((s, i) => `${uSep(t.sorok, i, h ? 13 : 11)}<tr><td class="b">${esc(s.sorszam)}</td><td class="b">${idsz([s.tol, s.ig])}</td><td>${n(s.mvm.kiszamlazott)}</td><td>${n(s.mvm.kedvezmenyes)}</td><td>${n(s.mvm.piaci)}</td>${h ? `<td>${n(s.mvm.teli)}</td>` : ""}<td>${f(s.mvm.dij)}</td><td>${n(s.mert)}</td><td>${n(s.kedvezmenyes)}</td><td>${n(s.piaci)}</td>${h ? `<td>${n(s.teli)}</td>` : ""}<td>${f(s.helyes)}</td><td>${f(s.mvm.dij - s.helyes)}</td></tr>`).join("");
+    const sorokD = t.sorok.map((s, i) => { const j = s.dij || {}; return `${uSep(t.sorok, i, h ? 12 : 10)}<tr><td class="b">${idsz([s.tol, s.ig])}</td><td>${n(s.keret)}</td><td>${n(s.mert)}</td><td>${n(s.kedvezmenyes)}</td><td>${n(s.piaci)}</td>${h ? `<td>${n(s.teli)}</td>` : ""}<td>${f(j.kedvezmenyes)}</td><td>${f(j.piaci)}</td>${h ? `<td>${f((j.teli || 0) + (j.teli_rhd || 0))}</td>` : ""}<td>${f(j.rhd)}</td><td>${f(j.alapdij)}</td><td><b>${f(s.helyes)}</b></td></tr>`; }).join("");
+    const cs = h ? ["h_teli", "h_nyari"] : ["vetelezes"];
+    const allasok = cs.map((c) => `${h ? (c === "h_teli" ? "1.81 (téli): " : "1.82 (nyári): ") : ""}${Object.entries(t.allasok[c] || {}).map(([x, v]) => `${rovidNap(x)} ${n(v)}${(t.allasok_becsult || []).includes(x) ? "*" : ""}`).join(" · ")}`).join("<br>")
+      + ((t.allasok_becsult || []).length ? "<br>* két mérőállás közt arányosan becsült érték" : "");
+    const evek = t.kedv_evek.length ? `<h4>Kedvezményes évek (aug. 1. – júl. 31.)</h4><table><tr><th class="b">Év, számlázott rész</th><th>Nap</th><th>Fogyasztás</th><th>Járó keret</th><th>Számlákon kedvezményes</th><th>Hiányzik</th></tr>
+      ${t.kedv_evek.map((e0) => { const e = e0.teljes || e0; return `<tr${J && e0.ev === J.nev ? ' class="o"' : ""}><td class="b">${esc(e0.ev)}: ${idsz([e.tol, e.ig])}${e0.teljes ? "" : " (a kimutatás éve szerinti rész)"}</td><td>${e.nap}</td><td>${n(e.fogyasztas)}</td><td>${n(e.kedvezmenyes)}</td><td>${n(e.mvm_kedvezmenyes)}</td><td><b>${n(e.hiany)}</b></td></tr>`; }).join("")}</table>` : "";
+    const fszT = fsz ? `<h3 class="uj">3. melléklet – Folyószámla-egyeztetés${fsz.kozos ? ` (${esc(fsz.nev)})` : ""}</h3>
+      <p class="kicsi">A pozitív egyenleg tartozást, a negatív túlfizetést jelent. Nyitó egyenleg: ${f(fsz.nyito)} Ft. A nyomtatott egyenleg a számlán közölt, a nap végi állapotnak felel meg.</p>
+      <table><tr><th class="b">Dátum</th><th class="b">Tétel</th>${fsz.kozos ? `<th class="b">Fiók</th>` : ""}<th>Terhelés</th><th>Jóváírás</th><th>Egyenleg</th><th>Nyomtatott</th></tr>
+      ${fsz.sorok.map((s, i, l) => `${J && s.datum > J.ig && (i === 0 || l[i - 1].datum <= J.ig) ? jSep(`A ${JNEV} (${rovidNap(J.ig)}) után: a későbbi számlák és a mai egyenleg miatt`, fsz.kozos ? 7 : 6) : ""}<tr><td class="b">${rovidNap(s.datum)}</td><td class="b">${esc(s.megnevezes)}</td>${fsz.kozos ? `<td class="b">${esc(s.fiok || "")}</td>` : ""}<td>${s.kovetel ? f(s.kovetel) : ""}</td><td>${s.tartozik ? f(s.tartozik) : ""}</td><td>${f(s.egyenleg)}</td><td>${s.szolgaltato_egyenleg != null ? f(s.szolgaltato_egyenleg) : ""}</td></tr>`).join("")}
+      <tr class="o"><td class="b" colspan="${fsz.kozos ? 3 : 2}">Összesen (ebből befizetés: ${f(fsz.befizetes)} Ft)</td><td>${f(fsz.terheles)}</td><td>${f(fsz.jovairas + fsz.befizetes)}</td><td>${f(fsz.zaro)}</td><td></td></tr></table>` : "";
+    const jegy = t.szamlajegyzek.length ? `<h3 class="uj">${fsz ? 4 : 3}. melléklet – A figyelembe vett számlák (sztornókkal együtt)</h3>
+      <table><tr><th class="b">Kelte</th><th class="b">Sorszám</th><th class="b">Típus</th>${fsz?.kozos ? `<th class="b">Fiók</th>` : ""}<th class="b">Időszak</th><th>Számlaérték</th><th>Fizetendő</th><th class="b">Állapot</th></tr>
+      ${t.szamlajegyzek.map((x) => `<tr><td class="b">${rovidNap(x.kelte)}</td><td class="b">${esc(x.sorszam)}</td><td class="b">${esc({ resz: "részszámla", elszamolo: "elszámoló", storno: "sztornó", vegszamla: "végszámla" }[x.tipus] || x.tipus || "")}</td>${fsz?.kozos ? `<td class="b">${esc(x.fiok || "")}</td>` : ""}<td class="b">${idsz(x.idoszak)}</td><td>${f(x.szamlaertek)}</td><td>${f(x.fizetendo)}</td><td class="b">${esc(x.allapot || "")}${x.fizetve ? ` (${rovidNap(x.fizetve)})` : ""}</td></tr>`).join("")}</table>` : "";
+    const irany = t.osszeg.irany === "javamra" ? "a javamra" : "a szolgáltató javára";
+    return `<p>${/MVM/i.test(t.szolgaltato || "") ? "MVM Next Energiakereskedelmi Zrt.<br>Ügyfélszolgálat (ugyfelszolgalat@mvm.hu)" : `${esc(t.szolgaltato || "Szolgáltató")}<br>Ügyfélszolgálat`}</p>
+      <p><b>Tárgy: számlakifogás – a ${t.targy_szamlak.map(esc).join(", ")} sz. számla, a ${rovidNap(t.tol)} – ${rovidNap(t.ig)} közötti időszak elszámolása${h ? " (H-tarifa)" : ""}</b></p>
+      <p>Felhasználó: ${esc(u.nev || "…")} · Felhasználó azonosító: ${esc(u.azonosito || "…")}<br>Felhasználási hely: ${esc(u.hely || "…")}<br>Mérési pont: ${esc(u.meresi_pont || "…")}${t.mero ? ` · Mérő: ${esc(t.mero)}` : ""}</p>
+      <p>Tisztelt Ügyfélszolgálat!</p>
+      <div class="kiem"><b>A kifogás lényege.</b> ${esc(t.lenyeg)}</div>
+      <h4>Az eltérés oka</h4>${lista(t.okok)}
+      <h4>Jogszabályi és szerződéses alap</h4><ul>${t.jogalap.map((j) => `<li><b>${esc(j.cim)}:</b> ${esc(j.szoveg)}</li>`).join("")}</ul>
+      ${t.erveles.length ? `<h4>Az alkalmazás a konkrét esetre</h4>${t.erveles.map((x) => `<p>${esc(x)}</p>`).join("")}` : ""}
+      ${fsz?.kozos ? `<h4>Miért a számlaértékeket hasonlítom össze</h4><p>A fiókok (${esc(fsz.nev)}) egy folyószámlán vannak, ezért a „Fizetendő összeg” egy számlán sem az adott mérő díja: tartalmazza a másik fiókról átvezetett egyenleget is. A kimutatás ezért a bruttó számlaértékeket veti össze (1. melléklet), a pénzmozgást pedig külön, a számlákra nyomtatott egyenlegekhez egyeztetve vezeti le (3. melléklet).</p>` : ""}
+      <h4>Kérésem</h4>${lista(t.kerelmek)}
+      ${t.nem_vitatott.length ? `<p>Nem kifogásolom: ${esc(t.nem_vitatott.join(", "))}.</p>` : ""}
+      ${t.fuggo_szoveg ? `<p>${esc(t.fuggo_szoveg)}</p>` : ""}
+      <p>${esc(t.valasz)}</p>
+      <p>Mellékletek: 1. Számlánkénti összevetés · 2. A saját számítás levezetése${fsz ? " · 3. Folyószámla-egyeztetés" : ""}${t.szamlajegyzek.length ? ` · ${fsz ? 4 : 3}. A figyelembe vett számlák jegyzéke` : ""}</p>
+      <p>Kelt: ${ma}</p><p>Tisztelettel:<br><br>……………………………<br>${esc(u.nev || "")}</p>
+      <h3 class="uj">1. melléklet – Számlánkénti összevetés (bruttó Ft, kWh)</h3>
+      ${jogiT}${jogiT ? "<h4>A számlák egészben, nyomtatott értékükkel</h4>" : ""}
+      <table><tr><th class="b" rowspan="2">Számla</th><th class="b" rowspan="2">Időszak</th><th colspan="${h ? 5 : 4}">Számla szerint</th><th colspan="${h ? 5 : 4}">Mérés és díjszabás szerint</th><th rowspan="2">Számla – saját</th></tr>
+      <tr><th>kWh</th><th>kedv.</th><th>piaci</th>${h ? "<th>téli</th>" : ""}<th>díj</th><th>kWh</th><th>kedv.</th><th>piaci</th>${h ? "<th>téli</th>" : ""}<th>díj</th></tr>${sorokM}
+      <tr class="o"><td class="b" colspan="2">Összesen</td><td>${n(o.kiszamlazott)}</td><td>${n(o.mvm_kedvezmenyes)}</td><td>${n(o.mvm_piaci)}</td>${h ? `<td>${n(o.mvm_teli)}</td>` : ""}<td>${f(o.mvm)}</td><td>${n(o.mert)}</td><td>${n(o.kedvezmenyes)}</td><td>${n(o.piaci)}</td>${h ? `<td>${n(o.teli)}</td>` : ""}<td>${f(o.helyes)}</td><td>${f(o.mvm - o.helyes)}</td></tr></table>
+      <p>${t.keret_hiany ? `A követelés a ${JNEV} hiánya: ${ft(t.osszeg.ft)} ${irany}. Az összevetett számlák sorainak összege, az időszakon kívüli részekkel és a kerekítésekkel: ${ft(t.osszeg.szamlasorok_ft)}.` : `A különbözet a mennyiségekből és az egységárakból ${ft(t.osszeg.ft)} ${irany}. A számlasorok összege a kerekítésekkel: ${ft(t.osszeg.szamlasorok_ft)}.`}</p>
+      ${evek}
+      <h3 class="uj">2. melléklet – A saját számítás levezetése</h3>
+      <p>Mérőállások: ${allasok}</p>
+      <p>Nettó egységárak: kedvezményes ${tiz(a1.energia_kedvezmenyes)} Ft/kWh · piaci ${tiz(a1.energia_piaci)} Ft/kWh · rendszerhasználat ${tiz(a1.rendszerhasznalati)} Ft/kWh · alapdíj ${tiz(a1.alapdij_ho)} Ft/hó${h ? ` · H téli ${tiz(hd.energia_teli)} Ft/kWh, téli rendszerhasználat ${tiz(hd.rendszerhasznalati)} Ft/kWh, téli alapdíj ${tiz(hd.alapdij_ho)} Ft/hó` : ""} · áfa ${afa}%. Évi kedvezményes keret: ${n(t.keret_ev)} kWh, naparányosan.</p>
+      <table><tr><th class="b">Időszak</th><th>Keret</th><th>Mért</th><th>Kedv.</th><th>Piaci</th>${h ? "<th>Téli</th>" : ""}<th>Kedv. Ft</th><th>Piaci Ft</th>${h ? "<th>Téli Ft</th>" : ""}<th>Rendsz. Ft</th><th>Alapdíj Ft</th><th>Díj Ft</th></tr>${sorokD}</table>
+      ${fszT}${jegy}`;
   }
 
   // Tájékoztató, számlaszerű tételes bontás egy még nem érkezett számlára (hu_rezsi/varhato_tetelek).
@@ -2291,7 +2477,19 @@ class HuRezsiPanel extends HTMLElement {
     } else {
       honapok = Array.from({ length: 12 }, (_, i) => `${g.ev}-${String(12 - i).padStart(2, "0")}`).filter((h) => h <= most || vHonapok.includes(h));
     }
-    const fiokok = a.fiokok.filter((f) => f.szamlak.length || (f.varhato || []).length);
+    // Az MVM-áramfiókok egy oszlopban (a közös folyószámla a panel adataiból ismert).
+    const panelFiok = Object.fromEntries((this._adat?.haztartasok || []).flatMap((x) => x.fiokok).map((x) => [x.sid, x]));
+    const nyers = a.fiokok.filter((f) => f.szamlak.length || (f.varhato || []).length);
+    const kmKozos = (f) => (panelFiok[f.sid]?.kozmu === "villany" ? panelFiok[f.sid]?.fejlec?.egyenleg?.kozos : null);
+    const fiokok = nyers.flatMap((f) => {
+      const sorrend = Object.keys(panelFiok), k = kmKozos(f);
+      const tagok = k ? nyers.filter((t) => kmKozos(t) === k).sort((x, y) => sorrend.indexOf(x.sid) - sorrend.indexOf(y.sid)) : [f];
+      if (tagok.length < 2) return [f];
+      if (nyers.find((t) => kmKozos(t) === k) !== f) return [];
+      return [{ ...f, nev: MVM_ARAM, szolgaltato: tagok.map((t) => t.nev).join(" · "),
+        szamlak: tagok.flatMap((t) => t.szamlak.map((x) => ({ ...x, tag: t.nev }))),
+        varhato: tagok.flatMap((t) => (t.varhato || []).map((v) => ({ ...v, tag: t.nev, tag_sid: t.sid }))) }];
+    });
     if (!fiokok.length) { el("kimuttabla").innerHTML = `<div class="kicsi">Ennek az otthonnak még nincs rögzített számlája.</div>`; return; }
     const ertek = (x) => {
       // Mindig a fizetendő: az elszámoló számlaértéke a korábbi (havi) számlákat is magában foglalja, összeadva kétszer
@@ -2342,7 +2540,7 @@ class HuRezsiPanel extends HTMLElement {
         const v = lista.reduce((t, x) => t + ertek(x), 0);
         sorOssz += v; oszlopOssz[f.sid] = (oszlopOssz[f.sid] || 0) + v;
         const k = `${f.sid}|${h}`;
-        return `<td data-cella="${k}" class="${v < 0 ? "minuszft" : ""}${g.cella === k ? " aktiv" : ""}" title="${esc(lista.map((x) => `${x.sorszam} · ${x.kelte} · ${fmt(ertek(x))}`).join("\n"))}">${fmt(v)}${lista.length > 1 ? `<span class="kmdb">${lista.length}×</span>` : ""}${jel(lista)}</td>`;
+        return `<td data-cella="${k}" class="${v < 0 ? "minuszft" : ""}${g.cella === k ? " aktiv" : ""}" title="${esc(lista.map((x) => `${x.tag ? `${x.tag} · ` : ""}${x.sorszam} · ${x.kelte} · ${fmt(ertek(x))}`).join("\n"))}">${fmt(v)}${lista.length > 1 ? `<span class="kmdb">${lista.length}×</span>` : ""}${jel(lista)}</td>`;
       });
       mindOssz += sorOssz;
       const [y, m] = h.split("-");
@@ -2401,8 +2599,8 @@ class HuRezsiPanel extends HTMLElement {
         elszamolas: "a várható éves egyenleg alapján (mínusz: visszajár)",
       };
       el("kimutreszlet").innerHTML = `<div class="cimke">${esc(f.nev)} – várható, még nem érkezett számla</div>` + vcella[g.cella.slice(2)].map((v) => `<div class="kmsor">
-        <b class="kmvarh">~${fmt(v.osszeg)}</b> · ${FORRAS_NEV[v.forras] || esc(v.forras)} · várható kelte ${nap(v.kelte)}${v.tol ? ` · ${nap(v.tol)} – ${nap(v.ig)}` : ""}${
-          ["meres", "diktalas"].includes(v.forras) && v.tol && v.ig ? ` <button type="button" class="linkgomb" data-tetel="${sid}" data-entry="${g.entryId}" data-tol="${v.tol}" data-ig="${v.ig}">tételesen ›</button>` : ""}
+        <b class="kmvarh">~${fmt(v.osszeg)}</b> · ${FORRAS_NEV[v.forras] || esc(v.forras)} · várható kelte ${nap(v.kelte)}${v.tag ? ` · ${esc(v.tag)}` : ""}${v.tol ? ` · ${nap(v.kezdet || v.tol)} – ${nap(v.ig)}` : ""}${
+          ["meres", "diktalas"].includes(v.forras) && v.tol && v.ig ? ` <button type="button" class="linkgomb" data-tetel="${v.tag_sid || sid}" data-entry="${g.entryId}" data-tol="${v.tol}" data-ig="${v.ig}">tételesen ›</button>` : ""}
         <span class="kicsi">Becslés: ${MAGY[v.forras] || ""}. A számla megérkezésekor helyette a valódi fizetendő áll.</span></div>`).join("");
     } else if (g.cella && cella[g.cella]) {
       const [sid] = g.cella.split("|"), f = fiokok.find((x) => x.sid === sid);
@@ -3708,15 +3906,15 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
         ${f.elszamolas_mod === "diktalas" ? `<div class="kicsi">Diktálásnál a lezárt időszak két egymást követő leolvasás között tart, a fogyasztás a két állás különbsége – a számla időszaka és összege ettől eltérhet.</div>` : ""}
         ${f.fix_dij ? "" : `<h4>Mérőállások</h4>
         ${tabla(["Nap", "Állás", "Mérő", "Forrás"], (f.leolvasasok || []).map((x) => [
-          nap(x.datum) + (x.elszamolasi ? " ★" : ""),
+          nap(x.datum) + (x.elszamolasi ? " ★" : "") + (x.evhatar ? " ◆" : ""),
           allas(x.allas),
           // A regiszter is: H-nál 1.8.0 (összes) / 1.81 téli / 1.82 nyári, A2-nél csúcs / völgy.
           x.csatorna === "almero" ? "almérő" : x.csatorna === "betaplalas" ? "betáplálás (2.8.0)"
             : `${esc(x.mero || "fő")}${{ h_teli: " · 1.81 téli", h_nyari: " · 1.82 nyári", zona_csucs: " · 1.8.1 csúcs", zona_volgy: " · 1.8.2 völgy" }[x.csatorna]
               || (f.dijszabas === "villany/h" || (f.regiszterek || []).length ? " · 1.8.0 összes" : "")}`,
-          esc(x.korrekcio ? "korrekció" : x.tipus === "kezdo" ? "kezdő óraállás" : x.tipus === "szamla_atalany" ? "számla alapján" : x.tipus === "szolgaltatoi" ? "szolgáltató" : x.megjegyzes?.startsWith("számla") ? "számla" : x.megjegyzes?.startsWith("v1") ? "v1" : "saját"),
+          esc(x.korrekcio ? "korrekció" : x.tipus === "kezdo" ? "kezdő óraállás" : x.tipus === "evhatar" ? "számlából számolva" : x.tipus === "szamla_atalany" ? "számla alapján" : x.tipus === "szolgaltatoi" ? "szolgáltató" : x.megjegyzes?.startsWith("számla") ? "számla" : x.megjegyzes?.startsWith("v1") ? "v1" : "saját"),
         ]))}
-        <div class="kicsi">★ éves elszámoló leolvasás · „korrekció”: korrekciós leolvasás – csak a saját szenzor szerinti állást és a korrekciós szorzót igazítja, nem időszakhatár · „számla alapján”: az átalányszámla szerint feltételezett állás (előző állás + számlázott mennyiség), tájékoztató – a fogyasztást nem befolyásolja · a „kezdő óraállás” a fiókban megadott kezdőállás – az elszámolások origója (Beállítások → fiók módosítása)</div>`}
+        <div class="kicsi">★ éves elszámoló leolvasás · ◆ az év vagy az idény határa a számla bontása szerint: innen számol a kedvezményes keret · „korrekció”: korrekciós leolvasás – csak a saját szenzor szerinti állást és a korrekciós szorzót igazítja, nem időszakhatár · „számla alapján”: az átalányszámla szerint feltételezett állás (előző állás + számlázott mennyiség), tájékoztató – a fogyasztást nem befolyásolja · a „kezdő óraállás” a fiókban megadott kezdőállás – az elszámolások origója (Beállítások → fiók módosítása)</div>`}
         ${this._evesLehet(f) ? `<p><button type="button" class="linkgomb" data-eves="${f.sid}" data-entry="${this._entryId(f.sid)}">Éves elszámolási kimutatás ›</button></p>` : ""}
         ${f.dijszabas_info ? (() => {
           // Helytakarékos: a fejlécben a díjszabás neve, a részletek (érvényesség, ellenőrzés, forrás) az ⓘ buborékban;
@@ -3924,7 +4122,7 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
       </dialog>
       <dialog id="evesdlg" class="szeles evesdlg" aria-labelledby="evescim">
         <div class="dfej"><h3 id="evescim" tabindex="-1" autofocus>Éves elszámolási kimutatás</h3>
-          <span class="dfejgombok"><select id="evesev" aria-label="Elszámolási év"></select>
+          <span class="dfejgombok"><select id="evesev" aria-label="Időszak"></select>
           <button class="ikongomb" id="evesreklam" title="Reklamáció-tervezet" disabled><ha-icon icon="mdi:email-edit-outline"></ha-icon></button>
           <button class="ikongomb" id="evesnyomtat" title="Nyomtatás / PDF" disabled><ha-icon icon="mdi:printer"></ha-icon></button>
           <button class="ikongomb" id="evesbezar" title="Bezárás"><ha-icon icon="mdi:close"></ha-icon></button></span></div>
@@ -4008,7 +4206,7 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
           </div>
           <label class="pipa" id="korrsor"><input type="checkbox" name="korrekcio"> Csak korrekciós leolvasás – a saját szenzor szerinti állást és a korrekciós szorzót igazítja; nem diktálás, nem elszámoló és nem időszakhatár</label>
           <label class="pipa" id="szolgsor"><input type="checkbox" name="szolgaltatoi"> Szolgáltatói leolvasás (nem saját)</label>
-          <label class="pipa" id="evessor"><input type="checkbox" name="eves"> Éves (elszámoló) leolvasás – a szolgáltató leolvasója járt itt; innen indul az új elszámolási év és a kedvezményes keret</label>
+          <label class="pipa" id="evessor"><input type="checkbox" name="eves"> Éves (elszámoló) leolvasás – a szolgáltató leolvasója járt itt; ehhez igazodik az átalány éves elszámolása (áramnál a kedvezményes keret ettől független)</label>
           <label class="pipa" id="diktaltsor"><input type="checkbox" name="diktalt"> Diktáltam a szolgáltatónak (itt zárul az elszámolási időszak; átalánynál egyszer, csak a következő számlát írja felül)</label>
           </div>
           <div class="dhiba" id="dhiba"></div>
@@ -5136,7 +5334,12 @@ const STILUS = `
   .folyosor { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
   .folyosor .cimke { margin: 0; }
   #reklambody .level { background: var(--card-background-color, #fff); border: 1px solid var(--divider-color); border-radius: 8px; padding: 16px; line-height: 1.5; }
+  .jogi { margin: 6px 0 14px; } .jogi h5 { margin: 10px 0 2px; font-size: 14px; font-weight: 600; }
   #reklambody .level p { margin: 0 0 10px; }
+  #reklambody .kifogas h3 { font-size: 15px; margin: 18px 0 6px; } #reklambody .kifogas h4 { font-size: 14px; margin: 12px 0 4px; }
+  #reklambody .kifogas .kiem { border: 1px solid var(--divider-color); padding: 8px 12px; margin: 8px 0; border-radius: 6px; }
+  #reklambody .kifogas table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 4px 0 10px; } #reklambody .kifogas td, #reklambody .kifogas th { border: 1px solid var(--divider-color); padding: 2px 5px; text-align: right; }
+  #reklambody .kifogas td.b, #reklambody .kifogas th.b { text-align: left; } #reklambody .kifogas tr.o td { font-weight: 600; }
   .figylista li[data-ugrik] { cursor: pointer; }
   ha-icon.javjel { --mdc-icon-size: 14px; color: var(--secondary-text-color); vertical-align: -2px; }
   #javmezok { display: grid; gap: 10px; margin: 12px 0; }
@@ -5327,6 +5530,7 @@ const STILUS = `
   .mxvarhato .mxbetu { background: none; color: var(--mx-s); border: 1px dashed var(--mx-s); }
   .mxstorno { text-decoration: line-through; color: var(--secondary-text-color); }
   .mxjel { display: inline-block; font-size: 10px; font-weight: 700; color: var(--primary-color); border: 1px solid var(--primary-color); border-radius: 3px; padding: 0 3px; margin: 2px 2px 0 0; }
+  .mxjel.mxkesz { color: var(--mx-ok); border-color: var(--mx-ok); }
   .mxjelm { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--secondary-text-color); }
   .mxjelm > span { display: inline-flex; gap: 5px; align-items: center; }
   .mxnegyzet { width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--mx-s); background: color-mix(in srgb, var(--mx-s) 15%, transparent); }
@@ -5343,6 +5547,7 @@ const STILUS = `
   .tematabla td { padding: 9px 10px; border-bottom: 1px solid var(--divider-color); vertical-align: middle; }
   .tematabla td.szam { text-align: right; white-space: nowrap; }
   .tematabla td.tfiok { white-space: nowrap; font-weight: 500; }
+  .tematabla td.tfiok .tagsor { font-weight: 400; margin-left: 26px; }
   .tematabla td.tfiok ha-icon { --mdc-icon-size: 18px; color: var(--primary-color); margin-right: 8px; vertical-align: -3px; }
   .tematabla tbody tr { cursor: pointer; }
   .tematabla tbody tr:hover { background: var(--secondary-background-color); }

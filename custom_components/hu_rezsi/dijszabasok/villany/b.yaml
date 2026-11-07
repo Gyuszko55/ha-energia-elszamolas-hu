@@ -22,9 +22,10 @@ verziok:
       keret:
         tipus: napi_aranyos
         ev_mennyiseg: 2523     # kWh/év, a hagyományos (A) mérőtől külön
+        ev_kezdet: "08-01"     # kedvezményes év: aug. 1. – júl. 31. (4/2011. NFM rendelet 6. § (3)), nem az éves leolvasás
         kerekites: 0
         tetel_hatar: "08-01"   # MVM: a számla aug. 1-jén két tételre bomlik, a keret tételenként kerekítve (2023–2025 számlák)
-        # Az elszámolási évben (éves elszámoló leolvasástól a következőig) halmozva, mint az A1-nél („sávkorrekció”).
+        # A kedvezményes évben (aug. 1. – júl. 31.) halmozva, mint az A1-nél („sávkorrekció”).
         osszesitett: true
       alapdij:
         mod: idoszakonkent

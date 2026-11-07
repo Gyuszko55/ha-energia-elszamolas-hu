@@ -176,6 +176,7 @@ class Ertesito:
         self.store: Store[dict[str, Any]] = Store(hass, 1, KULCS)
         self.adat: dict[str, Any] = {"kuldott": {}, "utolso": None}
         self._le: CALLBACK_TYPE | None = None
+        self._ujra: CALLBACK_TYPE | None = None
 
     async def betolt(self) -> None:
         self.adat = {"kuldott": {}, "utolso": None} | (await self.store.async_load() or {})
@@ -206,6 +207,7 @@ class Ertesito:
             async_call_later(self.hass, INDULAS_MP, self._kesleltetve)
 
     async def _kesleltetve(self, _most: datetime) -> None:
+        self._ujra = None
         await self.fut()
 
     async def fut(self) -> int:
@@ -217,7 +219,8 @@ class Ertesito:
             # Indulás után az első számolásig a Díjnet-fizetések nincsenek betöltve: minden számla befizetetlennek
             # látszana (téves „lejárt” üzenet). Később újra.
             _LOGGER.debug("Határidő-értesítés: az első számolás még nem futott le, %s mp múlva újra", UJRA_MP)
-            async_call_later(self.hass, UJRA_MP, self._kesleltetve)
+            if self._ujra is None:  # egyszerre egy újrapróbálás, akárhányszor jön a napi időpont
+                self._ujra = async_call_later(self.hass, UJRA_MP, self._kesleltetve)
             return 0
         ma = dt_util.now().date()
         tet = _gyujt(self.hass, ma)

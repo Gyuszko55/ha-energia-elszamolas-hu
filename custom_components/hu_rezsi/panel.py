@@ -22,7 +22,7 @@ from homeassistant.util import dt as dt_util
 
 from .gaz_atalany import havi_mj
 from .beallitas import elszamolas_mod, fix_dijas, idoszak_mod, reszszamlas
-from . import fizetes
+from . import fizetes, kimutatas
 from . import hatarido_ertesites, panel_beallitas
 from . import szamlak as szamlak_mod
 from .motor.dijszabas import ELLENORZES_ALLAPOTOK, VALIDALAS_ELSZAMOLAS, VALIDALAS_HMKE, VALIDALAS_SZAMLA
@@ -298,7 +298,7 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
             "szamlazasi": {**a.szamlazasi, "tol": _iso(a.szamlazasi["tol"]), "ig": _iso(a.szamlazasi["ig"])} if a.szamlazasi else None,
             "utem": {**a.utem, "kovetkezo_elszamolas": _iso(a.utem.get("kovetkezo_elszamolas"))} if a.utem else None,
             "aktualis_ar": _f(a.aktualis_ar, 3),
-            "eves": {"fogyasztas": _f(a.eves_fogyasztas, 1), "bazis": _iso(a.eves_bazis)},
+            "eves": {"fogyasztas": _f(a.eves_fogyasztas, 1), "bazis": _iso(a.eves_bazis), "kezdet": _iso(a.eves_kezdet)},
             "utolso_lezart": a.utolso_lezart,
         }
     )
@@ -346,6 +346,18 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
                 })
     if sub.data.get("dijszabas") == "villany/h":
         leolv = _h_idenyszuro(leolv)
+    if sub.data.get("dijszabas") in ("villany/a1", "villany/h"):
+        # Az év- és idényhatár mérőállása a számla bontásából: ha már rögzített állás, azt jelöli, különben külön sor.
+        for u in kimutatas.evhatar_allasok(sub.data["dijszabas"], tarolt.get("szamlak") or {}, lambda c: kimutatas.tarolt_pontok(tarolt, c)):
+            cs = "fo" if u["csatorna"] == "vetelezes" else u["csatorna"]
+            meglevo = next((x for x in leolv if x["datum"] == u["datum"] and x["csatorna"] == cs), None)
+            if meglevo:
+                meglevo["evhatar"] = u["sorszam"]
+            else:
+                leolv.append({
+                    "datum": u["datum"], "allas": _f(Decimal(str(u["allas"])), 3), "tipus": "evhatar", "csatorna": cs, "evhatar": u["sorszam"],
+                    "mero": (tarolt.get("merok") or [{}])[0].get("gyari_szam") or "", "elszamolasi": False, "megjegyzes": f"számlából számolva ({u['sorszam']})",
+                })
     if origo := tarolt.get("kezdo_origo"):
         # A fiókban megadott kezdő óraállás: az elszámolások origója (lásd modell.kezdo_origo_szinkron).
         leolv.append({
@@ -375,7 +387,7 @@ def _fiok_adat(hass: HomeAssistant, koord: Any, sid: str, sub: Any) -> dict[str,
     # napelemnél egy napra több sor jut, a 2.8.0 se szoruljon ki).
     leolv = sorted(leolv, key=lambda x: (x["datum"], x["csatorna"] == "fo"), reverse=True)
     napok15 = sorted({x["datum"] for x in leolv}, reverse=True)[:15]
-    adat["leolvasasok"] = [x for x in leolv if x["datum"] in napok15 or x.get("tipus") == "kezdo"]
+    adat["leolvasasok"] = [x for x in leolv if x["datum"] in napok15 or x.get("tipus") == "kezdo" or x.get("evhatar")]
     fiz = koord.fizetes_allapotok(sid) if hasattr(koord, "fizetes_allapotok") else {}
     javitas = tarolt.get("szamla_javitas") or {}
     adat["szamlak"] = sorted(
@@ -1091,6 +1103,29 @@ async def ws_eves_kimutatas(hass: HomeAssistant, connection: websocket_api.Activ
     connection.send_result(msg["id"], eredmeny)
 
 
+@websocket_api.websocket_command({
+    vol.Required("type"): "hu_rezsi/kifogas_tervezet", vol.Required("entry_id"): str, vol.Required("sid"): str,
+    vol.Optional("ev_tol"): str,
+})
+@websocket_api.async_response
+async def ws_kifogas_tervezet(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Számlakifogás-tervezet egy villanyfiók elszámolási évére (kifogas.tervezet)."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED or msg["sid"] not in entry.runtime_data.fiokok():
+        connection.send_error(msg["id"], "nincs_fiok", "Nincs ilyen fiók.")
+        return
+    try:
+        eredmeny = await entry.runtime_data.kifogas_tervezet(msg["sid"], date.fromisoformat(msg["ev_tol"]) if msg.get("ev_tol") else None)
+    except ValueError as err:
+        connection.send_error(msg["id"], "nem_keszitheto", str(err))
+        return
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.exception("kifogás-tervezet")
+        connection.send_error(msg["id"], "hiba", f"A tervezet nem készíthető: {err}")
+        return
+    connection.send_result(msg["id"], eredmeny)
+
+
 def _hianyzo_szenzorok(hass: HomeAssistant, entry: Any) -> int:
     from . import mentes as mt  # noqa: PLC0415
 
@@ -1236,6 +1271,7 @@ async def regisztral_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_ellenorzes_dontes)
     websocket_api.async_register_command(hass, ws_varhato_tetelek)
     websocket_api.async_register_command(hass, ws_eves_kimutatas)
+    websocket_api.async_register_command(hass, ws_kifogas_tervezet)
     websocket_api.async_register_command(hass, ws_fizetes)
     websocket_api.async_register_command(hass, ws_dij_elteres)
     websocket_api.async_register_command(hass, ws_szamla_lemondas)

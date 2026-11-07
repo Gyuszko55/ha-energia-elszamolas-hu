@@ -58,7 +58,7 @@ Az adatok jelentése:
 - "szamlahibak": a Rezsikövető számla-ellenőrzésének eltérései (a számla és a saját számítás különbsége,
   "hatas_ft"); "sulyos": true = reklamálni érdemes.
 - "fuggo_szamlak_db": jóváhagyásra váró, beolvasott számlák a panelen.
-- "utem": szolgáltató, következő éves elszámolás/leolvasás, diktálási ablak.
+- "utem": szolgáltató, következő éves elszámolás/leolvasás, diktálási ablak, utolsó leolvasás napja. Ha az utolsó leolvasás a mostani diktálási ablakba esik, a diktálás kész: ne javasold.
 - "eves_szamlak": az utolsó 12 hónap számláinak összege és darabszáma.
 - "otthon.havi": a háztartás e havi eddigi és várható költsége, valamint az e hónapban esedékes számlák.
 
@@ -170,7 +170,9 @@ def _fiok(f: dict[str, Any], ma: date) -> dict[str, Any]:
                         for t in f.get("ellenorzes") or [] if not t.get("rendezve")],
         "fuggo_szamlak_db": len(f.get("fuggo") or []),
         "utem": {"kovetkezo_elszamolas": utem.get("kovetkezo_elszamolas"), "kovetkezo_leolvasas": utem.get("kovetkezo_leolvasas"),
-                 "kovetkezo_diktalas": utem.get("kovetkezo_diktalas"), "diktalasi_ablak": utem.get("diktalasi_ablak")},
+                 "kovetkezo_diktalas": utem.get("kovetkezo_diktalas"), "diktalasi_ablak": utem.get("diktalasi_ablak"),
+                 "utolso_leolvasas": max((x["datum"] for x in f.get("leolvasasok") or []
+                                          if x.get("datum") and not x.get("korrekcio") and x.get("csatorna") not in ("almero", "betaplalas")), default=None)},
         "eves_szamlak": {"osszeg_ft": (f.get("szamla_stat") or {}).get("eves_osszeg"), "db": (f.get("szamla_stat") or {}).get("eves_db")},
     })
 

@@ -103,25 +103,53 @@ def _a1(evhatarok=()):
                 elszamolasi_napok=tuple(evhatarok))
 
 
+def test_aram_ev_kezdete():
+    from motor.elszamolas import aram_ev_kezdete
+    a1 = lambda n: TAR.felold("villany/a1", n, "mvm_demasz")
+    h = lambda n: TAR.felold("villany/h", n, "mvm_demasz")
+    assert aram_ev_kezdete(a1(date(2026, 11, 6)), date(2026, 11, 6)) == date(2026, 8, 1)
+    assert aram_ev_kezdete(a1(date(2026, 7, 31)), date(2026, 7, 31)) == date(2025, 8, 1)
+    assert aram_ev_kezdete(h(date(2026, 11, 6)), date(2026, 11, 6)) == date(2026, 4, 16)  # télen is a tavaszi idénytől
+    assert aram_ev_kezdete(h(date(2026, 4, 15)), date(2026, 4, 15)) == date(2025, 4, 16)
+    assert aram_ev_kezdete(h(date(2026, 4, 16)), date(2026, 4, 16)) == date(2026, 4, 16)
+
+
 def test_villany_a1_savkorrekcio_2026_09():
-    """Elszámoló számla 2026.08.09–09.09 (32 nap), 20 061 → 20 520 kWh (459 kWh); az elszámolási év 08.01-jén
-    indult (a 07.31-i leolvasás az évhatár). Az MVM az új év első 8 napjára (55 kWh keret) csak 3 kWh-t osztott
-    (az előző számla többletének napokkal arányos részét), így most 52 kWh ki nem használt keret jár: a számlán
-    221 + 52 („sávkorrekció”) kWh kedvezményes, 238 − 52 kWh piaci, bruttó 23 125 Ft (két rendszerhasználati
-    sorra bontva, ezért ±3 Ft)."""
-    s = Szamlalo([Pont(datetime(2026, 7, 31), D(20028), True), Pont(datetime(2026, 8, 8), D(20031), True),
-                  Pont(datetime(2026, 9, 9), D(20490), True)])
-    r = szamol(_a1([date(2026, 7, 31)]), TAR, date(2026, 8, 8), date(2026, 9, 9), [s])
-    sz = r.szeletek[0]
-    assert (sz.keret, sz.kedvezmenyes, sz.piaci, sz.savkorrekcio) == (D(221), D(273), D(186), D(52))
-    assert abs(r.osszesen_ft - D(23125)) <= 3
-    # A valódi mérőállásokkal (07.31–08.08: 33 kWh) 55 − 33 = 22 kWh a korrekció.
-    v = Szamlalo([Pont(datetime(2026, 7, 31), D(20028), True), Pont(datetime(2026, 8, 8), D(20061), True),
-                  Pont(datetime(2026, 9, 9), D(20520), True)])
-    assert szamol(_a1([date(2026, 7, 31)]), TAR, date(2026, 8, 8), date(2026, 9, 9), [v]).szeletek[0].savkorrekcio == D(22)
-    # Évhatár nélkül a régi, szeletenkénti keret.
-    r0 = szamol(_a1(), TAR, date(2026, 8, 8), date(2026, 9, 9), [v])
-    assert (r0.szeletek[0].kedvezmenyes, r0.szeletek[0].savkorrekcio) == (D(221), D(0))
+    """Elszámoló számla 2026.08.09–09.09 (32 nap), 20 061 → 20 520 kWh (459 kWh). A kedvezményes év 08.01-jén indult.
+    Az MVM az új év első 8 napjára (55 kWh keret) csak 3 kWh-t osztott, így most 52 kWh ki nem használt keret jár: a
+    számlán 221 + 52 („sávkorrekció”) kWh kedvezményes, 238 − 52 kWh piaci, bruttó 23 125 Ft (két rendszerhasználati
+    sorra bontva, ezért ±3 Ft). Az éves leolvasásnak nincs szerepe: a jóváírás akkor is ennyi, ha nincs ilyen nap."""
+    s = Szamlalo([Pont(datetime(2026, 8, 1), D(20028), True), Pont(datetime(2026, 8, 9), D(20031), True),
+                  Pont(datetime(2026, 9, 10), D(20490), True)])
+    for napok in ([], [date(2025, 10, 1)]):
+        sz = szamol(_a1(napok), TAR, date(2026, 8, 9), date(2026, 9, 10), [s])
+        assert (sz.szeletek[0].keret, sz.szeletek[0].kedvezmenyes, sz.szeletek[0].piaci, sz.szeletek[0].savkorrekcio) == (D(221), D(273), D(186), D(52))
+        assert abs(sz.osszesen_ft - D(23125)) <= 3
+    # A valódi mérőállásokkal (08.01–08.08: 33 kWh) 55 − 33 = 22 kWh a korrekció.
+    v = Szamlalo([Pont(datetime(2026, 8, 1), D(20028), True), Pont(datetime(2026, 8, 9), D(20061), True),
+                  Pont(datetime(2026, 9, 10), D(20520), True)])
+    assert szamol(_a1(), TAR, date(2026, 8, 9), date(2026, 9, 10), [v]).szeletek[0].savkorrekcio == D(22)
+
+
+def test_villany_a1_a_keret_nem_megy_at_aug_1_utan():
+    """A júl. 31-én fel nem használt keret elvész, az éves leolvasástól függetlenül (4/2011. NFM rendelet 6. § (3))."""
+    s = Szamlalo([Pont(datetime(2026, 7, 1), D(0), True), Pont(datetime(2026, 8, 1), D(10), True), Pont(datetime(2026, 9, 1), D(610), True)])
+    sz = szamol(_a1([date(2026, 1, 1)]), TAR, date(2026, 8, 1), date(2026, 9, 1), [s]).szeletek[0]
+    assert (sz.keret, sz.kedvezmenyes, sz.piaci, sz.savkorrekcio) == (D(214), D(214), D(386), D(0))
+
+
+def test_villany_a1_az_eves_leolvasas_nem_nullazza_a_keretet():
+    """Az év közbeni (okt. 1-jei) éves leolvasásnál nem nullázódik: a szeptemberi maradék októberben még jár."""
+    s = Szamlalo([Pont(datetime(2026, 8, 1), D(0), True), Pont(datetime(2026, 10, 1), D(10), True), Pont(datetime(2026, 11, 1), D(600), True)])
+    sz = szamol(_a1([date(2026, 10, 1)]), TAR, date(2026, 10, 1), date(2026, 11, 1), [s]).szeletek[0]
+    assert sz.kedvezmenyes == D(590) and sz.piaci == D(0)  # 61 + 31 nap kerete jóval több, mint a fogyasztás
+
+
+def test_villany_a1_ev_kozben_indult_meres_is_halmoz():
+    """Új fiók aug. 1. után: a keret az első adattól, időarányosan halmozódik (nem esik ki a sávkorrekció)."""
+    s = Szamlalo([Pont(datetime(2026, 2, 1), D(0), True), Pont(datetime(2026, 3, 1), D(10), True), Pont(datetime(2026, 4, 1), D(310), True)])
+    sz = szamol(_a1(), TAR, date(2026, 3, 1), date(2026, 4, 1), [s]).szeletek[0]
+    assert sz.kedvezmenyes == D(300) and sz.savkorrekcio > 0
 
 
 def test_villany_a1_savkorrekcio_visszafele():

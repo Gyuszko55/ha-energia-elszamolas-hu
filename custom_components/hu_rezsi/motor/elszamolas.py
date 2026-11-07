@@ -193,6 +193,15 @@ def _evkezdet_napok(keret: dict[str, Any], tol: date, ig: date) -> set[date]:
     return {x for x in (date(ev, h, n) for ev in range(tol.year - 1, ig.year + 1)) if tol <= x <= ig}
 
 
+def aram_ev_kezdete(sajat: Ervenyes, nap: date) -> date | None:
+    """Az áramfiók jogszabály szerinti évének kezdete a napon: H-tarifa: a legutóbbi nyári idény eleje (ápr. 16.),
+    különben a kedvezményes év (aug. 1.) – 4/2011. NFM rendelet 6. §. None: a díjszabásban nincs ilyen év."""
+    if idenyek := sajat.szabalyok.get("idenyszak"):
+        return max((x for x in _idenyhatarok(date(nap.year - 1, 1, 1), nap, idenyek)
+                    if x <= nap and (idenyszak(x, idenyek) or {}).get("nev") == "nyari"), default=None)
+    return max(_evkezdet_napok(sajat.szabalyok.get("keret") or {}, date(nap.year - 1, 1, 1), nap), default=None)
+
+
 def _egesz_kulonbseg(csatorna: Any, szamlalo: Szamlalo, ta: datetime, tb: datetime) -> Decimal:
     """Az [ta, tb) szakasz fogyasztása egész egységre (lefelé) kerekített óraállásokból. A számláló a kezdőállástól
     mér, ezért a mérő kezdőállását hozzáadjuk (mérőcsere után az előző mérők záróállásával eltolva, ami egész)."""
@@ -300,14 +309,25 @@ def _osszesitett_kedvezmenyes(
     és a halmozott keret kisebbike, a szelet ennek a növekményét kapja (MVM: „sávkorrekció”). Így a korábban ki nem
     használt keret később piaci helyett kedvezményes áron jár, és fordítva.
 
-    Elszámolási év: az éves elszámoló leolvasástól a következő éves elszámoló leolvasásig (villany) – ha a keret
-    „ev_kezdet”-et ad meg (gáz: 08-01, a kedvezményes év), akkor attól. A keret csak ezen belül csoportosítható át,
-    a következő évre nem vihető át. Csak a keretre jogosult napok számítanak (H-tarifa: a nyári
+    Az év kezdete: a keret „ev_kezdet”-e (a kedvezményes év, 08-01: 4/2011. NFM rendelet 6. § (3)), ennek híján az
+    éves elszámoló leolvasás. H-tarifa nyári regiszterén a rendelet 6. § (1) szerint a keret a fűtési idényen kívüli
+    időszakra szól: az év kezdete az idény eleje. A keret csak ezen belül csoportosítható át, a következő évre nem
+    vihető át. Csak a keretre jogosult napok számítanak (H-tarifa: a nyári
     1.82-es regiszter az idényén kívül; a fűtési idény téli fogyasztása és napjai kimaradnak). Több számláló (A2:
     csúcs + völgy) közös keretnél: a fogyasztásuk összege számít.
     None: nincs évhatár a szelet előtt, vagy nincs adat az év elejétől – ilyenkor szeletenkénti a keret."""
     if keret_szabaly.get("ev_kezdet"):
-        evkezdet = max(_evkezdet_napok(keret_szabaly, date(a.year - 1, 1, 1), a), default=None)
+        sajat = tar.felold(_hozzarendeles(fiok, a), a, fiok.szolgaltato, fiok.feluliras)
+        if idenyek := sajat.szabalyok.get("idenyszak"):  # H-tarifa: az idény eleje
+            evkezdet = max((x for x in _idenyhatarok(date(a.year - 1, 1, 1), a, idenyek) if x <= a), default=None)
+        else:
+            evkezdet = max(_evkezdet_napok(keret_szabaly, date(a.year - 1, 1, 1), a), default=None)
+        # Év közben indult mérés (új fiók, első adat aug. 1. után): a keret az első adattól, időarányosan jár. Csak
+        # visszamenőleges keretnél: a gáz „csak előre átvihető” kerete marad a kedvezményes évhez kötve.
+        if evkezdet and keret_szabaly.get("visszamenoleges") is not False:
+            elso = [p.ido.date() for sz in szamlalok for p in sz.pontok[:1]]
+            if elso and max(elso) > evkezdet:
+                evkezdet = max(elso)
     else:
         evkezdet = max((x for x in fiok.elszamolasi_napok if x <= a), default=None)
     if evkezdet is None:

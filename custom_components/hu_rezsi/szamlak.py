@@ -866,6 +866,8 @@ def mvm_tetelek(szoveg: str, idoszak: tuple[date, date] | None, kelte: date) -> 
     sor = " ".join(t.split())
     datum = r"(\d{4}\.\d\d\.\d\d)\s*-\s*(\d{4}\.\d\d\.\d\d)"
     menny = {"kedvezmenyes": Decimal(0), "piaci": Decimal(0), "teli": Decimal(0)}
+    # A tételek a saját időszakukkal (a sávkorrekció is): a jogszabály szerinti évekre így bontható a számla.
+    idoszakos: dict[str, list[list[str]]] = {"kedvezmenyes": [], "piaci": [], "teli": []}
     van = False
     for m in re.finditer(datum + r"\s*(-?\d[\d.]*(?:,\d+)?)\s*kWh\s*(\d+,\d+)\s*Ft/kWh", sor):
         elotte = sor[max(0, m.start() - 70):m.start()]
@@ -875,6 +877,7 @@ def mvm_tetelek(szoveg: str, idoszak: tuple[date, date] | None, kelte: date) -> 
         q, ar = Decimal(m.group(3).replace(".", "").replace(",", ".")), Decimal(m.group(4).replace(",", "."))
         fajta = "piaci" if "piaci" in cimke else "teli" if ar < 4 else "kedvezmenyes"
         menny[fajta] += q
+        idoszakos[fajta].append([_d(m.group(1)).isoformat(), _d(m.group(2)).isoformat(), str(q)])
         van = True
     e = re.search(r"Energiadíj összesen\s*(?:" + datum + r")?\s*(-?[\d .-]+)", sor)
     r_ = re.search(r"Rendszerhasználati díjak összesen\s*(-?[\d .-]+)", sor)
@@ -899,6 +902,7 @@ def mvm_tetelek(szoveg: str, idoszak: tuple[date, date] | None, kelte: date) -> 
     return {
         "kiszamlazott_kwh": str(_ezres(fo.group(1))) if fo else None,
         **{k: str(v) for k, v in menny.items()},
+        "kedv_tetelek": idoszakos["kedvezmenyes"], "piaci_tetelek": idoszakos["piaci"], "teli_tetelek": idoszakos["teli"],
         "energia_brutto": str(energia[1]), "rhd_brutto": str(rhd[1]),
         "alapdij": {k: str(v) for k, v in sorted(alap.items())},
     }

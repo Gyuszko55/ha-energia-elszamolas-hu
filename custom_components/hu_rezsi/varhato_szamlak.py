@@ -52,18 +52,18 @@ def varhato_szamlak(f: dict[str, Any], szamlak: dict[str, dict[str, Any]], ma: d
                   if x.get("idoszak") and x.get("tipus") != "storno" and k not in torolt]
     out: list[dict[str, Any]] = []
 
-    def tesz(kelte: date | None, tol: Any, ig: Any, osszeg: Any, forras: str) -> None:
+    def tesz(kelte: date | None, tol: Any, ig: Any, osszeg: Any, forras: str, kezdet: Any = None) -> None:
         if kelte is None or osszeg is None:
             return
         kelte = max(kelte, ma)  # elmaradt számla: még várjuk, a mostani hónapban
         if kelte > ma + timedelta(days=horizont):
             return
         out.append({"kelte": kelte.isoformat(), "honap": kelte.isoformat()[:7], "tol": _d(tol).isoformat() if tol else None,
-                    "ig": _d(ig).isoformat() if ig else None, "osszeg": int(osszeg), "forras": forras})
+                    "ig": _d(ig).isoformat() if ig else None, "osszeg": int(osszeg), "forras": forras, **({"kezdet": kezdet} if kezdet else {})})
 
     # Lezárt időszak, amelyre még nem jött számla (mért fiók).
     for x in f.get("uton_szamlak") or []:
-        tesz(_d(x["ig"]) + keses, x["tol"], x["ig"], x["osszeg"], "meres")
+        tesz(_d(x["ig"]) + keses, x["tol"], x["ig"], x["osszeg"], "meres", x.get("kezdet"))
 
     es = f.get("esedekes") or {}
     sz = f.get("szamlazasi") or {}
