@@ -483,8 +483,6 @@ Szigetüzemi – vagy hálózati tartalékos, generátoros – energiarendszer k
 
 ## 7. A Rezsikövető panel
 
-> [!TIP]
-
 A bal oldali menüben: **Rezsikövető**. (Mobilon a bal felső ☰ gombbal nyílik a menü.) A panel percenként frissül; a jobb felső ⟳ gombbal azonnal. A gomb a már kiszámolt adatokat tölti újra (a számolás és a számlamappa ellenőrzése 10 percenként, magától fut). Ha közben a Rezsikövető új változata került fel, a gomb – és az alkalmazás háttérből való visszatérése – az oldalt is újratölti, így mobilon sem kell kézzel gyorsítótárat üríteni.
 
 ![A panel teteje – fülsor az otthonokkal (narancs pötty: ott teendő van), kiválasztva az Újbudai bérlakás](kepek/01_panel_teteje.png)
@@ -1051,8 +1049,6 @@ Ha a Rezsikövető egy PDF-számlát nem ismer fel (más szolgáltató, pl. egy 
 ## 10. Hogyan számol?
 
 **A következő számla – közös szabály minden fióknál** (`motor/kovetkezo_szamla.py`): a következő számla a legutóbbi számla utolsó (valódi) napja utántól a következő mérőállásig tart (a diktálási ablak közepéig; ha a számlán nincs ablak, a számlázási ütem szerinti napig). Amíg ez az állás nincs meg, a díja a saját mérésből számolódik, napi átlaggal kivetítve. Mért fióknál ez a folyó elszámolási időszak; átalányos fióknál csak akkor, ha a szolgáltató diktálás szerint számláz (az utolsó két számla elszámoló, vagy 120 napon belül diktáltál) – különben a következő számla az átalány.
-
-> [!TIP]
 
 1. **Fogyasztás:** a mérőállás-szenzor napi statisztikájából és a leolvasásokból, a leolvasásokhoz igazítva; két leolvasás között napra arányosítva („becsült”).
 2. **Szeletek:** az időszakot ott vágja, ahol a díj, a keret vagy a fűtőérték változik (pl. H-tarifa okt. 15., gáz hónapforduló).
