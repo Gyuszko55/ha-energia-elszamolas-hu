@@ -1,11 +1,4 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo_sotet.png">
-    <img src="docs/brand/logo.png" alt="Rezsikövető" width="420">
-  </picture>
-</p>
-
-# Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
+# <img src="docs/brand/ikon_kek.png" alt="Rezsikövető ikon" width="48" align="absmiddle"> Rezsikövető – magyar lakossági rezsi-elszámolás Home Assistanthoz
 
 > [!IMPORTANT]
 > **Tájékoztató jellegű számítás, nem helyettesíti a szolgáltatói számlát.** A valódi összeg mindig a szolgáltató számláján szerepel.
