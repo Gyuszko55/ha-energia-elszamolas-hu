@@ -21,6 +21,10 @@ A panel négy kérdésre felel: **Mennyibe került? → Mennyi lesz? → Hol tar
 | Tervek – adatmodell, díjszabás-formátum, elszámoló motor, ütemterv | fejlesztő | [`docs/terv/`](docs/terv/) |
 | Változások | mindenki | [CHANGELOG](CHANGELOG.md) |
 
+## Javítások a 2.4.1-ben (2026. november 13.)
+
+- Biztonság és adatvédelem: az e-mail kapcsolat ellenőrzi a szerver tanúsítványát; az *Utolsó számla* szenzor nem hordoz személyes adatot; a Home Assistant-mentésből készült Rezsikövető-mentésbe sem kerül jelszó; titkosított HA-mentés kiolvasásához a kulcsot a panelen kell megadni. Lassú tárolón sem akasztja meg a Home Assistantot. Részletek: [CHANGELOG](CHANGELOG.md).
+
 ## Újdonságok a 2.4.0-ban (2026. november 7.)
 
 - **Értesítés a határidő előtt, hangon is:** a telefonodra szól (Home Assistant mobilalkalmazás), ha egy számla határideje közeleg – alapból 3 nappal előtte, beállítható, ki-be kapcsolható –, és egyszer, ha lejárt és még nincs befizetve. Az Assisttól meg is kérdezheted: *„Van befizetendő számlám?”*, *„Mennyi lesz a következő gázszámla?”*, *„Mennyi a rezsi eddig?”*, *„Hol tartok a keretben?”*, *„Mennyi volt az utolsó villanyszámla?”*. Útmutató: [kézikönyv 7.5.2–7.5.3](docs/KEZIKONYV.md#752-értesítés-a-mobilra-a-fizetési-határidő-előtt-240).

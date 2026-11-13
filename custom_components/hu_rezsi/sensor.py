@@ -25,6 +25,16 @@ from . import sziget_ha
 MAX_NAPLO = 24
 EGYENLEG_KULCSOK = {"befizetve", "varhato_eves_koltseg", "varhato_egyenleg"}
 NAPELEM_KULCSOK = {"betaplalas", "betaplalas_jovairas", "napelem_egyenleg"}
+# 2.4.1: az Utolsó számla szenzoron csak ezek – az ügyfél adatai (név, cím, azonosítók, mérő), a tételek, a fizetési mód
+# és a fájlnév a felvevőbe és az előzményekbe kerülnének, minden felhasználónak láthatóan
+UTOLSO_SZAMLA_ATTR = ("sorszam", "kelte", "osszeg", "tipus", "idoszak", "hatarido", "szamlak_szama")
+
+
+def utolso_szamla_attr(szamla: dict | None) -> dict:
+    """Az Utolsó számla szenzor attribútumai: szám, kelte, összeg, típus, időszak, határidő (személyes adat nélkül)."""
+    return {k: szamla[k] for k in UTOLSO_SZAMLA_ATTR if szamla and k in szamla}
+
+
 SZAMLA_KULCSOK = {"utolso_szamla", "eves_szamlaosszeg", "kovetkezo_szamla"}
 # Fix díjas (mérő nélküli) fióknál csak ezek értelmesek:
 FIX_KULCSOK = {
@@ -330,7 +340,7 @@ FIOK_LEIRASOK: tuple[FiokLeiras, ...] = (
         native_unit_of_measurement=PENZNEM,
         suggested_display_precision=0,
         ertek=lambda a: int(float(a.utolso_szamla["osszeg"])) if a.utolso_szamla.get("osszeg") is not None else None,
-        attr=lambda a: a.utolso_szamla,
+        attr=lambda a: utolso_szamla_attr(a.utolso_szamla),
         elerheto=lambda a: a.utolso_szamla is not None,
     ),
     FiokLeiras(

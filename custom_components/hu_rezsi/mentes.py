@@ -366,8 +366,9 @@ def ha_mentesbol_otthonok(t: HaMentesTartalom) -> list[OtthonMentes]:
     for e in (t.config_entries.get("data") or {}).get("entries", []):
         if e.get("domain") != "hu_rezsi":
             continue
-        alar = [{"subentry_id": s["subentry_id"], "subentry_type": s["subentry_type"], "title": s["title"], "data": s["data"]}
-                for s in e.get("subentries") or []]
+        # 2.4.1: az e-mail fiók jelszava itt sem kerül a mentésbe (mint a Rezsikövető saját mentésében)
+        alar = titkok_nelkul([{"subentry_id": s["subentry_id"], "subentry_type": s["subentry_type"], "title": s["title"],
+                               "data": s["data"]} for s in e.get("subentries") or []])
         szenzorok = {}
         for h in szenzor_hivatkozasok(alar):
             r = reg.get(h["entity_id"]) or {}

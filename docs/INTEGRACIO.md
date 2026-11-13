@@ -1,4 +1,4 @@
-# Rezsikövető integráció (2.4.0, 2026-11-07)
+# Rezsikövető integráció (2.4.1, 2026-11-13)
 
 > **Tájékoztató jellegű számítás, a hivatalos számlát nem helyettesíti.**
 > A 0.1 a v1 YAML-csomag tudását hozza integrációként. A víz, a gáz MJ-alapú elszámolása és a napelem a következő lépcsőkben jön (lásd `docs/terv/04_UTEMTERV.md`).
@@ -161,7 +161,7 @@ Közmű: „Hulladékszállítás (fix díj)”. Nincs mérő: a költség a dí
 | Aktuális egységár | A következő egység ára – a HA Energia irányítópulthoz ár-entitásként is megadható |
 | Éves fogyasztás | Áramnál a jogszabály szerinti év eleje óta (aug. 1., H-tarifánál a nyári idény eleje, ápr. 16.), a többi közműnél az utolsó elszámoló (éves) leolvasás óta; `ev_kezdete` attribútum |
 | Várható elszámolás | „Ha ma lenne az elszámolás”: az utolsó valódi elszámoló számla időszakának vége óta mért fogyasztás költsége (alapdíjjal) és az azóta kiállított számlák különbsége. Pozitív: visszatérítés, negatív: ráfizetés. Ha nincs elszámoló számla, az első számla időszakától számol. |
-| Utolsó számla | A számlamappából feldolgozott legutóbbi számla összege (sorszám, kelte, típus) |
+| Utolsó számla | A számlamappából feldolgozott legutóbbi számla összege (attribútumok, 2.4.1: sorszám, kelte, összeg, típus, időszak, határidő, számlák száma – személyes adat nélkül) |
 | Utolsó lezárt időszak | Az időszak végén automatikusan lezárul (a következő időszak első napján 01:00 után) |
 
 A háztartáson: **Rezsi eddig összesen** és **Rezsi várható összesen**.

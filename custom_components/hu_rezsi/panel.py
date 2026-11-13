@@ -1174,7 +1174,7 @@ async def _ha_mentesek(hass: HomeAssistant, msg: dict[str, Any]) -> list[dict[st
 async def _ha_mentesbol(hass: HomeAssistant, msg: dict[str, Any]) -> dict[str, Any]:
     from . import mentes_ha  # noqa: PLC0415
 
-    return await mentes_ha.ha_mentesbol(hass, msg["backup_id"], msg.get("agent_id"))
+    return await mentes_ha.ha_mentesbol(hass, msg["backup_id"], msg.get("agent_id"), msg.get("jelszo"))
 
 
 def _otthon(hass: HomeAssistant, entry_id: str):  # noqa: ANN202
@@ -1204,7 +1204,8 @@ ws_mentes_beallitas = websocket_api.websocket_command(
 ws_mentes_helyek = websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/mentes_helyek"})(_mentes_ws(_mentes_helyek))
 ws_ha_mentesek = websocket_api.websocket_command({vol.Required("type"): "hu_rezsi/ha_mentesek"})(_mentes_ws(_ha_mentesek))
 ws_ha_mentesbol = websocket_api.websocket_command(
-    {vol.Required("type"): "hu_rezsi/ha_mentesbol", vol.Required("backup_id"): str, vol.Optional("agent_id"): str})(_mentes_ws(_ha_mentesbol))
+    {vol.Required("type"): "hu_rezsi/ha_mentesbol", vol.Required("backup_id"): str, vol.Optional("agent_id"): str,
+     vol.Optional("jelszo"): str})(_mentes_ws(_ha_mentesbol))
 ws_szenzor_lista = websocket_api.websocket_command(
     {vol.Required("type"): "hu_rezsi/szenzor_lista", vol.Required("entry_id"): str})(_mentes_ws(_szenzor_lista))
 ws_szenzor_csere = websocket_api.websocket_command(

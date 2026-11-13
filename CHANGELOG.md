@@ -1,5 +1,15 @@
 # Változások
 
+## Rezsikövető 2.4.1 – 2026-11-13
+
+Biztonsági és adatvédelmi javítások a HACS-bírálat (hacs/default#13437) alapján.
+
+- **E-mail: tanúsítvány-ellenőrzés.** Az IMAP-kapcsolat (SSL és STARTTLS) a Home Assistant szabványos kliens-kontextusával ellenőrzi a szerver tanúsítványát és nevét; a jelszó csak a valódi szerverhez megy (eddig az imaplib alapértelmezése nem ellenőrzött).
+- **Utolsó számla szenzor: személyes adat nélkül.** Attribútumai csak a sorszám, a kelte, az összeg, a típus, az időszak, a fizetési határidő és a számlák száma; az ügyfél adatai (név, cím, azonosítók, mérő), a tételek, a fizetési mód és a fájlnév nem kerülnek a felvevőbe és az előzményekbe. A hangválasz és a panel ugyanazt mutatja, mint eddig.
+- **Mentés Home Assistant-mentésből: jelszó nélkül.** Az ebből készült Rezsikövető-mentésbe sem kerül bele az e-mail fiók jelszava (mint a saját mentésbe); visszaállítás után újra meg kell adni.
+- **Titkosított Home Assistant-mentés: a kulcsot te adod meg.** A *Visszaállítás Home Assistant-mentésből* listában a titkosított mentés sorában kell beírni a titkosítási kulcsot; csak erre a kiolvasásra használja, nem tárolja. A Rezsikövető a HA saját mentéskulcsát többé nem olvassa ki. Hibás kulcsnál érthető hibaüzenet.
+- **Nem akad meg a Home Assistant:** a számlamappa fájljainak vizsgálata (AI-kiolvasás, számlafeldolgozás, régi számlák pótlása) végrehajtó szálon fut, lassú tárolón (SD-kártya, hálózati mappa) sem állítja meg az eseményhurkot.
+
 ## Rezsikövető 2.4.0 – 2026-11-07
 
 Végleges kiadás: a 2.4.0b1–b3 bétákban megjelent újdonságok (lent) és az alábbiak.

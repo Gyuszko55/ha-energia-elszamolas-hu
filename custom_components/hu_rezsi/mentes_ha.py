@@ -36,6 +36,8 @@ from .const import DOMAIN
 from .tarolo import VERZIO, Tarolo
 
 _LOGGER = logging.getLogger(__name__)
+# 2.4.1: a titkosított HA-mentéshez a panel bekéri a kulcsot (a hibaüzenet elejéről ismeri fel)
+KULCS_KELL = "a mentés titkosított: add meg a titkosítási kulcsát"
 JEGY = "visszaallitas"
 BEALLITAS_KULCS = f"{DOMAIN}_mentes"
 NAPOK = ["hétfő", "kedd", "szerda", "csütörtök", "péntek", "szombat", "vasárnap"]
@@ -333,7 +335,8 @@ async def ha_mentesek(hass: HomeAssistant) -> list[dict[str, Any]]:
     return sorted(ki, key=lambda x: x["datum"], reverse=True)
 
 
-async def ha_mentesbol(hass: HomeAssistant, backup_id: str, agent_id: str | None = None) -> dict[str, Any]:
+async def ha_mentesbol(hass: HomeAssistant, backup_id: str, agent_id: str | None = None,
+                      jelszo: str | None = None) -> dict[str, Any]:
     """Egy HA-mentés Rezsikövető-tartalmából szabályos Rezsikövető-mentés (zip) az első mentési helyre."""
     from homeassistant.components.backup import DATA_MANAGER
     from homeassistant.components.backup.util import DecryptedBackupStreamer
@@ -360,9 +363,10 @@ async def ha_mentesbol(hass: HomeAssistant, backup_id: str, agent_id: str | None
         return await agent.async_download_backup(backup_id)
 
     if agent_backup.protected:
-        jelszo = manager.config.data.create_backup.password
+        # 2.4.1: a kulcsot a felhasználó adja meg a panelen, csak erre az egy kiolvasásra; a HA saját (a mentés
+        # beállításaiban tárolt) kulcsát a Rezsikövető nem olvassa ki, és a megadottat sem tárolja
         if not jelszo:
-            raise m.MentesHiba("a mentés titkosított, de a HA-ban nincs beállított mentéskulcs")
+            raise m.MentesHiba(KULCS_KELL)
         stream = await DecryptedBackupStreamer(hass, agent_backup, nyit, jelszo).open_stream()
     else:
         stream = await nyit()
@@ -384,7 +388,14 @@ async def ha_mentesbol(hass: HomeAssistant, backup_id: str, agent_id: str | None
             meret = m.zip_ir(cel, otthonok, sz, b.homeassistant_version or "?", keszult.replace(microsecond=0).isoformat())
         return {"fajl": cel.name, "meret": meret, "otthonok": [o.nev for o in otthonok], "szamlak": len(sz)}
 
-    eredmeny = await hass.async_add_executor_job(feldolgoz)
+    try:
+        eredmeny = await hass.async_add_executor_job(feldolgoz)
+    except m.MentesHiba:
+        raise
+    except Exception as err:  # noqa: BLE001 – hibás kulcsnál a visszafejtés / kicsomagolás bármivel elszállhat
+        if agent_backup.protected:
+            raise m.MentesHiba(f"a mentés nem fejthető vissza – hibás a titkosítási kulcs? ({err})") from err
+        raise
     _LOGGER.info("Rezsikövető-mentés HA-mentésből (%s, %s): %s", b.name, agent_id, eredmeny)
     return eredmeny | {"ha_mentes": b.name, "agent": agent_id}
 

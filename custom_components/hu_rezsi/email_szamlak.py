@@ -20,6 +20,7 @@ import html
 import imaplib
 import logging
 import re
+import ssl
 import tempfile
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -538,6 +539,17 @@ def _uzenet_bajtok(valasz: Any) -> bytes | None:
     return None
 
 
+def ssl_kontextus() -> ssl.SSLContext:
+    """A tanúsítványt és a gépnevet is ellenőrző TLS-kapcsolat (2.4.1): a Home Assistant szabványos kliens-kontextusa
+    (a jelszó csak a valódi szerverhez mehet; az imaplib alapértelmezése nem ellenőriz)."""
+    try:
+        from homeassistant.util.ssl import client_context  # noqa: PLC0415
+
+        return client_context()
+    except ImportError:  # HA nélkül (önálló próbák): a Python ellenőrző alapkontextusa
+        return ssl.create_default_context()
+
+
 def kapcsolodik(pf: Postafiok, gyar: Callable[[Postafiok], Any] | None = None) -> Any:
     """Bejelentkezett IMAP-kapcsolat. Hibás jelszó: HitelesitesiHiba; nem elérhető szerver: KapcsolatiHiba."""
     if not pf.jelszo:
@@ -546,10 +558,10 @@ def kapcsolodik(pf: Postafiok, gyar: Callable[[Postafiok], Any] | None = None) -
         if gyar is not None:
             imap = gyar(pf)
         elif pf.ssl:
-            imap = imaplib.IMAP4_SSL(pf.szerver, pf.port, timeout=IDOKORLAT)
+            imap = imaplib.IMAP4_SSL(pf.szerver, pf.port, timeout=IDOKORLAT, ssl_context=ssl_kontextus())
         else:
             imap = imaplib.IMAP4(pf.szerver, pf.port, timeout=IDOKORLAT)
-            imap.starttls()
+            imap.starttls(ssl_context=ssl_kontextus())
     except (OSError, imaplib.IMAP4.error) as err:
         raise KapcsolatiHiba(f"A szerver nem érhető el ({pf.szerver}:{pf.port}): {err}") from err
     try:

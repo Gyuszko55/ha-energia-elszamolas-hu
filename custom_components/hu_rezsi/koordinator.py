@@ -2368,6 +2368,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         return sub
 
     def _ai_fajl(self, sub: ConfigSubentry, fajl: str) -> Path:
+        """A kiolvasandó PDF útja a fiók számlamappájában (végrehajtó szálon: fájlrendszert vizsgál)."""
         if not sub.data.get(CONF_SZAMLA_MAPPA):
             raise ValueError("Ennek a fióknak nincs számlamappája – a számlát az Új számla gombbal töltsd fel vagy rögzítsd.")
         mappa = Path(self.hass.config.config_dir) / sub.data[CONF_SZAMLA_MAPPA]
@@ -2417,7 +2418,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         és a számla szövege (a panel jóváhagyó ablakához). Semmit nem rögzít, semmit nem tárol."""
         sub = self._ai_fiok(sid)
         tarolt = self.tarolo.fiok(sid)
-        p = self._ai_fajl(sub, fajl)
+        p = await self.hass.async_add_executor_job(self._ai_fajl, sub, fajl)  # 2.4.1: a fájlvizsgálat szálon
         sima, tabla = await self.hass.async_add_executor_job(self._ai_szovegek, p)
         segito, ismert, merok = self._ai_segito(sub, tarolt)
         kt = ai_beolvaso.Kitakaro(ismert, merok)
@@ -2452,7 +2453,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
         async with self._zar:
             sub = self._ai_fiok(sid)
             tarolt = self.tarolo.fiok(sid)
-            p = self._ai_fajl(sub, fajl)
+            p = await self.hass.async_add_executor_job(self._ai_fajl, sub, fajl)  # 2.4.1: a fájlvizsgálat szálon
             sima, tabla = await self.hass.async_add_executor_job(self._ai_szovegek, p)
             adat = ai_beolvaso.normalizal(adat)
             szuro = {x.strip() for x in str(sub.data.get(CONF_SZAMLA_MEROK) or "").split(",") if x.strip()}
@@ -2982,10 +2983,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             ujra = set(tarolt.get("ismeretlen_fajlok", []))
             if tarolt.get("pdf_olvaso_verzio", 1) < 2:
                 ismert_fajl = {x.get("fajl") for x in (tarolt.get("szamlak") or {}).values()}
-                ujra |= {
-                    f for f in tarolt.get("feldolgozott_fajlok", [])
-                    if f.lower().endswith(".pdf") and f not in ismert_fajl and not (mappa / f).with_suffix(".xml").exists()
-                }
+                regiek = list(tarolt.get("feldolgozott_fajlok", []))
+                ujra |= await self.hass.async_add_executor_job(  # 2.4.1: a fájlvizsgálat szálon
+                    lambda: {f for f in regiek
+                             if f.lower().endswith(".pdf") and f not in ismert_fajl
+                             and not (mappa / f).with_suffix(".xml").exists()})
             tarolt["feldolgozott_fajlok"] = [f for f in tarolt.get("feldolgozott_fajlok", []) if f not in ujra]
             tarolt.pop("nem_olvasott_fajlok", None)
             tarolt["pdf_olvaso_verzio"] = szamlak.PDF_OLVASO_VERZIO
@@ -3104,9 +3106,11 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             # számla-ellenőrzéshez és a folyószámla-sorhoz; csak ezek pótlódnak. Az utolsó ~2 év számlái.
             hatar = (date.today() - timedelta(days=800)).isoformat()
             # A fájlnév nélkül rögzített (pl. feltöltött) számlánál a mappában a „<sorszám>.pdf”.
-            jeloltek = [(k, x.get("fajl") or f"{k}.pdf") for k, x in tarolt["szamlak"].items()
-                        if (x.get("fajl") or (mappa / f"{k}.pdf").exists()) and x.get("forras", "mvm_aram") == "mvm_aram"
-                        and x.get("tipus") != "storno" and x.get("kelte", "") >= hatar and not str(k).startswith("kezi")]
+            szamlak_ = list(tarolt["szamlak"].items())
+            jeloltek = await self.hass.async_add_executor_job(  # 2.4.1: a fájlvizsgálat szálon
+                lambda: [(k, x.get("fajl") or f"{k}.pdf") for k, x in szamlak_
+                         if (x.get("fajl") or (mappa / f"{k}.pdf").exists()) and x.get("forras", "mvm_aram") == "mvm_aram"
+                         and x.get("tipus") != "storno" and x.get("kelte", "") >= hatar and not str(k).startswith("kezi")])
 
             def potol6() -> dict[str, dict[str, Any]]:
                 out: dict[str, dict[str, Any]] = {}
@@ -3401,11 +3405,10 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             )
         # Fel nem ismert fájlok (nem számla, ismeretlen szolgáltató, szkennelt PDF): ne vesszenek el csendben.
         # Az XML-párral rendelkező PDF szándékosan kimarad (az XML-t olvassuk), az nem „ismeretlen”.
-        ujak_ismeretlen = {
-            f.name for f, x in zip(fajlok, beolvasott, strict=True)
-            if x is None and not (f.suffix.lower() == ".pdf" and f.with_suffix(".xml").exists())
-            and not _ismert_masolat(f.name, tarolt)
-        }
+        ujak_ismeretlen = await self.hass.async_add_executor_job(  # 2.4.1: a fájlvizsgálat szálon
+            lambda: {f.name for f, x in zip(fajlok, beolvasott, strict=True)
+                     if x is None and not (f.suffix.lower() == ".pdf" and f.with_suffix(".xml").exists())
+                     and not _ismert_masolat(f.name, tarolt)})
         felismert = {f.name for f, x in zip(fajlok, beolvasott, strict=True) if x is not None}
         tarolt["ismeretlen_fajlok"] = sorted((set(tarolt.get("ismeretlen_fajlok", [])) - felismert) | ujak_ismeretlen)
         if ujak_ismeretlen:

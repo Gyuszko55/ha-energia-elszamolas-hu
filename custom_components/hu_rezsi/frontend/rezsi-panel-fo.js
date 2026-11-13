@@ -4977,10 +4977,19 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     el("halista").addEventListener("click", async (ev) => {
       const t = ev.target.closest("[data-hakiolvas]");
       if (!t) return;
+      // 2.4.1: titkosított mentésnél a kulcsot a felhasználó adja meg (csak erre a kiolvasásra, nem tároljuk)
+      const kulcsMezo = t.closest("tr")?.querySelector("input[data-hakulcs]");
+      const kulcs = kulcsMezo ? kulcsMezo.value.trim() : "";
+      if (kulcsMezo && !kulcs) {
+        ered(`<span class="figyszoveg">A mentés titkosított: írd be a titkosítási kulcsát (Home Assistant: Beállítások → Rendszer → Mentések → Titkosítási kulcs).</span>`);
+        kulcsMezo.focus();
+        return;
+      }
       t.disabled = true;
       ered("Kiolvasás a Home Assistant-mentésből… (nagy mentésnél egy-két perc)");
       try {
-        const e = await this._hass.callWS({ type: "hu_rezsi/ha_mentesbol", backup_id: t.dataset.hakiolvas });
+        const e = await this._hass.callWS({ type: "hu_rezsi/ha_mentesbol", backup_id: t.dataset.hakiolvas, ...(kulcs ? { jelszo: kulcs } : {}) });
+        if (kulcsMezo) kulcsMezo.value = "";
         ered(`<span class="ok">✓ Rezsikövető-mentés készült a(z) „${esc(e.ha_mentes)}” HA-mentésből:</span> ${esc(e.fajl)} · ${esc((e.otthonok || []).join(", "))}${e.szamlak ? ` · ${e.szamlak} számla-fájl` : ""} – a Mentések listájából visszaállítható.`);
         await this._mentesLista();
       } catch (err) {
@@ -5154,7 +5163,7 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
       el.innerHTML = v.length ? `<table class="menteslista"><thead><tr><th>Készült</th><th>Név</th><th>Hol</th><th></th></tr></thead><tbody>${v.slice(0, 25).map((b) =>
         `<tr><td>${new Date(b.datum).toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}</td><td>${esc(b.nev)}</td>
           <td class="kicsi">${b.helyek.map((h) => `${esc(h.agent_id.replace("hassio.local", "helyi").replace("cloud.cloud", "Nabu Casa"))} · ${meret(h.meret)}${h.titkositott ? " · titkosított" : ""}`).join("<br>")}</td>
-          <td class="mentesgombok"><button type="button" class="linkgomb" data-hakiolvas="${esc(b.backup_id)}">Kiolvasás</button></td></tr>`).join("")}</tbody></table>`
+          <td class="mentesgombok">${b.helyek.some((h) => h.titkositott) ? `<input type="password" data-hakulcs autocomplete="off" placeholder="Titkosítási kulcs" aria-label="A mentés titkosítási kulcsa" class="hakulcs"> ` : ""}<button type="button" class="linkgomb" data-hakiolvas="${esc(b.backup_id)}">Kiolvasás</button></td></tr>`).join("")}</tbody></table>`
         : `<div class="kicsi">Nincs Home Assistant-mentés.</div>`;
     } catch (err) {
       el.innerHTML = `<div class="figyszoveg">${esc(err.message || err)}</div>`;
@@ -5748,6 +5757,7 @@ const STILUS = `
   table.menteslista { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.menteslista th, table.menteslista td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--divider-color); vertical-align: top; }
   .mentesgombok { white-space: nowrap; text-align: right !important; }
+  input.hakulcs { width: 150px; max-width: 40vw; font: inherit; padding: 3px 6px; border: 1px solid var(--divider-color); border-radius: 6px; background: var(--card-background-color); color: var(--primary-text-color); }
   .szigetossz { list-style: none; padding: 0; margin: 10px 0 2px; font-size: 14px; }
   .szigetossz li::before { content: "☀ "; color: var(--warning-color, #ff9800); }
   .szigetido { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0; }
