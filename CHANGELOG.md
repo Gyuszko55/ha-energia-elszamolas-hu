@@ -1,5 +1,11 @@
 # Változások
 
+## Rezsikövető 2.4.2 – 2026-11-17
+
+- **Javítás gomb: egy kattintás, egy ablak.** A panel javítás-gombjainak figyelője eddig minden újrarajzoláskor újra
+  rákerült a panelre, így néhány frissítés után egyetlen kattintás többször nyitotta meg a javítás ablakát. Most csak
+  egyszer kerül fel, mint a panel többi delegált figyelője. (A HACS-bírálat – hacs/default#13437 – javaslata.)
+
 ## Rezsikövető 2.4.1 – 2026-11-13
 
 Biztonsági és adatvédelmi javítások a HACS-bírálat (hacs/default#13437) alapján.

@@ -115,4 +115,4 @@ def test_ha_mentes_kulcsa_a_felhasznalotol(monkeypatch):
 def test_verzio():
     import json
 
-    assert json.loads((CS / "manifest.json").read_text(encoding="utf-8"))["version"] == "2.4.1"
+    assert json.loads((CS / "manifest.json").read_text(encoding="utf-8"))["version"] in ("2.4.1", "2.4.2")

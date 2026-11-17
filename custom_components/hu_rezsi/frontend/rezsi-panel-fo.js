@@ -4686,10 +4686,11 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
 
   _javitasKezelo() {
     const r = this.shadowRoot, d = r.getElementById("javdlg");
-    r.addEventListener("click", (ev) => {
+    // 2.4.2: a shadow root a rajzolások között megmarad – a delegált figyelő csak egyszer kerül rá (HACS-bírálat)
+    this._egyszer("javit", () => r.addEventListener("click", (ev) => {
       const b = ev.target.closest?.("[data-javit]");
       if (b) { const i = b.dataset.javit.indexOf("|"); this._javitasNyit(b.dataset.javit.slice(0, i), b.dataset.javit.slice(i + 1)); }
-    });
+    }));
     r.getElementById("javmegse").addEventListener("click", () => d.close());
     r.getElementById("javfiz").addEventListener("change", (ev) => {
       const dm = r.getElementById("javdatum");
