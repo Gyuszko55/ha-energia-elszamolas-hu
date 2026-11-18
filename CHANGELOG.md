@@ -1,5 +1,17 @@
 # Változások
 
+## Rezsikövető 2.4.3 – 2026-11-18
+
+- **Kímélő számlakeresés e-mailben.** A „Keresés újra” (felderítés) az utolsó fél év minden PDF-mellékletes levelét
+  átnézi; egy nagy postafiókban ez gyengébb gépen fél óránál is tovább tartott, és közben az egész Home Assistant
+  akadozott (a számla-PDF-ek szövegre bontása tiszta Pythonban fut). Most:
+  - a felderítés a PDF teljes szövegét nem bontja ki (a besoroláshoz a számla-beolvasó eredménye elég);
+  - a 8 MB-nál nagyobb vagy 20 oldalnál hosszabb PDF-et (kézikönyv, prospektus – nem számla) nem olvassa be;
+  - a legújabb levelekkel kezd, és 15 perc után megáll; az addig talált számlák megmaradnak, a panel jelzi, hogy a
+    keresés részleges volt;
+  - levelenként rövid szünetet tart (a felderítésnél és az óránkénti átnézésnél is), hogy a Home Assistant közben is
+    gyorsan válaszoljon.
+
 ## Rezsikövető 2.4.2 – 2026-11-17
 
 - **Javítás gomb: egy kattintás, egy ablak.** A panel javítás-gombjainak figyelője eddig minden újrarajzoláskor újra

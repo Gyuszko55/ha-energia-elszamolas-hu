@@ -1312,7 +1312,7 @@ class HuRezsiPanel extends HTMLElement {
       else allapot = `utoljára ${ido(p.utolso_atnezes)} · ${p.utolso_talalt ? `<b>${p.utolso_talalt} új számla</b>` : "nincs új számla"}${p.nem_besorolhato
         ? ` · <span class="figyszoveg" title="${esc((p.talalatok || []).filter((t) => t.tipus === "nem_besorolhato").map((t) => `${t.datum}: ${t.ok} (${t.fiok})`).join("\n"))}">${p.nem_besorolhato} levelet nem tudtam fiókhoz rendelni</span>` : ""}`;
       const f = p.felderites;
-      const fsz = f && !p.felderites_fut ? (f.hiba ? "" : `<div class="kicsi">Legutóbbi keresés (${ido(f.ido)}): az utolsó fél évben ${f.talalt || 0} számlát találtam.</div>`) : "";
+      const fsz = f && !p.felderites_fut ? (f.hiba ? "" : `<div class="kicsi">Legutóbbi keresés (${ido(f.ido)}): az utolsó fél évben ${f.talalt || 0} számlát találtam${f.reszleges ? " (az időkorlát miatt nem minden levelet néztem át – a régebbiek kimaradhattak)" : ""}.</div>`) : "";
       const lista = (p.talalatok || []).filter((t) => t.tipus !== "nem_besorolhato").map((t) => `${t.datum} · ${t.fiok}: ${t.fajl || `${t.sorszam} (${t.osszeg} Ft, értesítő)`}`).join("\n");
       const kezi = (p.bekotott || []).some((b) => b.mod === "kezi");
       return `<div class="emailpf"${lista ? ` title="Legutóbb talált:\n${esc(lista)}"` : ""}><div><b>${esc(p.nev)}</b>${p.cim ? ` <span class="kicsi">${esc(p.cim)}</span>` : ""}: ${allapot}</div>
@@ -4358,7 +4358,7 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
     } else {
       const f = g.eredmeny?.felderites, e = g.eredmeny?.email;
       const ossz = (f?.osszekotve || []), mar = (f?.mar_bekotve || []);
-      html = f?.hiba ? `<p class="figyszoveg">A keresés nem sikerült: ${esc(f.hiba)}</p>` : f ? `<p class="emkesz">✓ Kész! Az utolsó fél évben <b>${f.talalt || 0} számlát</b> találtam.</p>
+      html = f?.hiba ? `<p class="figyszoveg">A keresés nem sikerült: ${esc(f.hiba)}</p>` : f ? `<p class="emkesz">✓ Kész! Az utolsó fél évben <b>${f.talalt || 0} számlát</b> találtam.${f.reszleges ? " Az időkorlát miatt a legrégebbi levelek kimaradhattak." : ""}</p>
         ${ossz.length ? `<p>Mostantól e-mailből jönnek:</p><ul>${ossz.map((x) => `<li><b>${esc(x.nev)}</b> – ${esc((x.tipusok || []).join(", "))}</li>`).join("")}</ul>` : ""}
         ${mar.length ? `<p class="kicsi">Már be volt kötve: ${mar.map((x) => esc(x.nev)).join(", ")}.</p>` : ""}
         ${(e?.kerdesek || []).length ? `<p>❓ ${(e.kerdesek || []).length} számláról nem tudom biztosan, melyik fiókhoz tartozik – a panelen egy gombnyomással eldöntheted.</p>` : ""}

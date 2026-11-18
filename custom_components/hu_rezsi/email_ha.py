@@ -191,9 +191,12 @@ def _felderit(pf: es.Postafiok, ma: date, terkep: dict[str, set[str]],
               fiokok: list[tuple[str, str, dict[str, Any], dict[str, Any], list[str]]], config_dir: Path,
               mellozott: set[str], kezi: set[str]) -> es.Felderites:
     """Végrehajtó szálon: a postafiók felderítése és a talált számlák besorolása a háztartás fiókjaihoz."""
-    jelek = es.felderit(pf, ma, terkep)
+    allapot: dict[str, Any] = {}
+    jelek = es.felderit(pf, ma, terkep, allapot=allapot)
     af = [es.AutoFiok.adatbol(sid, nev, data, tarolt, config_dir, feladok) for sid, nev, data, tarolt, feladok in fiokok]
-    return es.osztalyoz(jelek, af, mellozott, kezi)
+    fe = es.osztalyoz(jelek, af, mellozott, kezi)
+    fe.reszleges = bool(allapot.get("reszleges"))
+    return fe
 
 
 class EmailFigyelo:
@@ -461,7 +464,7 @@ class EmailFigyelo:
                 "ido": dt_util.now().replace(microsecond=0).isoformat(), "talalt": fe.talalt,
                 "osszekotve": [{"sid": k, "nev": v["nev"], "szamlak": v["szamlak"], "tipusok": v["tipusok"]} for k, v in fe.osszekot.items()],
                 "mar_bekotve": [{"sid": k, "nev": v["nev"], "szamlak": v["szamlak"], "tipusok": v["tipusok"]} for k, v in fe.mar_bekotve.items()],
-                "kerdesek": len(fe.kerdesek), "ajanlatok": len(fe.ajanlatok),
+                "kerdesek": len(fe.kerdesek), "ajanlatok": len(fe.ajanlatok), "reszleges": fe.reszleges,
             }
             all_.pop("felderites_kell", None)
             if frissit:

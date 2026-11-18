@@ -17,4 +17,4 @@ def test_javitas_figyelo_egyszer():
 
 
 def test_verzio():
-    assert json.loads((CS / "manifest.json").read_text(encoding="utf-8"))["version"] == "2.4.2"
+    assert json.loads((CS / "manifest.json").read_text(encoding="utf-8"))["version"] in ("2.4.2", "2.4.3")

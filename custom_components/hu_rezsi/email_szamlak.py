@@ -22,6 +22,7 @@ import logging
 import re
 import ssl
 import tempfile
+import time
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from email.message import EmailMessage
@@ -41,6 +42,11 @@ ALAP_PORT = 993
 ALAP_NAPOK = 45
 IDOKORLAT = 40  # mp: kapcsolódás és egy-egy IMAP-parancs
 MAX_LEVEL = 200  # egy átnézésben legfeljebb ennyi levelet töltünk le mappánként (a keresés így sem fut el)
+# 2.4.3: egy PDF-melléklet, amely ennél nagyobb vagy több oldalas, nem számla (kézikönyv, prospektus): nem olvassuk
+# be – a pypdf tiszta Python, egy nagy PDF szövegre bontása percekig fogná a HA-t.
+PDF_MAX_BAJT = 8 * 1024 * 1024
+PDF_MAX_OLDAL = 20
+LEVEL_SZUNET = 0.05  # mp levelenként: a végrehajtó szál átengedi a GIL-t, a HA eseményhurka közben is szóhoz jut
 SZAMLA_KITERJESZTESEK = {".pdf", ".xml"}
 LATOTT_TARTAS_NAP = 7  # a visszatekintésen túl ennyi napig emlékszünk a feldolgozott levelekre
 GMAIL_GAZDAK = ("gmail.com", "googlemail.com")
@@ -895,6 +901,7 @@ def atnez(
             uidok = (ids[0] or b"").split() if ids else []
             for uid in uidok[-MAX_LEVEL:]:
                 _level(imap, uid, ctx, latott_most)
+                time.sleep(LEVEL_SZUNET)
     except EmailHiba:
         raise
     except (imaplib.IMAP4.abort, OSError) as err:
@@ -929,9 +936,24 @@ def felado_szolgaltatok(feladok: list[str], terkep: dict[str, set[str]]) -> set[
     return ki
 
 
-def _elemek(mell: list[tuple[str, bytes]], targy: str) -> list[dict[str, Any]]:
+def tul_nagy_pdf(fajl: Path, adat: bytes) -> bool:
+    """Számlának túl nagy / túl hosszú PDF (az oldalszám a szöveg kibontása nélkül)."""
+    if fajl.suffix.lower() != ".pdf":
+        return False
+    if len(adat) > PDF_MAX_BAJT:
+        return True
+    try:
+        from pypdf import PdfReader  # noqa: PLC0415 – csak PDF-nél kell
+
+        return len(PdfReader(str(fajl)).pages) > PDF_MAX_OLDAL
+    except Exception:  # noqa: BLE001 – sérült PDF: a beolvasó dönt róla
+        return False
+
+
+def _elemek(mell: list[tuple[str, bytes]], targy: str, szoveg_kell: bool = True) -> list[dict[str, Any]]:
     """A mellékletek beolvasva (ideiglenes mappában, hogy a PDF–XML pár együtt legyen): név, tartalom, számla,
-    szöveg, sorszám, számlának látszik-e, és a besorolás adatai (jel)."""
+    szöveg, sorszám, számlának látszik-e, és a besorolás adatai (jel). `szoveg_kell`: a PDF teljes szövege (a
+    felderítéshez nem kell – ott csak a besorolás adatai számítanak, így a PDF-et egyszer kevesebbszer bontjuk)."""
     with tempfile.TemporaryDirectory(prefix="hu_rezsi_email_") as tmp:
         elemek = []
         fajlok = []
@@ -943,8 +965,15 @@ def _elemek(mell: list[tuple[str, bytes]], targy: str) -> list[dict[str, Any]]:
             f.write_bytes(adat)
             fajlok.append((f, adat))
         for f, adat in fajlok:
+            if tul_nagy_pdf(f, adat):
+                _LOGGER.debug("%s: számlának túl nagy PDF, kihagyva", f.name)
+                elemek.append({"nev": f.name, "adat": adat, "sz": None, "szoveg": "", "sorszam": None, "jel": None, "szamla": False})
+                continue
             sz = _beolvas(f)
-            szoveg = _pdf_szoveg(f) if f.suffix == ".pdf" else adat.decode("utf-8", "replace")
+            if f.suffix == ".pdf":
+                szoveg = _pdf_szoveg(f) if szoveg_kell else ""
+            else:
+                szoveg = adat.decode("utf-8", "replace")
             sorszam = (getattr(sz, "sorszam", None) or None) if sz is not None else None
             sorszam = sorszam or fajlnev_sorszam(f.name)
             elemek.append({"nev": f.name, "adat": adat, "sz": sz, "szoveg": szoveg, "sorszam": sorszam, "jel": szamla_jel(sz),
@@ -1086,6 +1115,7 @@ def _ment_elemek(fiok: Any, szamla_elemek: list[dict[str, Any]], ctx: _Kornyezet
 
 FELDERITES_NAPOK = 180
 FELDERITES_MAX = 400  # mappánként legfeljebb ennyi (a legújabb) levél
+FELDERITES_IDOKORLAT = 15 * 60  # mp: tovább nem keresünk – a már talált számlák a részleges eredményben maradnak
 
 
 def felderit(
@@ -1094,11 +1124,17 @@ def felderit(
     felado_terkep: dict[str, set[str]],
     napok: int = FELDERITES_NAPOK,
     gyar: Callable[[Postafiok], Any] | None = None,
+    allapot: dict[str, Any] | None = None,
+    idokorlat: float = FELDERITES_IDOKORLAT,
 ) -> list[SzamlaJel]:
     """A postafiók számláinak felkutatása (végrehajtó szálon, csak olvas): az utolsó `napok` nap minden mappájában
     (Gmail: Összes levél + Kuka) az ismert szolgáltatói feladók levelei és a PDF/XML mellékletes levelek; a
     mellékleteket a számla-beolvasó olvassa be. Eredmény: a felismert számlák (és Telekom-értesítők) adatai –
-    fájlt nem ment (azt a besorolás utáni felzárkózó átnézés teszi). Hibánál EmailHiba."""
+    fájlt nem ment (azt a besorolás utáni felzárkózó átnézés teszi). Hibánál EmailHiba. A legújabb levelekkel kezd;
+    `idokorlat` mp után megáll, ilyenkor `allapot["reszleges"]` = True (és `allapot["levelek"]` a feldolgozottak száma)."""
+    allapot = allapot if allapot is not None else {}
+    allapot.update(reszleges=False, levelek=0)
+    hatar = time.monotonic() + idokorlat
     imap = kapcsolodik(pf, gyar)
     talalt: list[SzamlaJel] = []
     try:
@@ -1114,8 +1150,14 @@ def felderit(
             typ, ids = imap.uid("SEARCH", *feltetel)
             if typ != "OK":
                 continue
-            for uid in ((ids[0] or b"").split() if ids else [])[-FELDERITES_MAX:]:
+            for uid in reversed(((ids[0] or b"").split() if ids else [])[-FELDERITES_MAX:]):
+                if time.monotonic() > hatar:
+                    allapot["reszleges"] = True
+                    _LOGGER.info("%s: a számlakeresés elérte az időkorlátot (%d levél után) – részleges eredmény", pf.nev, allapot["levelek"])
+                    return talalt
                 talalt.extend(_felderit_level(imap, uid, felado_terkep, latott, szerkezet_kell=not gm))
+                allapot["levelek"] += 1
+                time.sleep(LEVEL_SZUNET)
     except EmailHiba:
         raise
     except (imaplib.IMAP4.abort, OSError) as err:
@@ -1150,7 +1192,7 @@ def _felderit_level(imap: Any, uid: bytes, terkep: dict[str, set[str]], latott: 
     ki: list[SzamlaJel] = []
     if mell:
         latott_jel: set[tuple[str, str]] = set()
-        for e in _elemek(mell, str(fej.get("Subject") or "")):
+        for e in _elemek(mell, str(fej.get("Subject") or ""), szoveg_kell=False):
             jel = e["jel"]
             if jel and (jel.sorszam, jel.forras) not in latott_jel:
                 latott_jel.add((jel.sorszam, jel.forras))
@@ -1171,6 +1213,7 @@ class Felderites:
     kerdesek: list[dict[str, Any]] = field(default_factory=list)
     ajanlatok: list[dict[str, Any]] = field(default_factory=list)
     talalt: int = 0
+    reszleges: bool = False  # 2.4.3: az időkorlát miatt nem nézett át minden levelet
 
 
 def _pelda(jelek: list[SzamlaJel]) -> dict[str, Any]:

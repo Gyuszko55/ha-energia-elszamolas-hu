@@ -588,3 +588,56 @@ def test_postafiok_urlap_ket_mezo_es_osszecsukott_halado(monkeypatch):
     r = asyncio.run(f.async_step_user({"email_cim": "kiss.bela@gmail.com", "jelszo": "abcd efgh ijkl mnop", "halado": {}}))
     assert r["type"] == "create_entry" and r["title"] == "kiss.bela"
     assert r["data"]["imap_szerver"] == "imap.gmail.com" and r["data"]["jelszo"] == "abcdefghijklmnop"
+
+
+# --------------------------------------------------------------------------------------------- 2.4.3: kímélő keresés
+
+
+@pytest.fixture
+def szunet_nelkul(monkeypatch):
+    monkeypatch.setattr(es, "LEVEL_SZUNET", 0)
+
+
+def test_243_felderites_nem_bontja_ki_a_pdf_szoveget(hamis_beolvaso, szunet_nelkul, monkeypatch):
+    bontott = []
+    monkeypatch.setattr(es, "_pdf_szoveg", lambda f: bontott.append(f.name) or "")
+    jelek = es.felderit(_pf(), MA, TERKEP, gyar=lambda pf: _postafiok())
+    assert len(jelek) == 4 and bontott == []  # a besoroláshoz a beolvasó elég, a teljes szöveg nem kell
+
+
+def test_243_tul_nagy_pdf_kimarad(hamis_beolvaso, szunet_nelkul, monkeypatch):
+    monkeypatch.setattr(es, "PDF_MAX_BAJT", 5)  # a hamis PDF-ek 9–13 bájtosak
+    olvasott = []
+    monkeypatch.setattr(es, "_beolvas", lambda f: olvasott.append(f.name) or HAMIS_SZAMLAK.get(f.name))
+    jelek = es.felderit(_pf(), MA, TERKEP, gyar=lambda pf: _postafiok())
+    assert [j.forras for j in jelek] == ["telekom"] and olvasott == []  # csak az értesítő (melléklet nélkül) marad
+
+
+def test_243_tul_nagy_pdf_meret_es_oldalszam(tmp_path, monkeypatch):
+    kicsi = tmp_path / "a.pdf"
+    kicsi.write_bytes(b"x")
+    assert not es.tul_nagy_pdf(kicsi, b"x")  # sérült PDF: a beolvasó dönt
+    assert es.tul_nagy_pdf(kicsi, b"x" * (es.PDF_MAX_BAJT + 1))
+    assert not es.tul_nagy_pdf(tmp_path / "a.xml", b"x" * (es.PDF_MAX_BAJT + 1))
+    import pypdf
+    w = pypdf.PdfWriter()
+    for _ in range(es.PDF_MAX_OLDAL + 1):
+        w.add_blank_page(100, 100)
+    hosszu = tmp_path / "hosszu.pdf"
+    w.write(str(hosszu))
+    assert es.tul_nagy_pdf(hosszu, hosszu.read_bytes())
+
+
+def test_243_idokorlat_reszleges_eredmeny_a_legujabbakkal(hamis_beolvaso, szunet_nelkul, monkeypatch):
+    ora = iter(range(0, 1000, 10))
+    monkeypatch.setattr(es.time, "monotonic", lambda: next(ora))
+    allapot = {}
+    jelek = es.felderit(_pf(), MA, TERKEP, gyar=lambda pf: _postafiok(), allapot=allapot, idokorlat=25)
+    assert allapot["reszleges"] is True and allapot["levelek"] == 2
+    assert jelek == [] or all(j.sorszam != "9000000001" for j in jelek)  # a legújabbakkal kezdett (6, 5 …), az 1-es kimaradt
+
+
+def test_243_teljes_kereses_nem_reszleges(hamis_beolvaso, szunet_nelkul):
+    allapot = {}
+    es.felderit(_pf(), MA, TERKEP, gyar=lambda pf: _postafiok(), allapot=allapot)
+    assert allapot == {"reszleges": False, "levelek": 6}  # 5 találat az Összes levélben + 1 a Kukában
