@@ -1,5 +1,34 @@
 # Változások
 
+## Rezsikövető 2.4.4 – 2026-11-23
+
+- **Díj-beállítás módosítása után újraszámolt lezárt időszakok.** Ha a fiók szolgáltatóját (területét),
+  díjszabását vagy annak kezdetét, a „Kedvezményes (rezsicsökkentett) keret jár” kapcsolót, a csatornadíjat, a
+  H-tarifa / A2 két regiszterét, a gáz fizetési módját vagy a fogyasztói közösséget módosítod, a már lezárt
+  időszakok az új beállítással újraszámolódnak. Eddig a módosítás előtt lezárt időszakok a régi összeggel maradtak
+  (pl. a H-tarifa nyári időszaka keret nélkül, ~70 Ft/kWh-n, a mérőnként járó kedvezményes sáv helyett). Ha egy régi
+  időszak nem számolható újra (nincs mögötte mérés), a régi sora marad. Az első induláskor csak feljegyzi a
+  beállítást, semmit nem számol újra. Egy felhasználó jelzése alapján.
+- **Számlák sorrendje: felül a legújabb.** A fiók Számlák táblázata eddig a kelte szerint, régebbitől
+  rendezett, azonos keltén pedig a rögzítés (javítás) sorrendjében – így két egy napon kelt számla sorrendje
+  véletlenszerűnek tűnt. Most csökkenő: kelte, azonos keltén az elszámolt időszak vége, végül a sorszám (számként).
+  Az összevont MVM-fiók (A + H) számlái is egy sorrendbe kerülnek. Egy felhasználó jelzése alapján.
+- **Aláírt e-számla PDF (ALFÖLDVÍZ, 2026 ősz).** Az e-aláírással küldött számla oldalainak tartalma beágyazott
+  sablonban van; a beolvasó eddig ebből csak üres oldalt látott, a számla „nem olvasható” maradt. Most a beágyazott
+  tartalmat is kiolvassa (minden szolgáltatónál, ahol ilyen PDF jön); a rendes PDF-ek szövege nem változik.
+- **ALFÖLDVÍZ új számlaelrendezés:** egysoros mérősor (időszak, induló–záró állás), két sorban az elszámolt ivóvíz és
+  szennyvíz, a bruttó számlaérték az „összesen” fölötti sorban, két sorba tördelt felhasználási hely. A régi
+  elrendezésű számlák ugyanúgy olvasódnak.
+- **Meleg szennyvíz a melegvízmérő szerint.** A távhős melegvíz szennyvizét a vízmű (ALFÖLDVÍZ) a melegvízmérő
+  állásai szerint számolja el; eddig a Rezsikövető a havi távhőszámla melegvizéből becsülte. Most:
+  - a mennyiség a melegvízmérő állásaiból jön (a távhő fiók mérője és a vízszámla melegvízmérő-sora – a vízmű
+    leolvasása az erősebb), napra arányosítva; állás nélküli napokra marad a távhőszámla havi melegvize / az átalány;
+  - a részszámlán (havi átalány) hónaponként legalább 1 m³, az elszámolón a mért mennyiség;
+  - a díj hónaponként az akkor érvényes díjszabással; az ALFÖLDVÍZ díjszabásában 2025-12-01-től (eddig 2026-05-től);
+  - az elszámoló beolvasója kiolvassa a melegvízmérő sorát (mérő, időszak, induló–záró állás, m³), és a számlák
+    összevetése a meleg szennyvizet is beszámítja, ha a számla is számlázza – így az elszámoló nem mutat
+    indokolatlan eltérést.
+
 ## Rezsikövető 2.4.3 – 2026-11-18
 
 - **Kímélő számlakeresés e-mailben.** A „Keresés újra” (felderítés) az utolsó fél év minden PDF-mellékletes levelét

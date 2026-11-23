@@ -175,7 +175,14 @@ def folyoszamla_meta(sz: Szamla) -> dict[str, Any]:
         **({"hatarido": sz.hatarido.isoformat()} if sz.hatarido else {}),
         **({"fizetesi_mod": sz.fizetesi_mod} if sz.fizetesi_mod else {}),
         **({"sztornozott": sz.sztornozott} if sz.sztornozott else {}),
+        **({"meleg_szennyviz": meleg_szennyviz_meta(sz.meleg_szennyviz)} if sz.meleg_szennyviz else {}),
     }
+
+
+def meleg_szennyviz_meta(m: dict[str, Any]) -> dict[str, Any]:
+    """A számla meleg szennyvíz adata tárolható alakban (dátum: ISO, szám: szöveg)."""
+    return {"mero": m["mero"], "idoszak": [m["idoszak"][0].isoformat(), m["idoszak"][1].isoformat()],
+            "indulo": str(m["indulo"]), "zaro": str(m["zaro"]), "m3": str(m["m3"])}
 
 
 def _elszamolo_allas(sz: Szamla, ma: Meroallas) -> bool:

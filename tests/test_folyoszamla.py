@@ -86,7 +86,7 @@ def test_oraallas_a_szamlarol():
     """A számlán szereplő induló → záró óraállás a kivonat megnevezése alatt, a leolvasás módjával (becsült is)."""
     from folyoszamla import oraallas
 
-    x = {"allasok": [{"mero": "68027738", "indulo": ["2026-05-01", "64"], "zaro": ["2026-08-31", "68"], "lm": "Becs"}]}
+    x = {"allasok": [{"mero": "11223344", "indulo": ["2026-05-01", "64"], "zaro": ["2026-08-31", "68"], "lm": "Becs"}]}
     assert oraallas(x, "m³") == "óraállás 64 → 68 m³ (becsült)"
     assert oraallas({"allasok": [{"mero": "1", "indulo": None, "zaro": ["2026-07-28", "20520"], "lm": "Dikt"}]}, "kWh") == "óraállás záró 20520 kWh (diktált)"
     assert oraallas({}) is None

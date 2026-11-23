@@ -3936,7 +3936,11 @@ ${mvm ? `<p class="kicsi fszkozos">Közös folyószámla: ${a.fiokok.length} tar
 
   // Számlák: soronként lenyíló részletek (a számla minden tárolt adata). A nyitott sorokat megjegyzi (újrarajzoláskor is).
   _szamlaTabla(f) {
-    const lista = f.szamlak || [];
+    // Felül a legújabb: kelte, azonos keltén az elszámolt időszak vége, végül a sorszám (számként) szerint csökkenő.
+    // Az összevont (MVM A+H) fiók tagjainak számlái is így kerülnek egy sorrendbe.
+    const lista = [...(f.szamlak || [])].sort((a, b) => (b.kelte || "").localeCompare(a.kelte || "")
+      || (b.idoszak?.[1] || "").localeCompare(a.idoszak?.[1] || "")
+      || String(b.sorszam ?? "").localeCompare(String(a.sorszam ?? ""), "hu", { numeric: true }));
     if (!lista.length) return `<div class="kicsi">nincs adat</div>`;
     const jel = !!f.device_id && this._admin;  // kijelölés törlésre: csak rendszergazda
     const fej = [jel ? "" : null, "Kelte", "Sorszám", "Típus", "Összeg", "Fizetve"].filter((x) => x !== null);

@@ -189,6 +189,40 @@ def mero_szinkron(tarolt: dict[str, Any], beallitas: dict[str, Any]) -> bool:
     return valtozott
 
 
+def dij_ujjlenyomat(beallitas: dict[str, Any]) -> dict[str, Any]:
+    """A fiók díját befolyásoló beállítások: szolgáltató (terület), díjszabás és kezdete, kedvezményes keret,
+    csatornadíj, H-tarifa / A2 két regiszterrel, gáz fizetési mód és fogyasztói közösség, napelem."""
+    return {
+        "szolgaltato": str(beallitas.get(CONF_SZOLGALTATO) or ""),
+        "dijszabas": str(beallitas.get(CONF_DIJSZABAS) or ""),
+        "dijszabas_tol": str(beallitas.get(CONF_DIJSZABAS_TOL) or ""),
+        "keret_aktiv": bool(beallitas.get(CONF_KERET_AKTIV, True)),
+        "csatornadij_aktiv": bool(beallitas.get(CONF_CSATORNADIJ, True)),
+        "h_regiszter": h_regiszter_mod(beallitas),
+        "a2_regiszter": bool(beallitas.get(CONF_A2_CSUCS) and beallitas.get(CONF_A2_VOLGY)),
+        "fizetesi_mod": str(beallitas.get("fizetesi_mod") or ""),
+        "lakasszam": str(beallitas.get("lakasszam") or ""),
+        "kozosseg_tipus": str(beallitas.get("kozosseg_tipus") or ""),
+        "napelem_mod": str(beallitas.get("napelem_mod") or ""),
+    }
+
+
+def dij_szinkron(tarolt: dict[str, Any], beallitas: dict[str, Any]) -> bool:
+    """A fiók szerkesztésekor módosított díj-beállítás (pl. szolgáltató, díjszabás, „Kedvezményes keret jár”) után a
+    lezárt időszakok az új beállítással újraszámolódnak (a koordinátor „lezart_ujra” jelzése, a díjszabás / a mérő
+    kezdetétől). Eddig a már lezárt időszakok a régi beállítás szerinti összeggel maradtak. Az első futáskor csak
+    feljegyzi a beállítást. Igaz, ha változott."""
+    uj = dij_ujjlenyomat(beallitas)
+    elozo = tarolt.get("dij_beallitas")
+    if elozo == uj:
+        return False
+    if elozo is not None and tarolt.get("lezart"):
+        tarolt["lezart_ujra"] = min(filter(None, [tarolt.get("lezart_ujra"), "2000-01-01"]))  # a legkorábbitól
+        tarolt["lezart_ujra_megtart"] = True  # automatikus: a nem újraszámolható régi időszak marad
+    tarolt["dij_beallitas"] = uj
+    return True
+
+
 def kezdo_origo_szinkron(tarolt: dict[str, Any], beallitas: dict[str, Any]) -> bool:
     """A fiók létrehozásakor vagy módosításakor megadott kezdő óraállás (a kezdőnapon) az elszámolások origója: éves
     elszámoló leolvasásként számít (évkezdet, „Ha ma lenne az elszámolás” kezdete), amíg egy későbbi éves leolvasás

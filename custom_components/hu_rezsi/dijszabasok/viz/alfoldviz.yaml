@@ -57,9 +57,38 @@ verziok:
         viz_m3: 234.00
         csatorna_m3: 242.30    # szennyvíz 240,30 + áthárított vízterhelési díj 2,00
         alapdij_ho: 0
+  - ervenyes_tol: 2025-12-01
+    forras: >-
+      ALFÖLDVÍZ Zrt. (mellékvízmérő): az árak a 2025-04-01-es változatéi (vízterhelési díj 2,00 Ft/m³). 2025-12-01-től a háztartás távhős melegvizének szennyvizét („meleg szennyvíz”) is az ALFÖLDVÍZ számlázza – korábban a HVSZ; az elszámoló 900015LV26 a 55667788 melegvízmérő állásaival (18–30) 2025.12.01-től számolja el.
+    ellenorzes:
+      allapot: szamlabol
+      datum: 2026-11-20
+      mivel: "ALFÖLDVÍZ elszámoló 900015LV26 (meleg szennyvíz 2025.12.01-től)"
+    szabalyok:
+      keret: {tipus: nincs}
+      mennyiseg_egesz: true
+      mennyiseg_minimum: 1   # számlánként legalább 1 m³ (víz és csatorna) – üdülőnél (sajátos számlázás) nem
+      # A locsolási almérő levonása a csatornadíjból csak a locsolási idényben (58/2013. Korm. rendelet).
+      almero_idoszak: {tol: "05-01", ig: "10-01"}
+      ar: viz_m3
+      csatornadij: {alapertelmezes: be}
+      # A háztartás távhős melegvizének szennyvizét is ez a vízmű számlázza, a csatornadíjjal (2025-12-től).
+      meleg_szennyviz: true
+      szamla_kerekites: vegosszeg
+      # Diktálni az elszámolási (négyhavi) időszak vége utáni hónap 10–15-én lehet; ha nem diktálnak, havi 1 m³
+      # átalányt számláz, az éves leolvasáskor korrigál (a felhasználó közlése, 2026-10-06).
+      diktalas: {honap: utana, ablak: [10, 15]}
+      alapdij:
+        mod: idoszakonkent
+    dijak:
+      alap:                    # NETTÓ Ft
+        afa: 27
+        viz_m3: 234.00
+        csatorna_m3: 242.30    # szennyvíz 240,30 + áthárított vízterhelési díj 2,00
+        alapdij_ho: 0
   - ervenyes_tol: 2026-05-01
     forras: >-
-      ALFÖLDVÍZ Zrt. számlái (mellékvízmérő): ivóvíz nettó 234,00 Ft/m³, szennyvíz nettó 240,30 Ft/m³, ÁFA 27%, alapdíj nincs; az áthárított vízterhelési díj az elvezetett mennyiségre jár, a csatornadíjba vonva. Vízterhelési díj 6,90 Ft/m³ (900014LV26: 2026.05.01–08.31; a számlán a szennyvízdíj-sor kétszer szerepel – valószínű számlázási hiba, a díjszabás egyszeres mennyiséggel számol). A második szennyvízsor a távhős melegvíz szennyvize („meleg szennyvíz”): 2026-05-től az ALFÖLDVÍZ számlázza (korábban a HVSZ) – havonta a távhőszámla melegvíz-mennyisége, legalább 1 m³.
+      ALFÖLDVÍZ Zrt. számlái (mellékvízmérő): ivóvíz nettó 234,00 Ft/m³, szennyvíz nettó 240,30 Ft/m³, ÁFA 27%, alapdíj nincs; az áthárított vízterhelési díj az elvezetett mennyiségre jár, a csatornadíjba vonva. Vízterhelési díj 6,90 Ft/m³ (900014LV26: 2026.05.01–08.31; a számlán a szennyvízdíj-sor kétszer szerepel – valószínű számlázási hiba, a díjszabás egyszeres mennyiséggel számol). A második szennyvízsor a távhős melegvíz szennyvize („meleg szennyvíz”, 2025-12-től az ALFÖLDVÍZ számlázza): a részszámlán havi átalány (legalább 1 m³), az elszámolón a 55667788 melegvízmérő állásai szerint.
     ellenorzes:
       allapot: szamlabol
       datum: 2026-10-06
@@ -72,7 +101,7 @@ verziok:
       almero_idoszak: {tol: "05-01", ig: "10-01"}
       ar: viz_m3
       csatornadij: {alapertelmezes: be}
-      # A háztartás távhős melegvizének szennyvizét is ez a vízmű számlázza, a csatornadíjjal (2026-05-től).
+      # A háztartás távhős melegvizének szennyvizét is ez a vízmű számlázza, a csatornadíjjal (2025-12-től).
       meleg_szennyviz: true
       szamla_kerekites: vegosszeg
       # Diktálni az elszámolási (négyhavi) időszak vége utáni hónap 10–15-én lehet; ha nem diktálnak, havi 1 m³

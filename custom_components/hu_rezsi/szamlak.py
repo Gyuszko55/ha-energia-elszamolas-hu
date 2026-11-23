@@ -98,6 +98,9 @@ class Szamla:
     fizetesi_mod: str = ""
     # Stornó: az érvénytelenített (eredeti) számla sorszáma (MVM PDF: „Sztornózott számla sorszáma:”).
     sztornozott: str = ""
+    # Víz (ALFÖLDVÍZ elszámoló): a melegvízmérő szerint számlázott szennyvíz („meleg szennyvíz”) – mérő, időszak,
+    # induló és záró állás, m³ ({"mero", "idoszak": (tol, ig), "indulo", "zaro", "m3"}).
+    meleg_szennyviz: dict[str, Any] | None = None
 
     @property
     def merok(self) -> set[str]:
@@ -456,7 +459,7 @@ def hvsz_pdf(sz: Szamla, szoveg: str) -> None:
     folyo = re.search(r"folyószámla-egyenlege a számla kibocsátásakor\s+(" + _SZAM + r")\s*Ft", szoveg)
     if folyo:
         sz.folyoszamla = _ezres(folyo.group(1))
-    # „79407642 mérőóra fogyasztása 2026.08.01 - 2026.08.31 között: Nyitó óra állás:26; Záró óra állás:27” – a melegvízóra
+    # „55667788 mérőóra fogyasztása 2026.08.01 - 2026.08.31 között: Nyitó óra állás:26; Záró óra állás:27” – a melegvízóra
     # havi állásai (a HVSZ havonta diktáltatja / olvassa; elszámoló leolvasásnak nem számít).
     for m in re.finditer(r"(\d+) mérőóra fogyasztása (\d{4})\.(\d{2})\.(\d{2}) - (\d{4})\.(\d{2})\.(\d{2}) között: "
                          r"Nyitó óra állás:\s*(\d+(?:[.,]\d+)?); Záró óra állás:\s*(\d+(?:[.,]\d+)?)", szoveg):
@@ -552,6 +555,14 @@ _DATUM = r"(\d{4}[.-]\d{2}[.-]\d{2})"
 _ALFOLDVIZ_MERO = re.compile(
     r"(\S+) számú vízmérőn mért ivóvíz\s+" + _DATUM + r"-\s+(\d+)-(\d+)\s+[^\n]*\n\s*fogyasztással arányos díj\s+" + _DATUM
 )
+# Az aláírt e-számla (2026 ősz) elrendezése: „11223344 számú vízmérőn 2026.02.10-2026.11.10 62-74 12 m3 …”, alatta
+# „mért ivóvíz fogyasztással / arányos díj”.
+# Elszámoló: a (távhős) melegvízmérő szerinti szennyvízdíj – „55667788 Elvezetett 2025.12.01-2026.03.31 18-30 4,21 m3”;
+# a sor az elszámolt időszak részére (díjváltozás) bontva ismétlődhet, ugyanazzal az induló–záró állással.
+_ALFOLDVIZ_MELEG = re.compile(r"(\d{5,}) Elvezetett " + _DATUM + "-" + _DATUM + r" (\d+)-(\d+) (-?\d+(?:,\d+)?) m3")
+_ALFOLDVIZ_MERO_UJ = re.compile(
+    r"(\S+) számú vízmérőn " + _DATUM + "-" + _DATUM + r" (\d+)-(\d+) [^\n]*\n\s*mért ivóvíz"
+)
 # „Fogyasztás megállapításának módja” (részszámla) → a DAKÖV-féle LM-kód.
 _ALFOLDVIZ_MOD = {"kalkulált": "Becs", "becsült": "Becs", "diktált": "Dikt", "bejelentett": "Dikt", "leolvasott": "Leol"}
 
@@ -574,6 +585,14 @@ def alfoldviz_levont(t: str) -> list:
     return out
 
 
+def _alfoldviz_hely(t: str) -> str:
+    """A felhasználási hely címe; az e-számlán két sorba tördelve („…, Csengettyű” / „köz 4. 5.em A:14”)."""
+    m = re.search(r"Felhasználási hely címe: (.+?)[ \t]*$(?:\n[ \t]*([a-zé\d][^\n]{0,38}?)[ \t]*$)?", t, re.M)
+    if not m:
+        return ""
+    return " ".join(x.strip() for x in m.groups() if x and x.strip())
+
+
 def alfoldviz_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
     """ALFÖLDVÍZ Zrt. számla (layout-szöveg). Részszámla: havi / összevont, „kalkulált” (átalány, 1 m³/hó) vagy
     diktált mennyiséggel; elszámoló: az éves leolvasás (LM: Leol), a részszámlák levonásával."""
@@ -586,7 +605,9 @@ def alfoldviz_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
         return None
     elszamolo = "elszámoló számla" in t
     osszeg = re.search(r"Fizetendő összeg: (-?[\d ]+?) Ft", t)
-    ertek = re.search(r"Bruttó számlaérték összesen\*?: (-?[\d ]+?)\s*$", t, re.M)
+    ertek = (re.search(r"Bruttó számlaérték összesen\*?: (-?[\d ]+?)\s*$", t, re.M)
+             # e-számla: az érték a „Bruttó számlaérték” sorában, az „összesen*:” alatta
+             or re.search(r"Bruttó számlaérték (-?\d[\d ]*?)\s*\n\s*összesen\*?:", t))
     hatarido = re.search(r"Fizetési határidő: " + _DATUM, t)
     lm = re.search(r"Leolvasás módja \(LM\) jelen számlában: (\w+)", t)
     mod = re.search(r"Fogyasztás megállapításának módja: (\w+)", t)
@@ -602,16 +623,26 @@ def alfoldviz_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
         sz.egyeb_tetelek = [("figyelembe vett hátralék/túlfizetés", _szam(m.group(1)))]
     if idoszak := re.search(r"Elszámolt időszak: " + _DATUM + "-" + _DATUM, t):
         sz.idoszak = (_iso(idoszak.group(1)), _iso(idoszak.group(2)))
-    for m in _ALFOLDVIZ_MERO.finditer(t):
-        mero, kezd, vege = mero_azonosito(m.group(1)), _iso(m.group(2)), _iso(m.group(5))
-        sz.meroallasok += [Meroallas(mero, kezd, Decimal(m.group(3)), lm_s), Meroallas(mero, vege, Decimal(m.group(4)), lm_s)]
+    sorok = [(m.group(1), m.group(2), m.group(5), m.group(3), m.group(4)) for m in _ALFOLDVIZ_MERO.finditer(t)]
+    sorok += [m.groups() for m in _ALFOLDVIZ_MERO_UJ.finditer(t)]
+    for mero_s, kezd_s, vege_s, kezdo, zaro in sorok:
+        mero, kezd, vege = mero_azonosito(mero_s), _iso(kezd_s), _iso(vege_s)
+        sz.meroallasok += [Meroallas(mero, kezd, Decimal(kezdo), lm_s), Meroallas(mero, vege, Decimal(zaro), lm_s)]
         if sz.idoszak is None:  # elszámoló: az időszak a mérősorból
             sz.idoszak = (kezd, vege)
+    if meleg := list(_ALFOLDVIZ_MELEG.finditer(t)):
+        sz.meleg_szennyviz = {
+            "mero": mero_azonosito(meleg[0].group(1)),
+            "idoszak": (min(_iso(m.group(2)) for m in meleg), max(_iso(m.group(3)) for m in meleg)),
+            "indulo": Decimal(meleg[0].group(4)), "zaro": Decimal(meleg[-1].group(5)),
+            "m3": sum((Decimal(m.group(6).replace(",", ".")) for m in meleg), Decimal(0)),
+        }
     ido = dakov_idopontok(t)
     sz.kovetkezo_leolvasas, sz.kovetkezo_diktalas = ido.get("leolvasas"), ido.get("diktalas")
     if re.search(r"bejelentésre minden hónap 10-e és 15-e között", t):
         sz.diktalasi_ablak = (10, 15)
-    if menny := re.search(r"Elszámolt mennyiség: ?Ivóvíz (-?\d+) m3, Szennyvíz (-?\d+) m3", t):
+    # „Ivóvíz 4 m3, Szennyvíz 8 m3” egy sorban, vagy (e-számla) két „Elszámolt mennyiség:” sorban.
+    if menny := re.search(r"Elszámolt mennyiség: ?Ivóvíz (-?\d+) m3(?:,\s*|\s*Elszámolt mennyiség:\s*)Szennyvíz (-?\d+) m3", t):
         sz.elszamolt_viz = {
             "ivoviz": Decimal(menny.group(1)), "csatorna": Decimal(menny.group(2)), "atalany": lm_s == "Becs",
             "idoszak": [sz.idoszak[0].isoformat(), sz.idoszak[1].isoformat()] if sz.idoszak else None,
@@ -619,7 +650,7 @@ def alfoldviz_szoveg(szoveg: str, fajl: str = "") -> Szamla | None:
     ugyfel = {
         "nev": (m.group(1).strip() if (m := re.search(r"Felhasználó neve:\s+(.+?)(?:\s{2,}|$)", szoveg, re.M)) else ""),
         "azonosito": (m.group(1) if (m := re.search(r"Vevő \(fizető\) azonosító száma: (\d+)", t)) else ""),
-        "hely": (m.group(1).strip() if (m := re.search(r"Felhasználási hely címe: (.+?)\s*$", t, re.M)) else ""),
+        "hely": _alfoldviz_hely(t),
         "mero": next(iter(sz.merok), ""),
     }
     sz.ugyfel = {k: v for k, v in ugyfel.items() if v}
@@ -1042,8 +1073,46 @@ def pdf_szoveg(fajl: Path, mod: str = "layout") -> str:
     from pypdf import PdfReader  # noqa: PLC0415 – csak PDF-nél kell
 
     # Tartalom nélküli (üres) oldal: a layout-mód KeyError-ral elhasalna rajta (Telekom-számla 4. oldala).
-    szoveg = "\n".join(p.extract_text(extraction_mode=mod) for p in PdfReader(str(fajl)).pages if "/Contents" in p)
+    szoveg = "\n".join(_oldal_szoveg(p, mod) for p in PdfReader(str(fajl)).pages if "/Contents" in p)
     return szoveg if mod == "layout" else "\n".join(_utf16_javit(s) for s in szoveg.splitlines())
+
+
+def _tartalom(p: Any) -> bytes:
+    """Az oldal tartalomfolyama(i) nyersen."""
+    from pypdf.generic import ArrayObject  # noqa: PLC0415
+
+    c = p.get("/Contents")
+    if c is None:
+        return b""
+    c = c.get_object()
+    return b"\n".join(x.get_object().get_data() for x in (c if isinstance(c, ArrayObject) else [c]))
+
+
+def _oldal_szoveg(p: Any, mod: str) -> str:
+    """Egy oldal szövege. Az aláírt e-számlán (pl. ALFÖLDVÍZ 2026 ősz, TCPDF/FPDI) az oldal tartalma egy beágyazott
+    űrlap („/TPL0 Do”): a layout-mód nem néz bele – ilyenkor az űrlap(ok) tartalmát olvassuk az oldal helyén."""
+    from pypdf.generic import NameObject  # noqa: PLC0415
+
+    szoveg = p.extract_text(extraction_mode=mod)
+    if mod != "layout" or len(szoveg.strip()) > 100:
+        return szoveg
+    try:
+        xo = (p.get("/Resources") or {}).get("/XObject") or {}
+        nevek = [n.decode("latin-1") for n in re.findall(rb"/([^\s/\[\]()<>{}%]+)\s+Do\b", _tartalom(p))]
+        urlapok = [xo.raw_get("/" + n) for n in nevek if "/" + n in xo and xo["/" + n].get("/Subtype") == "/Form"]
+        if not urlapok:
+            return szoveg
+        eredeti = p.get("/Resources"), p.raw_get("/Contents")
+        reszek = []
+        for ref in urlapok:
+            p[NameObject("/Resources")] = ref.get_object().get("/Resources") or eredeti[0]
+            p[NameObject("/Contents")] = ref
+            reszek.append(p.extract_text(extraction_mode=mod))
+        p[NameObject("/Resources")], p[NameObject("/Contents")] = eredeti
+    except Exception as err:  # noqa: BLE001 – a kibontás csak kísérlet: hibánál marad az eredeti szöveg
+        _LOGGER.debug("PDF-űrlap kibontása nem sikerült: %s", err)
+        return szoveg
+    return "\n".join(reszek)
 
 
 # --- Mappa ---------------------------------------------------------------------------------------------

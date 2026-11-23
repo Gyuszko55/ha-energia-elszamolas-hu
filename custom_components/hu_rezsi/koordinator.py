@@ -84,7 +84,7 @@ from .szamla_import import (
 from . import fizetes, kifogas, kimutatas, sziget_ha
 from .modell import kovetkezo_idopont, szenzor_ertek, frissitesi_perc, FORRAS_PROBAK
 from .motor.kovetkezo_szamla import diktalas_szerint_szamlaz, kovetkezo_szamla_idoszak
-from .modell import utem_szerinti_diktalas, kezdo_origo_szinkron, kezdopont, mero_szinkron, diktalasi_ablak, diktalasi_hatarok, betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
+from .modell import utem_szerinti_diktalas, kezdo_origo_szinkron, kezdopont, mero_szinkron, dij_szinkron, diktalasi_ablak, diktalasi_hatarok, betaplalas_csatorna, d, kezdo_almero, elozo_bazis, eredmeny_tarolhato, elszamolasi_napok, fiok_motorba, kezdo_mero
 from .motor import napelem
 from .motor.egyenleg import (
     EvesEgyenleg,
@@ -944,6 +944,7 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 valtozott |= mero_szinkron(tarolt, dict(sub.data))
             valtozott |= await self._kezdes_ujrabazis(sub, tarolt, most)
             valtozott |= kezdo_origo_szinkron(tarolt, dict(sub.data))
+            valtozott |= dij_szinkron(tarolt, dict(sub.data))
             if sub.data.get(CONF_ALMERO) and not tarolt.get("almero_merok"):
                 tarolt["almero_merok"] = [kezdo_almero(dict(sub.data), tarolt["merok"][0]["beepitve"])]
                 valtozott = True
@@ -979,12 +980,14 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             else:
                 self.elonezet.pop(sid, None)
             if tol_ujra := tarolt.pop("lezart_ujra", None):
-                # A fiók kezdőnapját/kezdőállását módosították: a lezárt időszakok a frissítés után újraszámolódnak.
+                # A fiók kezdőnapját/kezdőállását vagy díj-beállítását (dij_szinkron) módosították: a lezárt időszakok
+                # a frissítés után újraszámolódnak.
                 valtozott = True
+                megtart = bool(tarolt.pop("lezart_ujra_megtart", False))
 
-                async def ujra(sid: str = sid, tol: str = tol_ujra) -> None:
+                async def ujra(sid: str = sid, tol: str = tol_ujra, megtart: bool = megtart) -> None:
                     try:
-                        await self.lezartak_ujraszamolasa(sid, date.fromisoformat(tol))
+                        await self.lezartak_ujraszamolasa(sid, date.fromisoformat(tol), megtart_hibasat=megtart)
                     except Exception:  # noqa: BLE001
                         _LOGGER.exception("A lezárt időszakok újraszámolása nem sikerült (%s)", sid)
 
@@ -1629,49 +1632,126 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                     havi[ido[0][:7]] = havi.get(ido[0][:7], Decimal(0)) + Decimal(str(et["melegviz"]))
         return lambda ho: max(havi.get(ho, atalany), Decimal(1))
 
-    def _haztartas_melegviz(self) -> Any:
-        """A háztartás távhős melegvize (m³) egy időszakra, egész hónapokban (a számlaellenőrzéshez). Távhő nélkül None."""
+    def _melegviz_pontok(self) -> dict[str, list[tuple[date, Decimal]]]:
+        """A háztartás melegvízmérő-állásai mérőnként (gyári szám → [(nap, állás)], nap szerint rendezve): a távhő
+        fiók(ok) mérőiről és a vízfiókok elszámolóinak meleg szennyvíz soráról (a vízmű leolvasása, induló–záró).
+        Ugyanarra a napra a vízmű leolvasása az erősebb."""
+        pontok: dict[str, dict[date, Decimal]] = {}
+        for sid, sub in self.fiokok().items():
+            kozmu = sub.data.get(CONF_KOZMU)
+            tarolt = self.tarolo.fiok(sid)
+            if kozmu == "tavho":
+                for m in tarolt.get("merok") or []:
+                    for lo in m.get("leolvasasok") or []:
+                        if (lo.get("csatorna") or "vetelezes") == "vetelezes":
+                            pontok.setdefault(szamlak.mero_azonosito(m.get("gyari_szam") or ""), {}).setdefault(
+                                date.fromisoformat(lo["datum"]), Decimal(str(lo["allas"])))
+            elif kozmu == "viz":
+                for x in (tarolt.get("szamlak") or {}).values():
+                    if ms := x.get("meleg_szennyviz"):
+                        p_ = pontok.setdefault(szamlak.mero_azonosito(ms.get("mero") or ""), {})
+                        p_[date.fromisoformat(ms["idoszak"][0])] = Decimal(ms["indulo"])
+                        p_[date.fromisoformat(ms["idoszak"][1])] = Decimal(ms["zaro"])
+        return {k: sorted(v.items()) for k, v in pontok.items() if len(v) >= 2}
+
+    def _melegviz_mennyiseg(self, minimum: bool = True) -> Any:
+        """A háztartás melegvize (m³) a [tol, ig) időszakra – (tol, ig) → Decimal; None, ha nincs távhő és melegvízmérő.
+
+        A melegvízmérő állásai között napra arányosítva (a vízmű az elszámolón is így bontja); ahol nincs állás (az első
+        előtt, az utolsó után), ott a távhőszámla havi melegvize, számla híján az átalány. minimum=True: hónaponként
+        legalább 1 m³ – így számláz a vízmű a (havi átalányos) részszámlán; az elszámolón (False) a mért mennyiség."""
         havi = self._melegviz_havi()
+        pontok = self._melegviz_pontok()
+        if havi is None and not pontok:
+            return None
         if havi is None:
-            return None
+            havi = lambda _ho: Decimal(1)  # noqa: E731 – távhőszámla nélkül az átalány
 
-        def melegviz(tol: date, ig: date) -> Decimal:
+        def merve(a: date, b: date) -> tuple[Decimal, int]:
+            """A mérőállásokkal lefedett rész: (m³, lefedett napok) – mérőnként, a lefedett szakaszok összege."""
+            m3, napok = Decimal(0), 0
+            for lista in pontok.values():
+                for (d0, v0), (d1, v1) in zip(lista, lista[1:]):
+                    lo, hi = max(a, d0), min(b, d1)
+                    if hi <= lo or d1 <= d0:
+                        continue
+                    m3 += max(v1 - v0, Decimal(0)) * (hi - lo).days / (d1 - d0).days
+                    napok += (hi - lo).days
+            return m3, napok
+
+        def mennyiseg(tol: date, ig: date, kerekit: bool = True) -> Decimal:
             ossz, ho = Decimal(0), date(tol.year, tol.month, 1)
-            while ho <= ig:
-                ossz += havi(ho.strftime("%Y-%m"))
-                ho = date(ho.year + (ho.month == 12), ho.month % 12 + 1, 1)
-            return ossz
+            while ho < ig:
+                kov = date(ho.year + (ho.month == 12), ho.month % 12 + 1, 1)
+                a, b = max(ho, tol), min(kov, ig)
+                m3, fedett = merve(a, b)
+                hossz = (kov - ho).days
+                # a mérőállás nélküli napokra a havi (számla / átalány) mennyiség arányos része
+                m3 += havi(ho.strftime("%Y-%m")) * max((b - a).days - fedett, 0) / hossz
+                if minimum:
+                    m3 = max(m3, Decimal((b - a).days) / hossz)
+                ossz += m3
+                ho = kov
+            return ossz.quantize(Decimal("0.001")).normalize() if kerekit else ossz  # a napra bontás tört maradéka nélkül
 
-        return melegviz
+        return mennyiseg
 
-    def _meleg_szennyviz(self, fiok: Fiok, tol: date, ig: date) -> tuple[Decimal, Decimal, dict[str, Any]] | None:
+    def _haztartas_melegviz(self) -> Any:
+        """A háztartás melegvize (m³) egy számla időszakára (tol..ig, mindkét nap benne; a számlaellenőrzéshez, havi
+        átalány-minimummal). Távhő és melegvízmérő nélkül None."""
+        mennyiseg = self._melegviz_mennyiseg()
+        if mennyiseg is None:
+            return None
+        return lambda tol, ig: mennyiseg(date(tol.year, tol.month, 1), date(ig.year + (ig.month == 12), ig.month % 12 + 1, 1))
+
+    def _meleg_szennyviz(self, fiok: Fiok, tol: date, ig: date, minimum: bool = True) -> tuple[Decimal, Decimal, dict[str, Any]] | None:
         """Víz fióknál a háztartás távhős melegvizének szennyvize („meleg szennyvíz”), amelyet a vízmű a csatornadíjjal
-        számláz (pl. ALFÖLDVÍZ 2026-05-től): (m³, bruttó Ft, tételsor) a [tol, ig) időszakra, hónaponként napra arányosítva.
-        None, ha nincs távhő a háztartásban, vagy a vízfiókon nincs csatornadíj."""
-        havi = self._melegviz_havi()
-        if havi is None or ig <= tol or not fiok.csatornak or not fiok.csatornak[0].csatornadij_aktiv:
+        számláz (ALFÖLDVÍZ 2025-12-től): (m³, bruttó Ft, tételsor) a [tol, ig) időszakra – a mennyiség a melegvízmérő
+        állásaiból (ld. _melegviz_mennyiseg), a díj hónaponként az akkor érvényes díjszabás szerint. None, ha nincs
+        melegvíz-adat, a vízfiókon nincs csatornadíj, vagy a díjszabás az időszakban sehol nem számláz meleg szennyvizet."""
+        mennyiseg = self._melegviz_mennyiseg(minimum)
+        if mennyiseg is None or ig <= tol or not fiok.csatornak or not fiok.csatornak[0].csatornadij_aktiv:
             return None
-        nap = ig - timedelta(days=1)
-        try:
-            e = self.tar.felold(_hozzarendeles(fiok, nap), nap, fiok.szolgaltato, fiok.feluliras)
-        except (DijszabasHiba, KeyError):
-            return None
-        # Csak ahol a vízmű a meleg szennyvizet külön számlázza (díjszabás „meleg_szennyviz”) – ahol a vízfiók a
-        # melegvízórát is méri (pl. budapesti társasház), ott a melegvíz eleve a vízfiókban van.
-        if not e.szabalyok.get("meleg_szennyviz") or not e.szabalyok.get("csatornadij") or not e.dijak.get("csatorna_m3"):
-            return None
-        m3, ho = Decimal(0), date(tol.year, tol.month, 1)
+        m3 = netto = Decimal(0)
+        afa = ar = None
+        ho = date(tol.year, tol.month, 1)
         while ho < ig:
             kov = date(ho.year + (ho.month == 12), ho.month % 12 + 1, 1)
-            atfed = (min(kov, ig) - max(ho, tol)).days
-            m3 += havi(ho.strftime("%Y-%m")) * atfed / (kov - ho).days
+            a, b = max(ho, tol), min(kov, ig)
             ho = kov
-        afa = e.dijak.get("afa")
-        netto = Decimal(str(e.dijak["csatorna_m3"]))
-        ft = m3 * netto * (1 + Decimal(str(afa)) / 100 if afa is not None else 1)
-        tetel = {"nev": "Meleg szennyvíz", "mennyiseg": float(round(m3, 3)), "egyseg": "m³", "ar": float(netto),
-                 "netto": float(round(m3 * netto, 2)), "afa": afa}
+            try:
+                e = self.tar.felold(_hozzarendeles(fiok, a), a, fiok.szolgaltato, fiok.feluliras)
+            except (DijszabasHiba, KeyError):
+                continue
+            # Csak ahol a vízmű a meleg szennyvizet külön számlázza (díjszabás „meleg_szennyviz”) – ahol a vízfiók a
+            # melegvízórát is méri (pl. budapesti társasház), ott a melegvíz eleve a vízfiókban van.
+            if not e.szabalyok.get("meleg_szennyviz") or not e.szabalyok.get("csatornadij") or not e.dijak.get("csatorna_m3"):
+                continue
+            q, ar = mennyiseg(a, b, kerekit=False), Decimal(str(e.dijak["csatorna_m3"]))
+            m3, netto, afa = m3 + q, netto + q * ar, e.dijak.get("afa")
+        if ar is None:
+            return None
+        m3 = m3.quantize(Decimal("0.001")).normalize()
+        ft = netto * (1 + Decimal(str(afa)) / 100 if afa is not None else 1)
+        tetel = {"nev": "Meleg szennyvíz", "mennyiseg": float(round(m3, 3)), "egyseg": "m³",
+                 "ar": float(round(netto / m3, 2)) if m3 else float(ar), "netto": float(round(netto, 2)), "afa": afa}
         return m3, ft, tetel
+
+    def _szamla_meleg_szennyviz(self, fiok: Fiok, x: dict[str, Any], tol: date, ig: date) -> tuple[Decimal, Decimal, dict[str, Any]] | None:
+        """Egy vízszámlán számlázott meleg szennyvíz a saját számítás szerint – csak ha a számla maga is számláz ilyet:
+        az elszámolón a melegvízmérő sora (annak időszakára, mért mennyiséggel), a részszámlán a szennyvíz több az
+        ivóvíznél (a számla időszakára, havi átalány-minimummal)."""
+        if ms := x.get("meleg_szennyviz"):
+            t0, t1 = (date.fromisoformat(d) for d in ms["idoszak"])
+            return self._meleg_szennyviz(fiok, t0, t1, minimum=False)  # állás napja = a nap eleje
+        ev = x.get("elszamolt_viz") or {}
+        try:
+            tobb = ev.get("csatorna") is not None and Decimal(str(ev["csatorna"])) > Decimal(str(ev.get("ivoviz") or 0))
+        except ArithmeticError:
+            tobb = False
+        if x.get("tipus") == "resz" and tobb:
+            return self._meleg_szennyviz(fiok, tol, ig + timedelta(days=1))
+        return None
 
     def _viz_potlek(self, sub: ConfigSubentry, fiok: Fiok, ny: NyitottIdoszak, tol: date, ig: date, most: datetime) -> NyitottIdoszak:
         """Víz fiók folyó időszaka: (1) az „eddig” legalább a várható időarányos része – egész m³-es számlázásnál a
@@ -2209,6 +2289,9 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 e = szamol(fiok, self.tar, tol, ig, szamlalok, extra_hatarok=elszamolasi_napok(tarolt))
                 sor["szamolt_ft"] = int(e.osszesen_ft)
                 sor["szamolt_mennyiseg"] = round(float(e.mennyiseg), 2)
+                if sub.data.get(CONF_KOZMU) == "viz" and (msz := self._szamla_meleg_szennyviz(fiok, x, tol0, ig_utolso)):
+                    sor["szamolt_ft"] += int(round(msz[1]))
+                    sor["meleg_szennyviz_m3"], sor["meleg_szennyviz_ft"] = round(float(msz[0]), 2), int(round(msz[1]))
                 idenyek: dict[str, float] = {}
                 for sz_ in e.szeletek:
                     if sz_.csatorna in ("h_teli", "h_nyari"):
@@ -2706,9 +2789,12 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
             "brutto": brutto, "kerekites": brutto - int(round(float(netto))) - sum(int(v) for v in afa_ft.values()) if afa_ft else 0,
         }
 
-    async def lezartak_ujraszamolasa(self, sid: str, tol: date | None = None) -> dict[str, Any]:
+    async def lezartak_ujraszamolasa(self, sid: str, tol: date | None = None, megtart_hibasat: bool = False) -> dict[str, Any]:
         """A lezárt időszakok újraszámolása a fiók MOSTANI módja szerint (pl. diktálási időszakokra), a díjszabás
-        kezdetétől (vagy tol-tól) a nyitott időszakig. A korábbi lezárások ettől kezdve lecserélődnek."""
+        kezdetétől (vagy tol-tól) a nyitott időszakig. A korábbi lezárások ettől kezdve lecserélődnek.
+
+        megtart_hibasat (automatikus újraszámolás díj-beállítás módosítása után): ha egy időszak nem számolható újra
+        (pl. nincs mögötte mérés, mert a v1-ből átvett), a régi bejegyzése marad, nem vész el."""
         sub = self.fiokok()[sid]
         tarolt = self.tarolo.fiok(sid)
         fiok = self._otthon_bazissal(sub, fiok_motorba(dict(sub.data), tarolt))
@@ -2746,6 +2832,8 @@ class RezsiKoordinator(DataUpdateCoordinator[dict[str, FiokAllapot]]):
                 uj.append(eredmeny_tarolhato(e) | {"rogzitve": most.isoformat(), "forras": f"ujraszamolt ({mod})"})
             except (NincsAdat, DijszabasHiba) as err:
                 hibak.append(f"{p.isoformat()}: {err}")
+                if megtart_hibasat:
+                    uj.extend(x for x in tarolt["lezart"] if p.isoformat() <= x["tol"] < q.isoformat())
             p = q
         regi = [x for x in tarolt["lezart"] if x["tol"] < kezdet.isoformat()]
         torolt = len(tarolt["lezart"]) - len(regi)

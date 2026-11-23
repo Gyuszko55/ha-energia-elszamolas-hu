@@ -17,4 +17,4 @@ def test_javitas_figyelo_egyszer():
 
 
 def test_verzio():
-    assert json.loads((CS / "manifest.json").read_text(encoding="utf-8"))["version"] in ("2.4.2", "2.4.3")
+    assert tuple(map(int, json.loads((CS / "manifest.json").read_text(encoding="utf-8"))["version"].split("."))) >= (2, 4, 2)

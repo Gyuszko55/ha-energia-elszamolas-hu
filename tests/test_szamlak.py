@@ -660,8 +660,8 @@ def test_tavho_szamla_mero_szuro_nem_zarja_ki():
     """A távhőszámlán (HVSZ) nincs mérőszám: a fiók „számla-mérők” szűrője (pl. a melegvízóra száma) nem zárhatja ki."""
     from szamlak import Szamla
     sz = Szamla(forras="hvsz", sorszam="H1/2026/1", kelte=date(2026, 9, 8), osszeg=D(494), tipus="resz")
-    assert hozzatartozik(sz, {"79407642"})
-    assert not hozzatartozik(Szamla(forras="mvm_aram", sorszam="1", kelte=date(2026, 9, 8), osszeg=D(1), tipus="resz"), {"79407642"})
+    assert hozzatartozik(sz, {"55667788"})
+    assert not hozzatartozik(Szamla(forras="mvm_aram", sorszam="1", kelte=date(2026, 9, 8), osszeg=D(1), tipus="resz"), {"55667788"})
 
 
 def test_idenyes_hulladek_kovetkezo_szamla():
@@ -724,9 +724,9 @@ def test_hvsz_pdf_folyoszamla_es_elszamolo_idoszak():
     hvsz_pdf(sz, "Elszámolt időszak:    2025.10.01-2026.03.31           Felhasználó azonosító száma: X\n"
                  "A nyilvántartás szerinti folyószámla-egyenlege a számla kibocsátásakor     -22.137 Ft.\n")
     assert sz.idoszak == (date(2025, 10, 1), date(2026, 8, 31)) and sz.folyoszamla == D("-22137")
-    hvsz_pdf(sz, "79407642 mérőóra fogyasztása 2026.08.01 - 2026.08.31 között: Nyitó óra állás:26; Záró óra állás:27; Fogyasztás:1 m3")
+    hvsz_pdf(sz, "55667788 mérőóra fogyasztása 2026.08.01 - 2026.08.31 között: Nyitó óra állás:26; Záró óra állás:27; Fogyasztás:1 m3")
     assert [(m.mero, m.datum, m.allas, m.valodi, m.leolvasott) for m in sz.meroallasok] == [
-        ("79407642", date(2026, 8, 1), D(26), True, False), ("79407642", date(2026, 8, 31), D(27), True, False)]
+        ("55667788", date(2026, 8, 1), D(26), True, False), ("55667788", date(2026, 8, 31), D(27), True, False)]
     resz = Szamla(forras="hvsz", sorszam="H1", kelte=date(2026, 5, 14), osszeg=D("4059"), tipus="resz", fajl="y.xml",
                   idoszak=(date(2026, 4, 1), date(2026, 4, 30)))
     hvsz_pdf(resz, "Elszámolt időszak:    2026.04.01-2026.04.30\nfolyószámla-egyenlege a számla kibocsátásakor  4.059 Ft.")
